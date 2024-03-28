@@ -278,7 +278,7 @@ object MainAppLogic extends CoderAppLogic
 		ModelWriter(classToWrite).flatMap { case (modelRef, dataRef, factoryRef, factoryWrapperRef) =>
 			DbModelWriter(classToWrite, modelRef, dataRef, factoryRef, tablesRef)
 				.flatMap { dbModelRef =>
-					FactoryDbWriter(classToWrite, modelRef, dataRef, dbModelRef).flatMap { dbFactoryRef =>
+					DbFactoryWriter(classToWrite, modelRef, dataRef, dbModelRef).flatMap { dbFactoryRef =>
 						// Adds description-specific references if applicable
 						(descriptionLinkObjects match {
 							// Case: At least one class uses descriptions

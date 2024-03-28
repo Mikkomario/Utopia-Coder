@@ -3,6 +3,7 @@ package utopia.coder.model.scala.template
 import utopia.coder.model.scala.code.CodeBuilder
 import utopia.coder.model.scala.code.{Code, CodeLine}
 import utopia.coder.model.scala.doc.ScalaDocPart
+import utopia.flow.util.StringExtensions._
 
 /**
   * Common trait for instances that can be converted to scaladoc lines
@@ -24,13 +25,11 @@ trait Documented
 	/**
 	  * @return A full scaladoc for this item
 	  */
-	def scalaDoc: Code =
-	{
+	def scalaDoc: Code = {
 		// Adds the documentation first
 		val documentationCode = documentation.map { _.toCode }.filter { _.nonEmpty }
-			.map { _.split.mapLines { line => CodeLine("  * " + line.code) } }
-		if (documentationCode.nonEmpty)
-		{
+			.map { _.split.mapLines { line => CodeLine("  * " + line.code.notStartingWith("\n")) } }
+		if (documentationCode.nonEmpty) {
 			val builder = new CodeBuilder()
 			builder += "/**"
 			documentationCode.foreach { builder ++= _ }

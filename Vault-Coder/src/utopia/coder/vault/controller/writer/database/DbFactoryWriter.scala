@@ -20,7 +20,7 @@ import scala.io.Codec
   * @author Mikko Hilpinen
   * @since 1.9.2021, v0.1
   */
-object FactoryDbWriter
+object DbFactoryWriter
 {
 	// ATTRIBUTES   --------------------
 	
@@ -112,7 +112,7 @@ object FactoryDbWriter
 	{
 		def _modelFromAssignments(assignments: CodePiece) =
 			modelRef.targetCode +
-				classToWrite.idType.fromValueCode("valid(id.name)")
+				classToWrite.idType.fromValueCode("valid(model.id.name)")
 					.append(dataRef.targetCode + assignments.withinParenthesis, ", ")
 					.withinParenthesis
 		
@@ -124,7 +124,6 @@ object FactoryDbWriter
 				ClassMethodFactory
 					.classFromValidatedModel(classToWrite)(_modelFromAssignments)
 		}
-		
 		Set(fromModelMethod)
 	}
 }

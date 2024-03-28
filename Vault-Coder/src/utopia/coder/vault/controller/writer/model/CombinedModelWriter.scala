@@ -63,8 +63,8 @@ object CombinedModelWriter
 					ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)(parentPropName)
 				),
 				methods = Set(
-					MethodDeclaration("mapWrapped", visibility = Protected, isOverridden = true)(
-						Parameter("f", Reference.flow.mutate(parentRef)))(s"copy($parentPropName = f($parentPropName))")
+					MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
+						Parameter("factory", parentRef))(s"copy($parentPropName = factory)")
 				),
 				description = data.description.notEmpty
 					.getOrElse(s"Combines ${data.parentName} with ${data.childName} data"),

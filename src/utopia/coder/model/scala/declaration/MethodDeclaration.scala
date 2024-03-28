@@ -5,6 +5,7 @@ import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.Visibility.{Protected, Public}
 import utopia.coder.model.scala.datatype.{GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.{Annotation, Parameters, Visibility}
+import utopia.flow.util.Mutate
 
 object MethodDeclaration
 {
@@ -88,8 +89,9 @@ case class MethodDeclaration(visibility: Visibility, name: String, genericTypes:
                              isLowMergePriority: Boolean)
 	extends FunctionDeclaration[MethodDeclaration] with Mergeable[MethodDeclaration, MethodDeclaration]
 {
-	override def keyword = "def"
+	// IMPLEMENTED  --------------------------
 	
+	override def keyword = "def"
 	override protected def params = Some(parameters)
 	
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
@@ -100,4 +102,9 @@ case class MethodDeclaration(visibility: Visibility, name: String, genericTypes:
 		MethodDeclaration(visibility, name, genericTypes, parameters.getOrElse(this.parameters), bodyCode,
 			explicitOutputType, annotations, description, returnDescription, headerComments, isOverridden, isImplicit,
 			isLowMergePriority)
+			
+	
+	// OTHER    -----------------------------
+	
+	def mapCode(f: Mutate[Code]) = copy(bodyCode = f(bodyCode))
 }

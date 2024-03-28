@@ -101,12 +101,14 @@ object EnumerationWriter
 				CodePiece(parseIdVal)
 			else {
 				val idValueType = e.idType.valueDataType
-				CodePiece(s"{ value.castTo(${
-					idValueType.target}, StringType) match { case Left(idVal) => $parseIdVal; case Right(stringVal) => val str = stringVal.getString; values.find { _.toString ~== str } } }",
+				CodePiece(s"value.castTo(${
+					idValueType.target}, StringType) match { case Left(idVal) => $parseIdVal; case Right(stringVal) => val str = stringVal.getString; values.find { _.toString ~== str } }",
 					Set(flow.equalsExtensions, idValueType, stringType))
 			}
 		}
-		val fromValueCode = forIdEndCode.mapText { end => s"findForValue(value)$end" }
+		val fromValueCode = forIdEndCode.mapText { end =>
+			s"findForValue(value)${ end.replace("$" + idPropName, "$value") }"
+		}
 		val valueParam = Parameter("value", value,
 			description = s"A value representing an ${ e.name.doc } ${ e.idPropName.doc }")
 		val enumValueToValueCode = e.idType.toValueCode(idPropName)

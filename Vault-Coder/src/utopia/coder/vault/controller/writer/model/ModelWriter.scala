@@ -94,14 +94,14 @@ object ModelWriter
 	private def writeFactoryWrapperTrait(classToWrite: Class, factoryRef: Reference, factoryPackage: Package)
 	                                    (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val wrapped = GenericType("A", requirement = Some(TypeRequirement.childOf(factoryRef)))
+		val wrapped = GenericType("A", requirement = Some(TypeRequirement.childOf(factoryRef(ScalaType.basic("A")))))
 		val repr = GenericType.covariant("Repr")
 		
 		File(factoryPackage,
 			TraitDeclaration(
 				name = (classToWrite.name + factoryTraitAppendix + wrapperAppendix).className,
 				genericTypes = Vector(wrapped, repr),
-				extensions = Vector(factoryRef),
+				extensions = Vector(factoryRef(repr.toScalaType)),
 				properties = Vector(
 					PropertyDeclaration.newAbstract("wrappedFactory", wrapped.toScalaType,
 						description = "The factory wrapped by this instance",
@@ -227,12 +227,21 @@ object ModelWriter
 					None
 			}
 			
-			val withId = MethodDeclaration("withId", isOverridden = true)(
-				Parameter("id", classToWrite.idType.toScala))("copy(id = id)")
-			val factoryParents = Vector[Extension](
-				factoryWrapperRef(dataClassRef, classType),
-				vault.fromIdFactory(ScalaType.int, classType)
-			)
+			// FromIdFactory extension is only available if Vault is available
+			val withId = {
+				if (setup.modelCanReferToDB)
+					Some(MethodDeclaration("withId", isOverridden = true)(
+						Parameter("id", classToWrite.idType.toScala))("copy(id = id)"))
+				else
+					None
+			}
+			val factoryWrapper = factoryWrapperRef(dataClassRef, classType)
+			val factoryParents: Vector[Extension] = {
+				if (setup.modelCanReferToDB)
+					Vector[Extension](factoryWrapper, vault.fromIdFactory(ScalaType.int, classType))
+				else
+					Vector(factoryWrapper)
+			}
 			
 			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database"
 			// ModelConvertible extension & implementation differs based on id type
@@ -261,10 +270,9 @@ object ModelWriter
 					properties) ++
 					accessProperty,
 				methods = Set(
-					withId,
-					MethodDeclaration("mapWrapped", visibility = Protected, isOverridden = true)(
-						Parameter("f", mutate(dataClassRef)))("copy(data = f(data))")
-				),
+					MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
+						Parameter("data", dataClassRef))("copy(data = data)")
+				) ++ withId,
 				description = description,
 				author = classToWrite.author,
 				since = DeclarationDate.versionedToday,

@@ -73,7 +73,7 @@ object DbModelWriter
 					description = s"Property that contains ${ classToWrite.name.doc } ${ prop.name.doc }")(
 					s"property(${ prop.modelName.quoted })")
 			}
-		propertiesBuilder += ComputedProperty("table", isOverridden = true)(
+		propertiesBuilder += ComputedProperty("table", Set(tablesRef), isOverridden = true)(
 			s"${ tablesRef.target }.${ classToWrite.name.prop }")
 		propertiesBuilder ++= deprecation.iterator.flatMap { _.properties }
 		
@@ -164,7 +164,7 @@ object DbModelWriter
 				.map { prop => prop.toValueCode.withPrefix(s"$className.${ prop.name.prop }.name -> ") }
 				.reduceLeft { _.append(_, ", ") }
 			ComputedProperty("valueProperties", propsPart.references + flow.valueConversions, isOverridden = true)(
-				s"Vector($quotedId -> id, $propsPart)"
+				s"Vector($className.id.name -> id, $propsPart)"
 			)
 		}
 	}

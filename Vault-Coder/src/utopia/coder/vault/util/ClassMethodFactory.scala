@@ -53,7 +53,6 @@ object ClassMethodFactory
 	  * Creates a new method that parses instances from a validated model
 	  * @param targetClass Class being parsed
 	  * @param methodName Name of the method (default = fromValidatedModel)
-	  * @param param Parameter accepted by the method (default = model called "valid")
 	  * @param isFromJson Whether the input model is from json (true) or from a database model (false).
 	  *                   Default = database model.
 	  * @param wrapAssignments A function that accepts assignments that provide enough data for a data instance
@@ -63,10 +62,11 @@ object ClassMethodFactory
 	  * @return A method declaration
 	  */
 	def classFromValidatedModel(targetClass: Class, methodName: String = "fromValidatedModel",
-	                            param: Parameter = Parameter("valid", model), isFromJson: Boolean = false)
+	                            isFromJson: Boolean = false)
 	                           (wrapAssignments: CodePiece => CodePiece)
 	                           (implicit naming: NamingRules) =
 	{
+		val param: Parameter = Parameter("valid", model)
 		// Case: Class contains no properties
 		if (targetClass.properties.isEmpty) {
 			val code = wrapAssignments(CodePiece.empty)
@@ -138,9 +138,8 @@ object ClassMethodFactory
 		// Uses different property names based on whether parsing from json or from a database model
 		if (isFromJson)
 			prop.dataType.fromJsonValueCode(s"$modelName(${prop.jsonPropName.quoted})")
-		// NB: Not very clean code. Assumes access to a database model factory named "model"
-		// Also assumes that properties from this model have already been imported
+		// NB: Not very clean code. Assumes access to a database model factory named "model".
 		else
-			prop.dataType.fromValueCode(prop.dbProperties.map { prop => s"$modelName(${prop.name.prop}.name)" })
+			prop.dataType.fromValueCode(prop.dbProperties.map { prop => s"$modelName(model.${prop.name.prop}.name)" })
 	}
 }

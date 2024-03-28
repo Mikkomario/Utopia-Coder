@@ -20,14 +20,15 @@ object CodeLine
 	  */
 	val tabWidth = 4
 	
+	// The boolean after the regular expression indicates
+	// that the splitting part should be preserved on the original line
 	private lazy val repeatableRegexes = Vector(
 		Regex("with ") -> false,
 		(Regex.escape(',') + Regex.whiteSpace.noneOrOnce).withinParenthesis.ignoringQuotations -> true,
-		Regex("s").noneOrOnce + Regex.escape('\"') + (!Regex.escape('\"')).anyTimes +
-			Regex.escape('\"') -> false,
+		Regex("s").noneOrOnce + Regex.escape('\"') + (!Regex.escape('\"')).anyTimes + Regex.escape('\"') -> false,
 		(Regex.anyOf("+-*/").oneOrMoreTimes + Regex.whiteSpace) -> true,
 		(Regex.whiteSpace + Regex.word + Regex.whiteSpace) +
-			!(Regex.escape('=') + Regex.escape('>')).withinParenthesis -> false
+			!(Regex.escape('=') + Regex.escape('>')).withinParenthesis -> true
 	)
 	private lazy val oneTimeRegexes = Vector(
 		Regex.escape('.') + Regex.letter.oneOrMoreTimes + Regex.whiteSpace.noneOrOnce + Regex.escape('{'),
@@ -83,32 +84,35 @@ case class CodeLine(indentation: Int, code: String) extends Combinable[String, C
 	def indented = copy(indentation = indentation + 1)
 	
 	/**
-	  * @return This code line split into possibly multiple lines (attempting to keep within maximum length)
-	  */
-	def split =
-	{
-		// Case: Already of the correct length
-		if (length <= maxLineLength)
-			Vector(this)
-		// Case: Would benefit from splitting
-		else
-		{
-			// Attempts to use repeatable splitters first
-			repeatableRegexes.find { _._1.existsIn(code) } match {
-				// Case: Repeatable splitter found => uses that
-				case Some((regex, splitAfter)) => splitWith(regex, splitAfter)
-				// Case: No repeatable splitter found => uses a one-time splitter
-				case None =>
-					oneTimeRegexes.findMap { _.startIndexIteratorIn(code).nextOption() } match {
-						// Case: Splitter found => splits with that one
-						case Some(splitIndex) =>
-							Vector(
-								copy(code = code.substring(0, splitIndex)),
-								CodeLine(indentation + 1, code.substring(splitIndex))
-							)
-						// Case: No splitter found => Keeps as is
-						case None => Vector(this)
-					}
+	 * @return This code line split into possibly multiple lines (attempting to keep within maximum length)
+	 */
+	def split: IndexedSeq[CodeLine] = {
+		// Always splits at new-lines
+		if (Regex.newLine.existsIn(code))
+			Regex.newLine.split(code).flatMap { lineText => CodeLine(indentation, lineText).split }
+		else {
+			// Case: Already of the correct length
+			if (length <= maxLineLength)
+				Vector(this)
+			// Case: Would benefit from splitting
+			else {
+				// Attempts to use repeatable splitters first
+				repeatableRegexes.find { _._1.existsIn(code) } match {
+					// Case: Repeatable splitter found => uses that
+					case Some((regex, splitAfter)) => splitWith(regex, splitAfter)
+					// Case: No repeatable splitter found => uses a one-time splitter
+					case None =>
+						oneTimeRegexes.findMap { _.startIndexIteratorIn(code).nextOption() } match {
+							// Case: Splitter found => splits with that one
+							case Some(splitIndex) =>
+								Vector(
+									copy(code = code.substring(0, splitIndex)),
+									CodeLine(indentation + 1, code.substring(splitIndex))
+								)
+							// Case: No splitter found => Keeps as is
+							case None => Vector(this)
+						}
+				}
 			}
 		}
 	}
@@ -154,8 +158,7 @@ case class CodeLine(indentation: Int, code: String) extends Combinable[String, C
 	def mapCode(f: String => String) = copy(code = f(code))
 	
 	// Split after regex determines whether the splitting part should be included on the original line
-	private def splitWith(regex: Regex, splitAfterRegex: Boolean = false) =
-	{
+	private def splitWith(regex: Regex, splitAfterRegex: Boolean = false) = {
 		// Finds the possible split locations
 		val possibleSplitIndices = regex.rangesFrom(code).map { range =>
 			if (splitAfterRegex)

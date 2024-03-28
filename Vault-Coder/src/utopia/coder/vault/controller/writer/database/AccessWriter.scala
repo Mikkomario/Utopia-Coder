@@ -11,7 +11,7 @@ import utopia.coder.vault.model.datatype.PropertyType
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
 import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import Reference._
@@ -135,7 +135,7 @@ object AccessWriter
 		// are present in both single and many model access points
 		val factoryProperty = ComputedProperty("factory", Set(factoryRef), isOverridden = true)(factoryRef.target)
 		val modelProperty = ComputedProperty("model", Set(dbModelRef), Protected,
-			description = "Factory used for constructing database the interaction models")(dbModelRef.target)
+			description = "Factory used for constructing the database-interaction models")(dbModelRef.target)
 		// For classes that support expiration, deprecate() -method is added for all traits
 		// Null-deprecation -supporting classes already inherit this method
 		// Option[Pair[method]], where first method is for individual access and second for many access
@@ -221,16 +221,16 @@ object AccessWriter
 		val uniqueAccessType = ScalaType.basic(uniqueAccessName)
 		val subViewName = s"_$uniqueAccessName"
 		val uniqueTraitParents: Vector[Extension] = {
-			val base = genericUniqueAccessTraitRef(combinedModelRef)
-			val (deprecationRef, filterRef) = deprecationAndFilterReferenceFor(combo.parentClass)
+			val base = genericUniqueAccessTraitRef(combinedModelRef, uniqueAccessType)
+			val deprecationParent = deprecationReferenceFor(combo.parentClass).map[Extension] { _(uniqueAccessType) }
 			if (combo.combinationType.isOneToMany)
-				Vector(base, filterRef(uniqueAccessType))
+				Vector(base)
 			else {
 				if (combo.parentClass.recordsIndexedCreationTime)
 					Vector[Extension](base, singleChronoRowModelAccess(combinedModelRef, uniqueAccessType)) ++
-						deprecationRef.map[Extension] { _(uniqueAccessType) }
+						deprecationParent
 				else
-					Vector(base, singleRowModelAccess(combinedModelRef), filterRef(uniqueAccessType))
+					Vector[Extension](base, singleRowModelAccess(combinedModelRef)) ++ deprecationParent
 			}
 		}
 		val factoryProp = ComputedProperty("factory", Set(combinedFactoryRef), isOverridden = true)(
@@ -258,11 +258,11 @@ object AccessWriter
 				}
 		}
 		File(singleAccessPackage,
-			accessCompanionObject(uniqueAccessType, subViewName, containsApply = true),
+			accessCompanionObject(uniqueAccessType, subViewName),
 			TraitDeclaration(uniqueAccessName,
 				extensions = uniqueTraitParents,
 				properties = Vector(self, factoryProp, childModelProp) ++ childGetters,
-				methods = childSetters + filterMethod(uniqueAccessType, subViewName),
+				methods = childSetters + filterMethod(uniqueAccessType),
 				description = s"A common trait for access points that return distinct ${ combo.name.pluralDoc }",
 				author = combo.author, since = DeclarationDate.versionedToday
 			)
@@ -321,8 +321,11 @@ object AccessWriter
 		// Properties and methods that will be written to the highest trait (which may vary)
 		// These are: .model, .id and various property getters and setters
 		val pullIdCode = classToWrite.idType.optional.fromValueCode(s"pullColumn(index)")
-		val highestTraitProperties = modelProperty +: propertyGettersFor(classToWrite, modelProperty.name) { _.prop } :+
-			ComputedProperty("id", pullIdCode.references, implicitParams = Vector(connectionParam))(pullIdCode.text)
+		val highestTraitProperties = modelProperty +:
+			propertyGettersFor(classToWrite, modelProperty.name) { _.prop } :+
+			ComputedProperty("id", pullIdCode.references, implicitParams = Vector(connectionParam),
+				description = s"Unique id of the accessible ${ classToWrite.name }. None if no ${
+					classToWrite.name } was accessible.")(pullIdCode.text)
 		val highestTraitMethods = propertySettersFor(classToWrite, modelProperty.name) { _.prop } ++ deprecationMethod
 		
 		// Writes the more generic trait version (-Like) first, if one is requested
@@ -330,12 +333,17 @@ object AccessWriter
 			if (classToWrite.writeGenericAccess) {
 				val item = GenericType.covariant("A")
 				val itemType = item.toScalaType
+				val repr = GenericType.covariant("Repr")
 				File(singleAccessPackage,
-					TraitDeclaration((uniqueAccessTraitName + genericAccessSuffix).className, Vector(item),
+					TraitDeclaration((uniqueAccessTraitName + genericAccessSuffix).className,
+						Vector(item, repr),
 						// Extends SingleModelAccess instead of SingleRowModelAccess because sub-traits may vary
-						Vector(singleModelAccess(itemType),
+						Vector(
+							singleModelAccess(itemType),
 							distinctModelAccess(itemType, ScalaType.option(itemType), flow.value),
-							indexed),
+							filterableView(repr.toScalaType),
+							indexed
+						),
 						highestTraitProperties, highestTraitMethods,
 						description = s"A common trait for access points which target individual ${
 							classToWrite.name.pluralDoc } or similar items at a time",
@@ -356,34 +364,39 @@ object AccessWriter
 			// 1) Whether generic type is used,
 			// 2) Whether row creation time is recorded, and
 			// 3) Whether deprecation is used
-			val (deprecationParentRef, filterParentRef) = deprecationAndFilterReferenceFor(classToWrite)
-			val standardParents: Vector[Extension] = {
+			val deprecationParentRef = deprecationReferenceFor(classToWrite)
+			val rowAccessParent: Extension = {
 				if (classToWrite.recordsIndexedCreationTime)
-					Vector[Extension](singleChronoRowModelAccess(modelRef, traitType)) ++
-						deprecationParentRef.map[Extension] { _(traitType) }
+					singleChronoRowModelAccess(modelRef, traitType)
 				else
-					Vector(singleRowModelAccess(modelRef), filterParentRef(traitType))
+					singleRowModelAccess(modelRef)
 			}
 			val parents: Vector[Extension] = parentRef match {
-				case Some(genericParent) => genericParent(modelRef) +: standardParents
+				case Some(genericParent) =>
+					Vector[Extension](genericParent(modelRef, traitType), rowAccessParent) ++
+						deprecationParentRef.map { _(traitType) }
 				case None =>
-					standardParents ++ Vector(
+					Vector[Extension](
+						rowAccessParent,
 						distinctModelAccess(modelRef, ScalaType.option(modelRef), flow.value),
+						deprecationParentRef.getOrElse(filterableView)(traitType),
 						indexed
 					)
 			}
 			val baseProperties = Vector(self, factoryProperty)
 			val properties = if (parentRef.isDefined) baseProperties else baseProperties ++ highestTraitProperties
-			val filterM = filterMethod(traitType, subViewName)
+			val filterM = filterMethod(traitType)
 			val methods = if (parentRef.isDefined) Set(filterM) else highestTraitMethods + filterM
 			
 			File(singleAccessPackage,
-				accessCompanionObject(traitType, subViewName, containsApply = true),
+				accessCompanionObject(traitType, subViewName),
 				TraitDeclaration(traitNameString,
 					extensions = parents, properties = properties, methods = methods,
 					description = s"A common trait for access points that return individual and distinct ${
 						classToWrite.name.pluralDoc
-					}.", author = classToWrite.author, since = DeclarationDate.versionedToday
+					}.",
+					author = classToWrite.author,
+					since = DeclarationDate.versionedToday
 				)
 			).write().map { parentRef -> _ }
 		}
@@ -440,7 +453,7 @@ object AccessWriter
 	                                  singleModelAccessRef: Reference, uniqueAccessRef: Reference,
 	                                  singleIdAccessRef: Reference,
 	                                  singleAccessPackage: Package, baseProperties: Vector[PropertyDeclaration],
-	                                  rootViewExtension: Extension, author: String, isDeprecatable: Boolean = false)
+	                                  rootViewExtension: Extension, author: String)
 	                                 (implicit naming: NamingRules, codec: Codec, setup: VaultProjectSetup) =
 	{
 		// Defines an .apply(id) method for accessing individual items
@@ -519,7 +532,7 @@ object AccessWriter
 					pullMany = true) { n => (combo.childName + n).props },
 				methods = propertySettersFor(combo.childClass,
 					childModelProp.name) { n => (combo.childName +: n).props } +
-					filterMethod(traitType, "SubAccess"),
+					filterMethod(traitType),
 				description = s"A common trait for access points that return multiple ${ combo.name.pluralDoc } at a time",
 				author = combo.author
 			)
@@ -543,13 +556,16 @@ object AccessWriter
 		
 		// Properties and methods that will be written to the highest trait (which may vary)
 		val idsPullCode = classToWrite.idType.fromValuesCode("pullColumn(index)")
-		val highestTraitProperties = modelProperty +: propertyGettersFor(classToWrite, pullMany = true) { _.props } :+
-			ComputedProperty("ids", idsPullCode.references, implicitParams = Vector(connectionParam))(idsPullCode.text)
+		val highestTraitProperties = modelProperty +:
+			propertyGettersFor(classToWrite, pullMany = true) { _.props } :+
+			ComputedProperty("ids", idsPullCode.references, implicitParams = Vector(connectionParam),
+				description = s"Unique ids of the accessible ${ classToWrite.name.pluralDoc }")(
+				idsPullCode.text)
 		val highestTraitMethods = propertySettersFor(classToWrite, modelProperty.name) { _.props } ++
 			filterMethodsFor(classToWrite, modelProperty.name) ++ deprecationMethod
 		
 		// Deprecatable items inherit special parent traits
-		val (deprecatableViewParentRef, filterViewParentRef) = deprecationAndFilterReferenceFor(classToWrite)
+		val deprecatableViewParentRef = deprecationReferenceFor(classToWrite)
 		
 		// Writes the more generic trait version (-Like) first, if one is requested
 		val parentRef = {
@@ -562,7 +578,7 @@ object AccessWriter
 						(traitNameBase + genericAccessSuffix).pluralClassName, Vector(item, repr),
 						// Extends ManyModelAccess instead of ManyRowModel access because sub-traits may vary
 						Vector(manyModelAccess(item.toScalaType), indexed,
-							filterViewParentRef(repr.toScalaType)),
+							deprecatableViewParentRef.getOrElse(filterableView)(repr.toScalaType)),
 						highestTraitProperties, highestTraitMethods,
 						description = s"A common trait for access points which target multiple ${
 							classToWrite.name.pluralDoc} or similar instances at a time",
@@ -637,7 +653,7 @@ object AccessWriter
 						(if (parentRef.isDefined) Vector(self) else self +: highestTraitProperties),
 					// Contains setters for property values (plural)
 					methods = (if (parentRef.isDefined) Set[MethodDeclaration]() else highestTraitMethods) ++
-						inheritanceMethods + filterMethod(traitType, subViewName),
+						inheritanceMethods + filterMethod(traitType),
 					description = s"A common trait for access points which target multiple ${
 						classToWrite.name.pluralDoc } at a time",
 					author = classToWrite.author, since = DeclarationDate.versionedToday
@@ -664,8 +680,7 @@ object AccessWriter
 		
 		// There is also a nested object for id-based multi-access, which may have description support
 		val subsetClassName = s"Db${ pluralClassName }Subset"
-		val subSetClass = descriptionReferences match
-		{
+		val subSetClass = descriptionReferences match {
 			case Some((describedRef, _, _)) =>
 				ClassDeclaration(subsetClassName,
 					constructionParams = Parameter("ids", ScalaType.set(ScalaType.int),
@@ -675,15 +690,16 @@ object AccessWriter
 				)
 			case None =>
 				ClassDeclaration(subsetClassName,
-					constructionParams = Parameter("targetIds", ScalaType.set(ScalaType.int)),
+					constructionParams = Parameter("targetIds", ScalaType.iterable(ScalaType.int)),
 					extensions = Vector(manyAccessTraitRef),
-					properties = Vector(ComputedProperty("accessCondition",
+					properties = Vector(ImmutableValue("accessCondition",
 						Set(flow.valueConversions), isOverridden = true)("Some(index in targetIds)"))
 				)
 		}
 		val subSetClassAccessMethod = MethodDeclaration("apply",
 			returnDescription = s"An access point to ${ className.pluralDoc } with the specified ids")(
-			Parameter("ids", ScalaType.set(ScalaType.int),
+			Parameter("ids",
+				if (descriptionReferences.isDefined) ScalaType.set(ScalaType.int) else ScalaType.iterable(ScalaType.int),
 				description = s"Ids of the targeted ${ className.pluralDoc }"))(
 			s"new $subsetClassName(ids)")
 		
@@ -711,19 +727,17 @@ object AccessWriter
 		).write()
 	}
 	
-	private def accessCompanionObject(accessTraitType: ScalaType, subViewName: String, containsApply: Boolean = false) =
-	{
-		val methods = {
-			if (containsApply)
-				Set(MethodDeclaration("apply", explicitOutputType = Some(accessTraitType),
+	private def accessCompanionObject(accessTraitType: ScalaType, subViewName: String) = {
+		ObjectDeclaration(
+			name = accessTraitType.toString,
+			methods = Set(
+				MethodDeclaration("apply", explicitOutputType = Some(accessTraitType),
 					returnDescription = "An access point that applies the specified filter condition (only)")(
 					Parameter("condition", condition, description = "Condition to apply to all requests"))(
-					s"new $subViewName(condition)"))
-			else
-				Set[MethodDeclaration]()
-		}
-		ObjectDeclaration(accessTraitType.toString,
-			methods = methods, nested = Set(subViewDeclaration(accessTraitType, subViewName)))
+					s"new $subViewName(condition)")
+			),
+			nested = Set(subViewDeclaration(accessTraitType, subViewName))
+		)
 	}
 	
 	private def subViewDeclaration(accessTraitType: ScalaType, subViewName: String) = {
@@ -735,11 +749,10 @@ object AccessWriter
 		)
 	}
 	
-	private def filterMethod(traitType: ScalaType, subViewName: String) = {
+	// Assumes that the companion object contains an apply method
+	private def filterMethod(traitType: ScalaType) =
 		MethodDeclaration("filter", explicitOutputType = Some(traitType), isOverridden = true)(
-			Parameter("filterCondition", condition))(
-			s"new $traitType.$subViewName(mergeCondition(filterCondition))")
-	}
+			Parameter("filterCondition", condition))(s"$traitType(mergeCondition(filterCondition))")
 	
 	// Assumes that deprecation has been tested already
 	private def historyAccessAndProperty(className: Name, accessTraitRef: Reference)(implicit naming: NamingRules) = {
@@ -772,9 +785,13 @@ object AccessWriter
 				val desc = {
 					if (pullMany)
 						s"${ prop.name.pluralDoc } of the accessible ${ classToWrite.name.pluralDoc }"
-					else
-						s"${ prop.description.nonEmptyOrElse(s"The ${ dbProp.name.doc } of this ${
-							classToWrite.name.doc }") }. None if no ${ classToWrite.name.doc } (or value) was found."
+					else {
+						val basePart = prop.description.notEmpty match {
+							case Some(desc) => desc.notEndingWith(".")
+							case None => s"The ${ dbProp.name.doc } of this ${ classToWrite.name.doc }"
+						}
+						s"$basePart. \nNone if no ${ classToWrite.name.doc } (or value) was found."
+					}
 				}
 				ComputedProperty(parsePropName(dbProp.name), pullCode.references, description = desc,
 					implicitParams = Vector(connectionParam))(pullCode.text)
@@ -817,16 +834,13 @@ object AccessWriter
 				s"putColumn($modelPropName.${ dbProp.name.prop }.column, $valueConversionCode)")
 	}
 	
-	private def deprecationAndFilterReferenceFor(classToWrite: Class) = {
-		val deprecatableViewParentRef = {
-			if (classToWrite.isNullDeprecatable)
-				Some(nullDeprecatableView)
-			else if (classToWrite.isExpiring)
-				Some(timeDeprecatableView)
-			else
-				None
-		}
-		deprecatableViewParentRef -> deprecatableViewParentRef.getOrElse(filterableView)
+	private def deprecationReferenceFor(classToWrite: Class) = {
+		if (classToWrite.isNullDeprecatable)
+			Some(nullDeprecatableView)
+		else if (classToWrite.isExpiring)
+			Some(timeDeprecatableView)
+		else
+			None
 	}
 	
 	private def filterMethodsFor(classToWrite: Class, modelPropName: String)(implicit naming: NamingRules) =
