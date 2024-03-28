@@ -1,0 +1,19 @@
+<component name="ArtifactManager">
+  <artifact name="Vault-Coder">
+    <output-path>$PROJECT_DIR$/out/artifacts/Vault_Coder</output-path>
+    <root id="root">
+      <element id="archive" name="Vault-Coder.jar">
+        <element id="directory" name="META-INF">
+          <element id="file-copy" path="$PROJECT_DIR$/Vault-Coder/META-INF/MANIFEST.MF" />
+        </element>
+        <element id="module-output" name="Vault-Coder" />
+        <element id="module-output" name="BunnyMunch" />
+        <element id="module-output" name="Flow" />
+        <element id="module-output" name="Utopia-Coder" />
+        <element id="module-output" name="Vault" />
+      </element>
+      <element id="library" level="project" name="mariadb-java-client" />
+      <element id="library" level="application" name="scala-sdk-2.13.12" />
+    </root>
+  </artifact>
+</component>

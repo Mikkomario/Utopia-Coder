@@ -10,6 +10,7 @@
 - Database models are now written into `database.storable` package instead of `database.model` package
 - The input file no longer supports a class property
 - A package property no longer supports an object as a value
+- The `.values` property in enumerations with exactly two values is now of type **Pair** instead of **Vector** 
 ### New features
 - Added support for referencing other files as package content
 - Added support for **Angle** data type

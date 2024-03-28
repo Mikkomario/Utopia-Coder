@@ -59,6 +59,20 @@ object EnumerationWriter
 		// Enumeration doesn't need to be imported in its own file
 		val enumDataType = ScalaType.basic(enumName)
 		
+		// Uses Pair in .values property that contains only two values
+		val values = {
+			val (typeToImport, valuesType, collectionConstructor) = {
+				if (e.values.size == 2)
+					(Some(pair), pair(enumDataType), "Pair")
+				else
+					(None, ScalaType.vector(enumDataType), "Vector")
+			}
+			ImmutableValue("values", typeToImport.toSet,
+				explicitOutputType = Some(valuesType),
+				description = s"All available ${e.name} values"
+			)(s"$collectionConstructor(${ e.values.map { v => v.name.enumValue }.mkString(", ") })")
+		}
+		
 		val defaultProp = e.defaultValue.map { v =>
 			ComputedProperty("default", description = s"The default ${ e.name.doc } (i.e. ${ v.name.doc })")(
 				v.name.enumValue)
@@ -114,11 +128,7 @@ object EnumerationWriter
 			// Enumeration values are nested within a companion object
 			ObjectDeclaration(enumName,
 				// Contains the .values -property
-				properties = Vector(
-					ImmutableValue("values", explicitOutputType = Some(ScalaType.vector(enumDataType)),
-						description = s"All available ${e.name} values")(
-						s"Vector(${ e.values.map { v => v.name.enumValue }.mkString(", ") })")
-				) ++ defaultProp,
+				properties = Vector(values) ++ defaultProp,
 				// Contains an id to enum value -function (one with Try, another with Option)
 				methods = Set(
 					MethodDeclaration(_findForIdName,
