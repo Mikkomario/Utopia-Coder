@@ -11,6 +11,7 @@ import utopia.coder.model.scala.{Annotation, DeclarationDate, Visibility}
   * @since 30.8.2021, v0.1
   */
 case class ObjectDeclaration(name: String, extensions: Vector[Extension] = Vector(),
+                             types: Vector[TypeDeclaration] = Vector.empty,
                              creationCode: Code = Code.empty, properties: Vector[PropertyDeclaration] = Vector(),
                              methods: Set[MethodDeclaration] = Set(), nested: Set[InstanceDeclaration] = Set(),
                              visibility: Visibility = Public, annotations: Seq[Annotation] = Vector(),
@@ -27,11 +28,11 @@ case class ObjectDeclaration(name: String, extensions: Vector[Extension] = Vecto
 	override def genericTypes = Vector()
 	
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
-	                                extensions: Vector[Extension], creationCode: Code,
+	                                extensions: Vector[Extension], types: Vector[TypeDeclaration], creationCode: Code,
 	                                properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
 	                                nested: Set[InstanceDeclaration], annotations: Seq[Annotation],
 	                                description: String, author: String,
 	                                headerComments: Vector[String], since: DeclarationDate) =
-		ObjectDeclaration(name, extensions, creationCode, properties, methods, nested, visibility, annotations,
+		ObjectDeclaration(name, extensions, types, creationCode, properties, methods, nested, visibility, annotations,
 			description, author, headerComments, since, isCaseObject)
 }

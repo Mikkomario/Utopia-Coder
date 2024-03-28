@@ -1,7 +1,7 @@
 package utopia.coder.controller.parsing.scala
 
 import utopia.coder.model.scala.code.CodeLine
-import utopia.coder.model.scala.declaration.{InstanceDeclaration, MethodDeclaration, PropertyDeclaration}
+import utopia.coder.model.scala.declaration.{InstanceDeclaration, MethodDeclaration, PropertyDeclaration, TypeDeclaration}
 
 /**
   * Common trait for builders that collect read scala data
@@ -10,6 +10,11 @@ import utopia.coder.model.scala.declaration.{InstanceDeclaration, MethodDeclarat
   */
 trait InstanceBuilderLike
 {
+	/**
+	 * Adds a type declaration to the built instance
+	 * @param typeDeclaration Declared type
+	 */
+	def addTypeDeclaration(typeDeclaration: TypeDeclaration): Unit
 	/**
 	  * Adds free code to instance body
 	  * @param lines Lines of code to add

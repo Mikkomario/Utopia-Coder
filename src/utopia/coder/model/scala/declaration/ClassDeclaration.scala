@@ -12,6 +12,7 @@ import utopia.coder.model.scala.{Annotation, DeclarationDate, Parameters, Visibi
   */
 case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Vector(),
                             constructionParams: Parameters = Parameters.empty, extensions: Vector[Extension] = Vector(),
+                            types: Vector[TypeDeclaration] = Vector.empty,
                             creationCode: Code = Code.empty, properties: Vector[PropertyDeclaration] = Vector(),
                             methods: Set[MethodDeclaration] = Set(), nested: Set[InstanceDeclaration] = Set(),
                             visibility: Visibility = Public, annotations: Seq[Annotation] = Vector(),
@@ -31,11 +32,11 @@ case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Vecto
 	override protected def constructorParams = Some(constructionParams)
 	
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
-	                                extensions: Vector[Extension], creationCode: Code,
+	                                extensions: Vector[Extension], types: Vector[TypeDeclaration], creationCode: Code,
 	                                properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
 	                                nested: Set[InstanceDeclaration], annotations: Seq[Annotation],
 	                                description: String, author: String,
 	                                headerComments: Vector[String], since: DeclarationDate) =
-		ClassDeclaration(name, genericTypes, constructionParams, extensions, creationCode, properties, methods,
+		ClassDeclaration(name, genericTypes, constructionParams, extensions, types, creationCode, properties, methods,
 			nested, visibility, annotations, description, author, headerComments, since, isCaseClass)
 }

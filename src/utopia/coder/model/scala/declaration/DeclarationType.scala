@@ -54,7 +54,21 @@ object DeclarationType
 	/**
 	  * All available declaration types
 	  */
-	val values = InstanceDeclarationType.values ++ FunctionDeclarationType.values
+	val values = (InstanceDeclarationType.values ++ FunctionDeclarationType.values) :+ TypeD
+	
+	
+	// NESTED   ------------------------------
+	
+	case object TypeD extends DeclarationType
+	{
+		override val keyword: String = "type"
+		override val availablePrefixes: Set[DeclarationPrefix] = Set()
+		
+		override def category: DeclarationTypeCategory = DeclarationTypeCategory.Type
+		
+		override def acceptsParameterList: Boolean = false
+		override def acceptsGenericTypes: Boolean = true
+	}
 }
 
 object InstanceDeclarationType

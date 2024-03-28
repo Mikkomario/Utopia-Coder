@@ -37,6 +37,10 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	  */
 	def extensions: Vector[Extension]
 	/**
+	 * @return Declared types
+	 */
+	def types: Vector[TypeDeclaration]
+	/**
 	  * @return Code executed every time an instance is created
 	  */
 	def creationCode: Code
@@ -70,7 +74,8 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	  * @param visibility New visibility
 	  * @param genericTypes Generic types to introduce / use within this declaration
 	  * @param extensions New extensions
-	  * @param creationCode New creation code
+	  * @param types New type declarations
+	 * @param creationCode New creation code
 	  * @param properties New properties
 	  * @param methods New methods
 	  * @param nested New nested instances
@@ -81,7 +86,8 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	  * @return A modified copy of this instance
 	  */
 	protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType], extensions: Vector[Extension],
-	                       creationCode: Code, properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
+	                       types: Vector[TypeDeclaration], creationCode: Code,
+	                       properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
 	                       nested: Set[InstanceDeclaration], annotations: Seq[Annotation], description: String,
 	                       author: String, headerComments: Vector[String], since: DeclarationDate): InstanceDeclaration
 	
@@ -140,9 +146,10 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 			3) Abstract properties
 			4) Abstract methods
 			5) Computed properties (non-implemented, first public, then private)
-			6) Implemented properties, then implemented methods (first public, then protected)
-			7) Other methods (first public)
-			8) Nested objects, then nested classes (first public)
+			6) Implicit functions
+			7) Implemented properties, then implemented methods (first public, then protected)
+			8) Other methods (first public)
+			9) Nested objects, then nested classes (first public)
 		*/
 		val (attributes, computed) = properties.divideBy { _.isComputed }.toTuple
 		
@@ -150,7 +157,8 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 		val (concreteMethods, abstractMethods) = methods.divideBy { _.isAbstract }.toTuple
 		
 		val (newComputed, implementedComputed) = concreteComputed.divideBy { _.isOverridden }.toTuple
-		val (otherMethods, implementedMethods) = concreteMethods.divideBy { _.isOverridden }.toTuple
+		val (nonImplementedMethods, implementedMethods) = concreteMethods.divideBy { _.isOverridden }.toTuple
+		val (otherMethods, implicitMethods) = nonImplementedMethods.divideBy { _.isImplicit }.toTuple
 		
 		val visibilityOrdering: Ordering[Declaration] = (a, b) => -a.visibility.compareTo(b.visibility)
 		val fullOrdering = new CombinedOrdering[Declaration](Vector(
@@ -162,6 +170,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 			(abstractComputed.sorted(visibilityOrdering) ++
 				abstractMethods.toVector.sorted(fullOrdering)) -> "ABSTRACT",
 			newComputed.sorted(visibilityOrdering) -> "COMPUTED",
+			implicitMethods -> "IMPLICIT",
 			(implementedComputed.sorted(fullOrdering) ++
 				implementedMethods.toVector.sorted(fullOrdering)) -> "IMPLEMENTED",
 			otherMethods.toVector.sorted(fullOrdering) -> "OTHER",
@@ -205,6 +214,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 			} ++ their.filterNot { theirDeclaration => my.exists { _.name == theirDeclaration.name } }
 		}
 		
+		val newTypes = _mergeDeclarations(types, other.types)
 		val newProperties = _mergeDeclarations(properties, other.properties)
 		val newMethods = _mergeDeclarations(methods.toVector, other.methods.toVector).toSet
 		val newNested = _mergeDeclarations(nested.toVector, other.nested.toVector).toSet
@@ -228,7 +238,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 		
 		makeCopy(visibility min other.visibility,
 			genericTypes ++ other.genericTypes.filterNot { t => genericTypes.exists { _.name == t.name } },
-			newExtensions,
+			newExtensions, newTypes,
 			creationCode ++ Code(other.creationCode.lines.filterNot(creationCode.lines.contains),
 				other.creationCode.references),
 			newProperties, newMethods, newNested, mergedAnnotations, description.nonEmptyOrElse(other.description),

@@ -7,6 +7,7 @@ import utopia.coder.model.scala.datatype.ScalaTypeCategory.{CallByName, Standard
 import utopia.coder.model.scala.datatype.TypeVariance.Invariance
 import utopia.coder.model.scala.datatype._
 import utopia.coder.model.scala.declaration.DeclarationPrefix.{Implicit, Lazy, Override}
+import utopia.coder.model.scala.declaration.DeclarationType.TypeD
 import utopia.coder.model.scala.declaration.FunctionDeclarationType.{FunctionD, ValueD, VariableD}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue, Variable}
 import utopia.coder.model.scala.declaration._
@@ -43,9 +44,9 @@ object ScalaParser
 	private lazy val declarationStartRegex = declarationModifierRegex.anyTimes + declarationKeywordRegex
 	private val namedDeclarationStartRegex = {
 		val operatorRegex = Regex.anyOf("!+-=/*&%?:<>|").oneOrMoreTimes.withinParenthesis
-		val nameRegex = (((Regex.escape('_') + Regex.letterOrDigit).withinParenthesis || Regex.letter).withinParenthesis +
+		val nameRegex = (((Regex.escape('_') + Regex.nonWhiteSpace).withinParenthesis || Regex.letter).withinParenthesis +
 			(Regex.wordCharacter.anyTimes + Regex.letterOrDigit).withinParenthesis.noneOrOnce +
-			(Regex.escape('_') + Regex.escape('=')).withinParenthesis.noneOrOnce).withinParenthesis
+			(Regex.escape('_') + operatorRegex).withinParenthesis.noneOrOnce).withinParenthesis
 		
 		declarationStartRegex + (operatorRegex || nameRegex).withinParenthesis
 	}
@@ -248,7 +249,7 @@ object ScalaParser
 					val declarationStart = declarationLine.code.slice(declarationStartRange)
 					val afterDeclarationStart = declarationLine.code.substring(declarationStartRange.exclusiveEnd)
 					val declarationName = {
-						if (declarationStart.contains(" "))
+						if (declarationStart.contains(' '))
 							declarationStart.afterLast(" ")
 						else
 							declarationStart
@@ -410,6 +411,8 @@ object ScalaParser
 							}
 							parentBuilder.addNested(builder.result(refMap))
 							true
+						case TypeD =>
+							???
 					}
 				// Case: No declaration found => adds read code lines as free code
 				case None =>

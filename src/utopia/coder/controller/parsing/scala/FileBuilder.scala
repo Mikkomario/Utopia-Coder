@@ -3,7 +3,7 @@ package utopia.coder.controller.parsing.scala
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.code.CodeLine
 import utopia.coder.model.scala.datatype.Reference
-import utopia.coder.model.scala.declaration.{File, InstanceDeclaration, MethodDeclaration, PropertyDeclaration}
+import utopia.coder.model.scala.declaration.{File, InstanceDeclaration, MethodDeclaration, PropertyDeclaration, TypeDeclaration}
 
 import scala.collection.immutable.VectorBuilder
 import scala.collection.mutable
@@ -33,6 +33,7 @@ class FileBuilder(fileName: String, filePackage: Package, extraReferences: Set[R
 	}
 	
 	// Ignores most of the incoming data types
+	override def addTypeDeclaration(typeDeclaration: TypeDeclaration): Unit = ()
 	override def addFreeCode(lines: IterableOnce[CodeLine]) = ()
 	override def addProperty(property: PropertyDeclaration) = ()
 	override def addMethod(method: MethodDeclaration) = ()

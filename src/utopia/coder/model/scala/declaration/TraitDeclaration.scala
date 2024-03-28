@@ -11,7 +11,7 @@ import utopia.coder.model.scala.{Annotation, DeclarationDate, Visibility}
   * @since 2.9.2021, v0.1
   */
 case class TraitDeclaration(name: String, genericTypes: Seq[GenericType] = Vector(),
-                            extensions: Vector[Extension] = Vector(),
+                            extensions: Vector[Extension] = Vector(), types: Vector[TypeDeclaration] = Vector.empty,
                             properties: Vector[PropertyDeclaration] = Vector(),
                             methods: Set[MethodDeclaration] = Set(), nested: Set[InstanceDeclaration] = Set(),
                             visibility: Visibility = Public, annotations: Seq[Annotation] = Vector(),
@@ -27,11 +27,17 @@ case class TraitDeclaration(name: String, genericTypes: Seq[GenericType] = Vecto
 	override def keyword = if (isSealed) "sealed trait" else "trait"
 	
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
-	                                extensions: Vector[Extension], creationCode: Code,
+	                                extensions: Vector[Extension], types: Vector[TypeDeclaration], creationCode: Code,
 	                                properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
 	                                nested: Set[InstanceDeclaration], annotations: Seq[Annotation],
 	                                description: String, author: String,
 	                                headerComments: Vector[String], since: DeclarationDate) =
-		TraitDeclaration(name, genericTypes, extensions, properties, methods, nested, visibility, annotations,
+	{
+		if (creationCode.nonEmpty) {
+			println(s"WARNING: the following code is removed from trait $name upon merging:")
+			println(creationCode)
+		}
+		TraitDeclaration(name, genericTypes, extensions, types, properties, methods, nested, visibility, annotations,
 			description, author, headerComments, since, isSealed)
+	}
 }

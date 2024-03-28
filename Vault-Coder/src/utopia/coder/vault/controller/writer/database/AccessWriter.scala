@@ -335,16 +335,18 @@ object AccessWriter
 				val itemType = item.toScalaType
 				val repr = GenericType.covariant("Repr")
 				File(singleAccessPackage,
-					TraitDeclaration((uniqueAccessTraitName + genericAccessSuffix).className,
-						Vector(item, repr),
+					TraitDeclaration(
+						name = (uniqueAccessTraitName + genericAccessSuffix).className,
+						genericTypes = Vector(item, repr),
 						// Extends SingleModelAccess instead of SingleRowModelAccess because sub-traits may vary
-						Vector(
+						extensions = Vector(
 							singleModelAccess(itemType),
 							distinctModelAccess(itemType, ScalaType.option(itemType), flow.value),
 							filterableView(repr.toScalaType),
 							indexed
 						),
-						highestTraitProperties, highestTraitMethods,
+						properties = highestTraitProperties,
+						methods = highestTraitMethods,
 						description = s"A common trait for access points which target individual ${
 							classToWrite.name.pluralDoc } or similar items at a time",
 						author = classToWrite.author, since = DeclarationDate.versionedToday
@@ -575,11 +577,13 @@ object AccessWriter
 				
 				File(manyAccessPackage,
 					TraitDeclaration(
-						(traitNameBase + genericAccessSuffix).pluralClassName, Vector(item, repr),
+						name = (traitNameBase + genericAccessSuffix).pluralClassName,
+						genericTypes = Vector(item, repr),
 						// Extends ManyModelAccess instead of ManyRowModel access because sub-traits may vary
-						Vector(manyModelAccess(item.toScalaType), indexed,
+						extensions = Vector(manyModelAccess(item.toScalaType), indexed,
 							deprecatableViewParentRef.getOrElse(filterableView)(repr.toScalaType)),
-						highestTraitProperties, highestTraitMethods,
+						properties = highestTraitProperties,
+						methods = highestTraitMethods,
 						description = s"A common trait for access points which target multiple ${
 							classToWrite.name.pluralDoc} or similar instances at a time",
 						author = classToWrite.author, since = DeclarationDate.versionedToday))

@@ -17,4 +17,8 @@ object DeclarationTypeCategory
 	  * Category that contains functions, values and variables
 	  */
 	case object Function extends DeclarationTypeCategory
+	/**
+	 * Category that contains type declarations
+	 */
+	case object Type extends DeclarationTypeCategory
 }

@@ -23,35 +23,40 @@ class InstanceBuilder(visibility: Visibility, prefixes: Set[DeclarationPrefix], 
 {
 	// ATTRIBUTES   ----------------------------
 	
+	private val typesBuilder = new VectorBuilder[TypeDeclaration]()
 	private val freeCodeBuilder = new VectorBuilder[CodeLine]()
 	private val propertiesBuilder = new VectorBuilder[PropertyDeclaration]()
 	private val methodsBuilder = new VectorBuilder[MethodDeclaration]()
 	private val nestedBuilder = new VectorBuilder[InstanceDeclaration]()
 	
 	
-	// OTHER    --------------------------------
+	// IMPLEMENTED  ----------------------------
 	
+	override def addTypeDeclaration(typeDeclaration: TypeDeclaration): Unit = typesBuilder += typeDeclaration
 	/**
-	  * Adds free code to instance body
-	  * @param lines Lines of code to add
-	  */
+	 * Adds free code to instance body
+	 * @param lines Lines of code to add
+	 */
 	def addFreeCode(lines: IterableOnce[CodeLine]): Unit =
 		freeCodeBuilder ++= lines
 	/**
-	  * Adds a new property to this instance
-	  * @param property Property to add
-	  */
+	 * Adds a new property to this instance
+	 * @param property Property to add
+	 */
 	def addProperty(property: PropertyDeclaration): Unit = propertiesBuilder += property
 	/**
-	  * Adds a new method to this instance
-	  * @param method Method to add
-	  */
+	 * Adds a new method to this instance
+	 * @param method Method to add
+	 */
 	def addMethod(method: MethodDeclaration): Unit = methodsBuilder += method
 	/**
-	  * Adds a new nested instance
-	  * @param instance nested instance to add
-	  */
+	 * Adds a new nested instance
+	 * @param instance nested instance to add
+	 */
 	def addNested(instance: InstanceDeclaration): Unit = nestedBuilder += instance
+	
+	
+	// OTHER    --------------------------------
 	
 	/**
 	  * Finalizes the instance
@@ -67,16 +72,22 @@ class InstanceBuilder(visibility: Visibility, prefixes: Set[DeclarationPrefix], 
 		
 		// TODO: WET WET
 		instanceType match {
-			case ObjectD => ObjectDeclaration(name, extensions, freeCode, propertiesBuilder.result(),
-				methodsBuilder.result().toSet, nestedBuilder.result().toSet, visibility, annotations,
-				scalaDoc.description, scalaDoc.author, commentsBefore, since, prefixes.contains(Case))
+			case ObjectD => ObjectDeclaration(name, extensions, typesBuilder.result(), freeCode,
+				propertiesBuilder.result(), methodsBuilder.result().toSet, nestedBuilder.result().toSet, visibility,
+				annotations, scalaDoc.description, scalaDoc.author, commentsBefore, since, prefixes.contains(Case))
 			case ClassD => ClassDeclaration(name, genericTypes, parameters.getOrElse(Parameters.empty), extensions,
-				freeCode, propertiesBuilder.result(), methodsBuilder.result().toSet, nestedBuilder.result().toSet,
-				visibility, annotations, scalaDoc.description, scalaDoc.author, commentsBefore, since,
-				prefixes.contains(Case))
-			case TraitD => TraitDeclaration(name, genericTypes, extensions, propertiesBuilder.result(),
-				methodsBuilder.result().toSet, nestedBuilder.result().toSet, visibility, annotations,
-				scalaDoc.description, scalaDoc.author, commentsBefore, since, prefixes.contains(Sealed))
+				typesBuilder.result(), freeCode, propertiesBuilder.result(), methodsBuilder.result().toSet,
+				nestedBuilder.result().toSet, visibility, annotations, scalaDoc.description, scalaDoc.author,
+				commentsBefore, since, prefixes.contains(Case))
+			case TraitD =>
+				val freeCode = freeCodeBuilder.result()
+				if (freeCode.nonEmpty) {
+					println(s"The following code is removed from read trait $name:")
+					freeCode.foreach { println(_) }
+				}
+				TraitDeclaration(name, genericTypes, extensions, typesBuilder.result(), propertiesBuilder.result(),
+					methodsBuilder.result().toSet, nestedBuilder.result().toSet, visibility, annotations,
+					scalaDoc.description, scalaDoc.author, commentsBefore, since, prefixes.contains(Sealed))
 		}
 	}
 }
