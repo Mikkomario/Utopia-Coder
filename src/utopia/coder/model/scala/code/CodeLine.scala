@@ -28,7 +28,7 @@ object CodeLine
 		Regex("s").noneOrOnce + Regex.escape('\"') + (!Regex.escape('\"')).anyTimes + Regex.escape('\"') -> false,
 		(Regex.anyOf("+-*/").oneOrMoreTimes + Regex.whiteSpace) -> true,
 		(Regex.whiteSpace + Regex.word + Regex.whiteSpace) +
-			!(Regex.escape('=') + Regex.escape('>')).withinParenthesis -> true
+			!(Regex.escape('=') + Regex.escape('>')).withinParenthesis -> false
 	)
 	private lazy val oneTimeRegexes = Vector(
 		Regex.escape('.') + Regex.letter.oneOrMoreTimes + Regex.whiteSpace.noneOrOnce + Regex.escape('{'),
@@ -158,6 +158,7 @@ case class CodeLine(indentation: Int, code: String) extends Combinable[String, C
 	def mapCode(f: String => String) = copy(code = f(code))
 	
 	// Split after regex determines whether the splitting part should be included on the original line
+	// TODO: When splitting by words, the whitespace is added to the beginning of the next line, which looks dumb
 	private def splitWith(regex: Regex, splitAfterRegex: Boolean = false) = {
 		// Finds the possible split locations
 		val possibleSplitIndices = regex.rangesFrom(code).map { range =>

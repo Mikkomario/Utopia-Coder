@@ -103,8 +103,6 @@ object ClassMethodFactory
 		
 		// Writes the instance creation now that the "try-properties" properties have been declared
 		// Imports the db properties, if needed
-		if (!isFromJson)
-			builder += "import model._"
 		val assignments = classToWrite.properties.map { prop =>
 			// Case: Try-based property / value => already defined
 			if (prop.dataType.yieldsTryFromValue)
@@ -140,6 +138,6 @@ object ClassMethodFactory
 			prop.dataType.fromJsonValueCode(s"$modelName(${prop.jsonPropName.quoted})")
 		// NB: Not very clean code. Assumes access to a database model factory named "model".
 		else
-			prop.dataType.fromValueCode(prop.dbProperties.map { prop => s"$modelName(model.${prop.name.prop}.name)" })
+			prop.dataType.fromValueCode(prop.dbProperties.map { prop => s"$modelName(this.model.${prop.name.prop}.name)" })
 	}
 }
