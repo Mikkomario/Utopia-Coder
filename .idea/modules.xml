@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ProjectModuleManager">
+    <modules>
+      <module fileurl="file://$PROJECT_DIR$/../Utopia-Scala/BunnyMunch/BunnyMunch.iml" filepath="$PROJECT_DIR$/../Utopia-Scala/BunnyMunch/BunnyMunch.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../Utopia-Scala/Flow/Flow.iml" filepath="$PROJECT_DIR$/../Utopia-Scala/Flow/Flow.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Reach-Coder/Reach-Coder.iml" filepath="$PROJECT_DIR$/Reach-Coder/Reach-Coder.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Utopia-Coder.iml" filepath="$PROJECT_DIR$/Utopia-Coder.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../Utopia-Scala/Vault/Vault.iml" filepath="$PROJECT_DIR$/../Utopia-Scala/Vault/Vault.iml" />
+      <module fileurl="file://$PROJECT_DIR$/Vault-Coder/Vault-Coder.iml" filepath="$PROJECT_DIR$/Vault-Coder/Vault-Coder.iml" />
+    </modules>
+  </component>
+</project>
