@@ -1,6 +1,7 @@
 package utopia.coder.vault.controller.writer.model
 
 import utopia.coder.model.data.NamingRules
+import utopia.coder.model.scala.Visibility.Protected
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{CombinationData, CombinationReferences, VaultProjectSetup}
 import utopia.coder.model.scala.{DeclarationDate, Parameter}
@@ -29,14 +30,14 @@ object CombinedModelWriter
 	  * @return Combination related references. Failure if file writing failed.
 	  */
 	def apply(data: CombinationData, parentRef: Reference, parentDataRef: Reference, childRef: Reference,
-	          parentFactoryRef: Reference)
+	          parentFactoryWrapperRef: Reference)
 	         (implicit setup: VaultProjectSetup, codec: Codec, naming: NamingRules) =
 	{
 		val combinedClassName = data.name.className
 		val combinedClassType = ScalaType.basic(combinedClassName)
 		
 		val extender: Extension = Reference.flow.extender(parentDataRef)
-		val factory: Extension = parentFactoryRef(combinedClassType)
+		val factory: Extension = parentFactoryWrapperRef(parentRef, combinedClassType)
 		// Extends the HasId trait only if Vault references are enabled
 		val parents = {
 			if (setup.modelCanReferToDB)
@@ -46,18 +47,8 @@ object CombinedModelWriter
 		}
 		
 		val parentName = data.parentName
-		val constructorParams = data.combinationType.applyParamsWith(parentName, data.childName,
-			parentRef, childRef)
-		
-		// Generates the withX functions in order to conform to the parent factory trait
-		val parentPropName = parentName.prop
-		val withFunctions = data.parentClass.properties.map { prop =>
-			val methodName = (ModelWriter.withPrefix + prop.name).function
-			val paramName = prop.name.prop
-			MethodDeclaration(methodName, isOverridden = true)(
-				Parameter(paramName, prop.dataType.concrete.toScala))(
-				s"copy($parentPropName = $parentPropName.$methodName($paramName))")
-		}
+		val constructorParams = data.combinationType.applyParamsWith(parentName, data.childName, parentRef, childRef)
+		val parentPropName = constructorParams.head.name
 		
 		File(setup.combinedModelPackage/data.packageName,
 			ClassDeclaration(combinedClassName,
@@ -67,10 +58,14 @@ object CombinedModelWriter
 				properties = Vector(
 					// Provides direct access to parent.id
 					ComputedProperty("id", description = s"Id of this ${data.parentName} in the database")(
-						s"${constructorParams.head.name}.id"),
-					ComputedProperty("wrapped", isOverridden = true)(s"${constructorParams.head.name}.data")
+						s"$parentPropName.id"),
+					ComputedProperty("wrapped", isOverridden = true)(s"$parentPropName.data"),
+					ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)(parentPropName)
 				),
-				methods = withFunctions.toSet,
+				methods = Set(
+					MethodDeclaration("mapWrapped", visibility = Protected, isOverridden = true)(
+						Parameter("f", Reference.flow.mutate(parentRef)))(s"copy($parentPropName = f($parentPropName))")
+				),
 				description = data.description.notEmpty
 					.getOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
 				author = data.author, since = DeclarationDate.versionedToday, isCaseClass = true

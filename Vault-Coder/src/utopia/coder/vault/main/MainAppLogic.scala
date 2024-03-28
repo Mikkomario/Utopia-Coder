@@ -275,7 +275,7 @@ object MainAppLogic extends CoderAppLogic
 	          descriptionLinkObjects: Option[(Reference, Reference, Reference)])
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
-		ModelWriter(classToWrite).flatMap { case (modelRef, dataRef, factoryRef) =>
+		ModelWriter(classToWrite).flatMap { case (modelRef, dataRef, factoryRef, factoryWrapperRef) =>
 			DbModelWriter(classToWrite, modelRef, dataRef, factoryRef, tablesRef)
 				.flatMap { dbModelRef =>
 					FactoryDbWriter(classToWrite, modelRef, dataRef, dbModelRef).flatMap { dbFactoryRef =>
@@ -301,8 +301,9 @@ object MainAppLogic extends CoderAppLogic
 							AccessWriter(classToWrite, modelRef, dbFactoryRef, dbModelRef,
 								descriptionReferences)
 								.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
-									classToWrite -> ClassReferences(modelRef, dataRef, factoryRef, dbFactoryRef,
-										dbModelRef, genericUniqueAccessRef, genericManyAccessRef) }
+									classToWrite -> ClassReferences(modelRef, dataRef, factoryRef, factoryWrapperRef,
+										dbFactoryRef, dbModelRef, genericUniqueAccessRef, genericManyAccessRef)
+								}
 						}
 					}
 				}
@@ -314,7 +315,7 @@ object MainAppLogic extends CoderAppLogic
 	{
 		val parentRefs = classRefsMap(combination.parentClass)
 		val childRefs = classRefsMap(combination.childClass)
-		CombinedModelWriter(combination, parentRefs.model, parentRefs.data, childRefs.model, parentRefs.factory)
+		CombinedModelWriter(combination, parentRefs.model, parentRefs.data, childRefs.model, parentRefs.factoryWrapper)
 			.flatMap { combinedRefs =>
 				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory)
 					.flatMap { comboFactoryRef =>

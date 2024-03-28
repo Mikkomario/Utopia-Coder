@@ -3,12 +3,13 @@ package utopia.coder.vault.controller.writer.model
 import utopia.coder.model.data
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
+import utopia.coder.model.scala.Visibility.Protected
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference.Flow._
-import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
+import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType, TypeRequirement}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
-import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, TraitDeclaration}
-import utopia.coder.model.scala.{DeclarationDate, Parameter}
+import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, PropertyDeclaration, TraitDeclaration}
+import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.controller.writer.database.AccessWriter
 import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
@@ -28,6 +29,7 @@ object ModelWriter
 	
 	private val dataClassAppendix = data.Name("Data", "Data", CamelCase.capitalized)
 	private val factoryTraitAppendix = data.Name("Factory", "Factories", CamelCase.capitalized)
+	private val wrapperAppendix = Name("Wrapper", "Wrappers", CamelCase.capitalized)
 	
 	/**
 	  * Prefix to apply to "withX" functions
@@ -42,28 +44,36 @@ object ModelWriter
 	  * @param classToWrite class being written
 	  * @param codec        Implicit codec used when writing files (implicit)
 	  * @param setup        Target project -specific settings (implicit)
-	  * @return Reference to the stored version, followed by a reference to the data version. Failure if writing failed.
+	  * @return References to:
+	 *              1) Stored model version,
+	 *              2) Data model version,
+	 *              3) Factory trait and
+	 *              4) Factory wrapper trait
+	 *
+	 *          Failure if file-writing failed
 	  */
 	def apply(classToWrite: Class)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Writes the factory trait, then the data model, and then teh stored model
-		writeFactoryTrait(classToWrite).flatMap { factoryRef =>
-			writeDataModel(classToWrite, factoryRef).flatMap { dataRef =>
-				writeStoredModel(classToWrite, factoryRef, dataRef)
-					.map { storedRef => (storedRef, dataRef, factoryRef) }
+		val factoryPackage = setup.modelPackage / s"factory.${ classToWrite.packageName }"
+		writeFactoryTrait(classToWrite, factoryPackage).flatMap { factoryRef =>
+			writeFactoryWrapperTrait(classToWrite, factoryRef, factoryPackage).flatMap { factoryWrapperRef =>
+				writeDataModel(classToWrite, factoryRef).flatMap { dataRef =>
+					writeStoredModel(classToWrite, factoryWrapperRef, dataRef)
+						.map { storedRef => (storedRef, dataRef, factoryRef, factoryWrapperRef) }
+				}
 			}
 		}
 	}
 	
-	private def writeFactoryTrait(classToWrite: Class)
+	private def writeFactoryTrait(classToWrite: Class, factoryPackage: Package)
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val factoryTraitName = (classToWrite.name + factoryTraitAppendix).className
-		val packageName = setup.modelPackage / s"factory.${ classToWrite.packageName }"
 		val genericType = GenericType.covariant("A")
 		
-		File(packageName,
+		File(factoryPackage,
 			TraitDeclaration(name = factoryTraitName,
 				genericTypes = Vector(genericType),
 				// Contains a withX(x) function for each data property
@@ -75,6 +85,48 @@ object ModelWriter
 				}.toSet,
 				description = s"Common trait for ${
 					classToWrite.name}-related factories which allow construction with individual properties",
+				author = classToWrite.author,
+				since = DeclarationDate.versionedToday
+			)
+		).write()
+	}
+	
+	private def writeFactoryWrapperTrait(classToWrite: Class, factoryRef: Reference, factoryPackage: Package)
+	                                    (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		val wrapped = GenericType("A", requirement = Some(TypeRequirement.childOf(factoryRef)))
+		val repr = GenericType.covariant("Repr")
+		
+		File(factoryPackage,
+			TraitDeclaration(
+				name = (classToWrite.name + factoryTraitAppendix + wrapperAppendix).className,
+				genericTypes = Vector(wrapped, repr),
+				extensions = Vector(factoryRef),
+				properties = Vector(
+					PropertyDeclaration.newAbstract("wrappedFactory", wrapped.toScalaType,
+						description = "The factory wrapped by this instance",
+						isProtected = true
+					)
+				),
+				methods = withMethodsFor(classToWrite) { (prop, propName) =>
+					s"mapWrapped { _.${ withMethodNameFor(prop) }($propName) }"
+				} +
+					MethodDeclaration.newAbstract(
+						"wrap", repr.toScalaType,
+						description = "Mutates this item by wrapping a mutated instance",
+						returnDescription = "Copy of this item with the specified wrapped factory",
+						isProtected = true)(
+						Parameter("factory", wrapped.toScalaType, description = "The new factory instance to wrap")) +
+					MethodDeclaration("mapWrapped",
+						visibility = Protected,
+						description = "Modifies this item by mutating the wrapped factory instance",
+						returnDescription = "Copy of this item with a mutated wrapped factory")(
+						Parameter("f", mutate(wrapped.toScalaType),
+							description = "A function for mutating the wrapped factory instance"))(
+						"wrap(f(wrappedFactory))")
+				,
+				description = s"Common trait for classes that implement ${factoryRef.target} by wrapping a ${
+					factoryRef.target } instance",
 				author = classToWrite.author,
 				since = DeclarationDate.versionedToday
 			)
@@ -149,7 +201,7 @@ object ModelWriter
 	
 	// Writes the stored model version
 	// Returns a reference
-	private def writeStoredModel(classToWrite: Class, factoryRef: Reference, dataClassRef: Reference)
+	private def writeStoredModel(classToWrite: Class, factoryWrapperRef: Reference, dataClassRef: Reference)
 	                            (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val name = classToWrite.name.className
@@ -177,10 +229,10 @@ object ModelWriter
 			
 			val withId = MethodDeclaration("withId", isOverridden = true)(
 				Parameter("id", classToWrite.idType.toScala))("copy(id = id)")
-			val withMethods = withMethodsFor(classToWrite) { (prop, propName) =>
-				s"copy(data = data.${ withMethodNameFor(prop) }($propName))"
-			}
-			val factoryParents = Vector[Extension](factoryRef(classType), vault.fromIdFactory(ScalaType.int, classType))
+			val factoryParents = Vector[Extension](
+				factoryWrapperRef(dataClassRef, classType),
+				vault.fromIdFactory(ScalaType.int, classType)
+			)
 			
 			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database"
 			// ModelConvertible extension & implementation differs based on id type
@@ -205,8 +257,14 @@ object ModelWriter
 			ClassDeclaration(name,
 				constructionParams = constructionParams,
 				extensions = parent +: factoryParents,
-				properties = properties ++ accessProperty,
-				methods = withMethods + withId,
+				properties = (ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)("data") +:
+					properties) ++
+					accessProperty,
+				methods = Set(
+					withId,
+					MethodDeclaration("mapWrapped", visibility = Protected, isOverridden = true)(
+						Parameter("f", mutate(dataClassRef)))("copy(data = f(data))")
+				),
 				description = description,
 				author = classToWrite.author,
 				since = DeclarationDate.versionedToday,
