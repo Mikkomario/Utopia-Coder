@@ -112,7 +112,7 @@ object DbFactoryWriter
 	{
 		def _modelFromAssignments(assignments: CodePiece) =
 			modelRef.targetCode +
-				classToWrite.idType.fromValueCode("valid(model.id.name)")
+				classToWrite.idType.fromValueCode("valid(this.model.id.name)")
 					.append(dataRef.targetCode + assignments.withinParenthesis, ", ")
 					.withinParenthesis
 		

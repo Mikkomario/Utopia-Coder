@@ -371,7 +371,7 @@ object ModelWriter
 			assignments.withinParenthesis.withPrefix(dataClassName)
 		
 		if (classToWrite.fromJsonMayFail)
-			ClassMethodFactory.classFromModel(classToWrite, "schema.validate(model).toTry",
+			ClassMethodFactory.classFromModel(classToWrite, "schema.validate(model)",
 				isFromJson = true)(_modelFromAssignments)
 		else
 			ClassMethodFactory.classFromValidatedModel(classToWrite, isFromJson = true)(_modelFromAssignments)

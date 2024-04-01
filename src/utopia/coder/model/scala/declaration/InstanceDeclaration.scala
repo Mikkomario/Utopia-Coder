@@ -141,15 +141,16 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 		
 		// Starts writing the instance body
 		/* Write order is as follows:
-			1) Attributes
-			2) Creation code
-			3) Abstract properties
-			4) Abstract methods
-			5) Computed properties (non-implemented, first public, then private)
-			6) Implicit functions
-			7) Implemented properties, then implemented methods (first public, then protected)
-			8) Other methods (first public)
-			9) Nested objects, then nested classes (first public)
+			1) Type declarations
+			2) Attributes
+			3) Creation code
+			4) Abstract properties
+			5) Abstract methods
+			6) Computed properties (non-implemented, first public, then private)
+			7) Implicit functions
+			8) Implemented properties, then implemented methods (first public, then protected)
+			9) Other methods (first public)
+			10) Nested objects, then nested classes (first public)
 		*/
 		val (attributes, computed) = properties.divideBy { _.isComputed }.toTuple
 		
@@ -165,6 +166,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 			visibilityOrdering, Ordering.by[Declaration, String] { _.name }))
 		
 		appendSegments(builder, Vector[(Iterable[CodeConvertible], String)](
+			types -> "TYPES",
 			attributes -> "ATTRIBUTES",
 			creationCode.notEmpty.toVector -> "INITIAL CODE",
 			(abstractComputed.sorted(visibilityOrdering) ++

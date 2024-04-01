@@ -279,7 +279,7 @@ object SqlWriter
 		writer.println()
 	}
 	
-	private def initialsFrom(tableNames: Iterable[String])(implicit naming: NamingRules) = {
+	def initialsFrom(tableNames: Iterable[String])(implicit naming: NamingRules) = {
 		val convention = naming(TableName)
 		// Splits each table name into parts
 		val allOptions = tableNames.map { name => name -> convention.split(name) }
@@ -296,8 +296,8 @@ object SqlWriter
 	
 	// Assumes that 1 char from each entry has been tested already
 	// Also assumes that the specified set contains items of identical lengths
-	private def makeUnique(options: Iterable[(String, Seq[String])], testedChars: Int): Iterable[(String, String)] =
-	{
+	@tailrec
+	private def makeUnique(options: Iterable[(String, Seq[String])], testedChars: Int): Iterable[(String, String)] = {
 		// Checks whether it is possible to find some index that (with this character count) makes the results distinct
 		options.head._2.indices
 			.find { i =>
