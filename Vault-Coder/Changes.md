@@ -2,6 +2,7 @@
 
 ## v1.11 (in development)
 ### Breaking changes
+- Code-generation now matches **Vault v1.19**
 - Factory objects are now named "...DbFactory" instead of "...Factory"
 - Database model factories no longer contain separate -attName and -column properties, 
   but individual properties that implicitly (or explicitly) convert to both

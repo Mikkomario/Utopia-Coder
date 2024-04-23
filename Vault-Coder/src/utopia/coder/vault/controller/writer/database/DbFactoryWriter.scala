@@ -5,7 +5,7 @@ import utopia.coder.model.data.NamingRules
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.DeclarationDate
 import utopia.coder.model.scala.code.CodePiece
-import utopia.coder.model.scala.datatype.{Extension, Reference}
+import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
 import utopia.coder.model.scala.declaration.{File, ObjectDeclaration, PropertyDeclaration}
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
@@ -92,12 +92,12 @@ object DbFactoryWriter
 		// Timestamp-based factories also specify a creation time property name
 		if (classToWrite.recordsIndexedCreationTime)
 			classToWrite.timestampProperty.foreach { createdProp =>
-				builder += ComputedProperty("creationTimePropertyName", isOverridden = true)(
-					s"model.${createdProp.name.prop}.name")
+				builder += ComputedProperty("timestamp", isOverridden = true)(s"model.${createdProp.name.prop}")
 			}
 		// Non-timestamp-based factories need to specify default ordering
 		else
-			builder += ComputedProperty("defaultOrdering", isOverridden = true, isLowMergePriority = true)("None")
+			builder += ComputedProperty("defaultOrdering", explicitOutputType = Some(ScalaType.option(orderBy)),
+				isOverridden = true, isLowMergePriority = true)("None")
 		// Deprecatable factories specify the deprecation condition (read from the database model)
 		if (classToWrite.isDeprecatable) {
 			builder += ComputedProperty("nonDeprecatedCondition", Set(dbModelRef), isOverridden = true)(

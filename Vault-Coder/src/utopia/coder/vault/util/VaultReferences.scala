@@ -30,6 +30,7 @@ object VaultReferences
 		lazy val connection = Reference(database, "Connection")
 		lazy val table = Reference(models / "immutable", "Table")
 		lazy val condition = Reference(sql, "Condition")
+		lazy val orderBy = Reference(sql, "OrderBy")
 		lazy val dbProp = Reference(immutableModels, "DbPropertyDeclaration")
 		
 		lazy val hasId = Reference(templateModels, "HasId")
