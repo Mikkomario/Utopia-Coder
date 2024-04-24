@@ -1,6 +1,7 @@
 # Utopia Coder - list of changes
 
-## v1.0.2 (in development)
+## v1.1 (in development)
+Adding refactoring support
 ### New features
 - Added **InputFiles** object that offers a function for identifying the latest versioned file in some directory
 - Added support for type declarations

@@ -31,8 +31,16 @@ import scala.collection.immutable.VectorBuilder
   */
 object ScalaParser
 {
-	private lazy val packageRegex = Regex("package ") + Regex.any
-	private lazy val importRegex = Regex("import ") + Regex.any
+	// ATTRIBUTES   -------------------------
+	
+	/**
+	 * A regular expression matching a package declaration line
+	 */
+	lazy val packageRegex = Regex("package ") + Regex.any
+	/**
+	 * A regular expression matching an import declaration line
+	 */
+	lazy val importRegex = Regex("import ") + Regex.any
 	
 	private lazy val annotationStartRegex = Regex.escape('@')
 	private lazy val visibilityRegex = (Regex("protected ") || Regex("private ")).withinParenthesis
@@ -67,77 +75,90 @@ object ScalaParser
 		(Regex.escape('\t') || Regex.whiteSpace).withinParenthesis.oneOrMoreTimes +
 		Regex.escape('-').oneOrMoreTimes
 	
+	
+	// OTHER    ---------------------------
+	
 	def apply(path: Path) = {
 		IterateLines.fromPath(path) { linesIter =>
-			val iter = linesIter.pollable /*linesIter.map { line =>
-				println("Reading: " + line)
-				line
-			}.pollable*/
+			val iter = linesIter.pollable
 			
-			// Searches for package declaration first
-			val filePackageString = iter.pollToNextWhere { _.nonEmpty }.filter(packageRegex.apply) match {
-				case Some(packageLine) =>
-					iter.skipPolled()
-					packageLine.afterFirst("package ")
-				case None => ""
-			}
-			// println(s"Read package: $filePackageString")
-			
-			// Next looks for import statements
-			val importStatements = iter.collectWhile { line => line.isEmpty || importRegex(line) }
-				.filter { _.nonEmpty }
-				.map { _.afterFirst("import ") }
-				.flatMap { importString =>
-					// println(s"Read import: $importString")
-					if (importString.contains('{')) {
-						val (basePart, endPart) = importString.splitAtFirst("{").toTuple
-						val trimmedBase = basePart.trim
-						val endItems = endPart.untilFirst("}").split(',').toVector.map { _.trim }
-						/*println(s"Which is split into ${endItems.size} parts after $trimmedBase (${
-							endItems.mkString(", ")})")*/
-						endItems.map { trimmedBase + _ }
-					}
-					else
-						Vector(importString.trim)
-				}
-			val separatedImportStatements = importStatements.map { importStatement =>
-				val (beginning, end) = importStatement.splitAtLast(".").toTuple
-				end.notEmpty match {
-					case Some(end) =>
-						if (end == "_") {
-							val (packagePart, targetPrefix) = beginning.splitAtLast(".").toTuple
-							if (targetPrefix.isEmpty)
-								filePackageString -> importStatement
-							else
-								packagePart -> s"$targetPrefix._"
-						}
-						else
-							beginning -> end
-					case None => filePackageString -> importStatement
-				}
-			}
-			val packagePerString = separatedImportStatements.map { case (packageString, _) => packageString }
-				.toSet.map { s: String => s -> Package(s) }.toMap
-			val referencesPerTarget = separatedImportStatements
-				.map { case (packageString, target) => target -> Reference(packagePerString(packageString), target) }
-				.toMap
-			// println(s"Read ${packagePerString.size} packages and ${referencesPerTarget.size} references")
+			val (filePackage, importedReferences) = readPackageAndImportsFrom(iter)
+			val referencesPerTarget = importedReferences.map { ref => ref.target -> ref }.toMap
 			
 			// Finally, finds and processes the object and/or class statements
 			// Implicit references are included in the resulting file directly
-			val builder = new FileBuilder(path.fileNameWithoutExtension, Package(filePackageString),
+			val builder = new FileBuilder(path.fileNameWithoutExtension, filePackage,
 				referencesPerTarget.valuesIterator.filter { _.target.contains('_') }.toSet)
-			// println(s"Poll before mapping: ${iter.poll}")
 			val codeLineIterator = iter.map { line =>
 				val indentation = line.takeWhile { _ == '\t' }.length
 				CodeLine(indentation, line.drop(indentation))
 			}.pollable
-			// println(s"Poll after mapping: ${codeLineIterator.poll}")
-			// println("Reading the instance data...")
 			readAllItemsFrom(codeLineIterator, referencesPerTarget, builder)
 			// Returns the parsed file
 			builder.result()
 		}
+	}
+	
+	/**
+	 * Processes the package declaration (if present), as well as the insert statements,
+	 * which are both typically found from the beginning of a scala file.
+	 *
+	 * After this method call,
+	 * the specified iterator will be polled to the next non-empty line after the last import statement.
+	 *
+	 * @param linesIter An iteraror which returns all lines within the targeted scala file.
+	 *                  Supports polling.
+	 *
+	 * @return Declared package and all declared imports as references.
+	 */
+	def readPackageAndImportsFrom(linesIter: PollingIterator[String]) = {
+		// Searches for package declaration first
+		val filePackageString = linesIter.pollToNextWhere { _.nonEmpty }.filter(packageRegex.apply) match {
+			case Some(packageLine) =>
+				linesIter.skipPolled()
+				packageLine.afterFirst("package ")
+			case None => ""
+		}
+		
+		// Next looks for import statements
+		val importStatements = linesIter.collectWhile { line => line.isEmpty || importRegex(line) }
+			.filter { _.nonEmpty }
+			.map { _.afterFirst("import ") }
+			.flatMap { importString =>
+				if (importString.contains('{')) {
+					val (basePart, endPart) = importString.splitAtFirst("{").toTuple
+					val trimmedBase = basePart.trim
+					val endItems = endPart.untilFirst("}").split(',').toVector.map { _.trim }
+					endItems.map { trimmedBase + _ }
+				}
+				else
+					Vector(importString.trim)
+			}
+		// Separates the targets from the packages
+		val separatedImportStatements = importStatements.map { importStatement =>
+			val (beginning, end) = importStatement.splitAtLast(".").toTuple
+			end.notEmpty match {
+				case Some(end) =>
+					if (end == "_") {
+						val (packagePart, targetPrefix) = beginning.splitAtLast(".").toTuple
+						if (targetPrefix.isEmpty)
+							filePackageString -> importStatement
+						else
+							packagePart -> s"$targetPrefix._"
+					}
+					else
+						beginning -> end
+				case None => filePackageString -> importStatement
+			}
+		}
+		// Generates a string to package -map
+		val packagePerString = separatedImportStatements.map { case (packageString, _) => packageString }
+			.toSet.map { s: String => s -> Package(s) }.toMap
+		// Converts the imports to references
+		val references = separatedImportStatements
+			.map { case (packageString, target) => Reference(packagePerString(packageString), target) }
+		
+		Package(filePackageString) -> references
 	}
 	
 	private def readAllItemsFrom(linesIter: PollingIterator[CodeLine], refMap: Map[String, Reference],
