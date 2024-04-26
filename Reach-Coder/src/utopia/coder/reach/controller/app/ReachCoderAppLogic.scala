@@ -95,7 +95,8 @@ object ReachCoderAppLogic extends CoderAppLogic
 			}
 			implicit val setup: ProjectSetup = ProjectSetup(
 				mergeConflictsFilePath = outputPath/mergeConflictsFileName,
-				sourceRoot = outputPath,
+				sourceRoot = subDirectory(outputPath, "src"),
+				backupRoot = subDirectory(outputPath, "backup"),
 				mergeSourceRoots = mergeRoot.value.toVector,
 				version = projectData.version
 			)

@@ -1,21 +1,24 @@
-package utopia.coder.model.refactoring
+package utopia.coder.controller.refactoring
 
 import utopia.coder.controller.parsing.scala.ScalaParser
-import utopia.coder.model.scala.Package
+import utopia.coder.model.refactoring.{ExtractorRegex, PackageTarget}
 import utopia.coder.model.scala.declaration.InstanceDeclarationType
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.operator.equality.EqualsExtensions._
-import utopia.flow.parse.string.{IterateLines, Regex}
 import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.parse.string.{IterateLines, Regex}
 import utopia.flow.util.logging.Logger
-import utopia.flow.util.StringExtensions._
 
 import java.nio.file.Path
 import scala.io.Codec
+import scala.util.Success
 
 /**
  * Used for renaming a specific instance declaration or multiple such declarations
- *
+ * @param targetPackage Package or packages where the targeted files are located
+ * @param targetType Targeted instance type
+ * @param targetInstance A method for identifying the targeted instances, as well as to extract the part to replace
+ * @param to Renaming for the target section of 'targetInstance'
  * @author Mikko Hilpinen
  * @since 23.04.2024, v1.1
  */
@@ -31,6 +34,12 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 	
 	// OTHER    ---------------------
 	
+	/**
+	 * Performs this renaming operation within the specified source root directory
+	 * @param sourceRoot Directory that represents the root / first package and contains all source files
+	 * @param log Implicit logging implementation for recording certain file-access failures
+	 * @return Success or failure
+	 */
 	def apply(sourceRoot: Path)(implicit log: Logger) = {
 		// Locates the target packages
 		targetPackage.locate(sourceRoot)
@@ -76,7 +85,7 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 							}
 					}
 			}
-			.map { edits =>
+			.flatMap { edits =>
 				// Once all primary files have been edited, edits all the references
 				val flatEdits = edits.flatten
 				val editsPerPackage = flatEdits
@@ -86,28 +95,40 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 				val completedEditPerFile = flatEdits.map { case (_, file, from, _) => file -> from }.toMap
 				
 				// TODO: Again, take backups before editing
-				sourceRoot.toTree.nodesBelowIterator.filter { _.nav.fileType ~== "scala" }.tryForeach { file =>
+				sourceRoot.toTree.nodesBelowIterator.filter { _.nav.fileType ~== "scala" }.tryForeach { fileNode =>
+					val file = fileNode.nav
 					// Reads the package and the imports section of the file in order to see whether
 					// that file is affected by these changes
-					IterateLines.fromPath(file.nav){ iter =>
-						val linesIter = iter.pollable
-						val (filePackage, imports) = ScalaParser.readPackageAndImportsFrom(linesIter)
-						
-						// Applies edits from:
-						//      1) All changes in the same package
-						//      2) All modified import references
-						// But not the change made originally within that file
-						val editsToApply = editsPerPackage(filePackage) ++
-							imports.flatMap { ref =>
-								editsPerPackage(ref.packagePath).get(ref.target).map { ref.target -> _ }
-							} -- completedEditPerFile.get(file.nav)
-						
-						// TODO: If there are edits to apply, open the file in edit mode and apply the changes
-						???
-					}
+					IterateLines
+						.fromPath(file) { iter =>
+							val linesIter = iter.pollable
+							ScalaParser.readPackageAndImportsFrom(linesIter)
+						}
+						.flatMap { case (filePackage, imports) =>
+							// Applies edits from:
+							//      1) All changes in the same package
+							//      2) All modified import references
+							// But not the change made originally within that file
+							val editsToApply = editsPerPackage(filePackage) ++
+								imports.flatMap { ref =>
+									editsPerPackage(ref.packagePath).get(ref.target).map { ref.target -> _ }
+								} -- completedEditPerFile.get(file)
+							
+							// Case: There are edits to apply => Rewrites the file lines
+							if (editsToApply.nonEmpty) {
+								file.edit { editor =>
+									editor.mapRemaining { line =>
+										editsToApply.foldLeft(line) { case (line, (from, to)) =>
+											line.replaceAll(from, to)
+										}
+									}
+								}
+							}
+							// Case: No edits to apply => Skips this file
+							else
+								Success(())
+						}
 				}
-				
-				// TODO: Continue
 			}
 	}
 }

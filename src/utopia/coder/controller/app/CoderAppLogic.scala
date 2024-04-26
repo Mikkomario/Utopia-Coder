@@ -269,4 +269,18 @@ trait CoderAppLogic extends AppLogic
 			}
 		}
 	}
+	
+	
+	// OTHER    -------------------------
+	
+	/**
+	 * Creates an (optional) sub-directory.
+	 * If file-creation fails, defaults to the parent directory instead.
+	 * @param parent Parent directory
+	 * @param dirName Name of the new directory
+	 * @param log Implicit logger for file-writing failures
+	 * @return Created directory or the parent directory if file-creation failed
+	 */
+	protected def subDirectory(parent: Path, dirName: String)(implicit log: Logger) =
+		(parent/dirName).createDirectories().getOrElseLog(parent)
 }

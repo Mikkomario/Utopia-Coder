@@ -68,7 +68,7 @@ object DbFactoryWriter
 		
 		// For tables which contain a creation time index, additional inheritance is added
 		if (classToWrite.recordsIndexedCreationTime)
-			builder += fromRowFactoryWithTimestamps(modelRef)
+			builder += fromTimelineRowFactory(modelRef)
 		
 		// If the class supports deprecation, it is reflected in this factory also
 		if (classToWrite.isDeprecatable)

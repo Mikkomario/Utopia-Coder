@@ -1,10 +1,12 @@
 package utopia.coder.model.data
 
+import utopia.coder.controller.refactoring.Backup
 import utopia.coder.model.merging.MergeConflict
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.flow.util.Version
+import utopia.flow.util.logging.Logger
 
 import java.nio.file.Path
 
@@ -15,20 +17,28 @@ object ProjectSetup
 	/**
 	  * @param mergeConflictsFilePath Path to the text file where merge conflicts shall be documented
 	  * @param sourceRoot Path to the export source directory
-	  * @param mergeSourceRoots Paths to the source roots where existing versions are read from and merged (may be empty)
+	  * @param backupRoot Path to the generated backup directory
+	 * @param mergeSourceRoots Paths to the source roots where existing versions are read from and merged (may be empty)
 	  * @param version Current project version, if known
-	  * @return A new project setup instance
+	  * @param log Implicit logging implementation used for non-critical error-logging
+	 * @return A new project setup instance
 	  */
-	def apply(mergeConflictsFilePath: Path, sourceRoot: Path, mergeSourceRoots: Vector[Path] = Vector(),
-	          version: Option[Version] = None): ProjectSetup =
-		_ProjectSetup(sourceRoot, mergeSourceRoots, mergeConflictsFilePath, version)
+	def apply(mergeConflictsFilePath: Path, sourceRoot: Path, backupRoot: Path,
+	          mergeSourceRoots: Vector[Path] = Vector(), version: Option[Version] = None)
+	         (implicit log: Logger): ProjectSetup =
+		new _ProjectSetup(sourceRoot, backupRoot, mergeSourceRoots, mergeConflictsFilePath, version)
 	
 	
 	// NESTED   -------------------------
 	
-	private case class _ProjectSetup(sourceRoot: Path, mergeSourceRoots: Vector[Path],
-	                                 mergeConflictsFilePath: Path, version: Option[Version])
+	private class _ProjectSetup(override val sourceRoot: Path, backupRoot: Path,
+	                            override val mergeSourceRoots: Vector[Path],
+	                            override val mergeConflictsFilePath: Path, override val version: Option[Version])
+	                           (implicit log: Logger)
 		extends ProjectSetup
+	{
+		override val backup: Backup = new Backup(mergeSourceRoots, backupRoot)
+	}
 }
 
 /**
@@ -52,6 +62,10 @@ trait ProjectSetup
 	  * @return Path to the text file where merge conflicts shall be documented
 	  */
 	def mergeConflictsFilePath: Path
+	/**
+	 * @return Backup logic used in this project build
+	 */
+	def backup: Backup
 	/**
 	  * @return Current project version, if known
 	  */

@@ -148,10 +148,12 @@ case class File(packagePath: Package, declarations: Vector[InstanceDeclaration],
 				}
 		}
 		// Checks whether this file needs to be merged with an existing file
-		val fileToWrite = setup.mergeSourceRoots
+		val matchingSourceFile = setup.mergeSourceRoots
 			.findMap { root => Some(ref.pathIn(root).withFileName(actualFileName)).filter { _.exists } }
-			.flatMap { ScalaParser(_).toOption } match
-		{
+		// Takes a backup of the file that will be overwritten
+		matchingSourceFile.foreach { oldFile => setup.backup(oldFile) }
+		// TODO: Log parse failure
+		val fileToWrite = matchingSourceFile.flatMap { ScalaParser(_).toOption } match {
 			case Some(readVersion) =>
 				// Merges these two files.
 				// Records conflicts, also

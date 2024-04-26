@@ -1,8 +1,10 @@
 package utopia.coder.vault.model.data
 
+import utopia.coder.controller.refactoring.Backup
 import utopia.coder.model.data.{Name, ProjectSetup}
 import utopia.coder.model.scala.Package
 import utopia.flow.util.Version
+import utopia.flow.util.logging.Logger
 
 import java.nio.file.Path
 
@@ -19,12 +21,17 @@ import java.nio.file.Path
   * @param modelCanReferToDB Whether model classes are allowed to refer to database classes
   * @param prefixSqlProperties Whether a prefix should be added to sql properties, making them unique
   */
-case class VaultProjectSetup(dbModuleName: Name, modelPackage: Package, databasePackage: Package, sourceRoot: Path,
-                             mergeSourceRoots: Vector[Path], mergeConflictsFilePath: Path,
-                             version: Option[Version], modelCanReferToDB: Boolean, prefixSqlProperties: Boolean)
+class VaultProjectSetup(val dbModuleName: Name, val modelPackage: Package, val databasePackage: Package,
+                        override val sourceRoot: Path, backupRoot: Path,
+                        override val mergeSourceRoots: Vector[Path], override val mergeConflictsFilePath: Path,
+                        override val version: Option[Version], val modelCanReferToDB: Boolean,
+                        val prefixSqlProperties: Boolean)
+                       (implicit log: Logger)
 	extends ProjectSetup
 {
 	// ATTRIBUTES   ------------------------
+	
+	override val backup: Backup = new Backup(mergeSourceRoots, backupRoot)
 	
 	/**
 	  * @return Package that contains database access points

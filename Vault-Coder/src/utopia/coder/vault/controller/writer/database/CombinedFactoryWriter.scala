@@ -63,9 +63,9 @@ object CombinedFactoryWriter
 		// Utilizes the same indexing
 		val creation = {
 			if (data.combinationType.isOneToOne && data.parentClass.recordsIndexedCreationTime) {
-				val extension: Extension = fromRowFactoryWithTimestamps(references.combined)
-				val function = ComputedProperty("creationTimePropertyName", Set(parentFactoryRef),
-					isOverridden = true)(s"${parentFactoryRef.target}.creationTimePropertyName")
+				val extension: Extension = fromTimelineRowFactory(references.combined)
+				val function = ComputedProperty("timestamp", Set(parentFactoryRef), isOverridden = true)(
+					"parentFactory.timestamp")
 				Some(extension -> function)
 			}
 			else

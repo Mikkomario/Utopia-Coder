@@ -46,7 +46,7 @@ object VaultReferences
 		
 		lazy val fromRowModelFactory = Reference(fromRowFactories / "model", "FromRowModelFactory")
 		lazy val fromValidatedRowModelFactory = Reference(fromRowFactories / "model", "FromValidatedRowModelFactory")
-		lazy val fromRowFactoryWithTimestamps = Reference(fromRowFactories, "FromRowFactoryWithTimestamps")
+		lazy val fromTimelineRowFactory = Reference(fromRowFactories, "FromTimelineRowFactory")
 		lazy val combiningFactory = Reference(singleLinkedFactories, "CombiningFactory")
 		lazy val possiblyCombiningFactory = Reference(singleLinkedFactories, "PossiblyCombiningFactory")
 		lazy val multiCombiningFactory = Reference(factories / "multi", "MultiCombiningFactory")

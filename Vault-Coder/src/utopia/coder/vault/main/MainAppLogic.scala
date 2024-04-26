@@ -141,26 +141,28 @@ object MainAppLogic extends CoderAppLogic
 		val filteredData = {
 			// May remove combo classes
 			val base = if (arguments("no-combos").getBoolean) data.map { _.withoutCombos } else data
-			if (targetType == _class)
-				filter match {
-					case Some(filter) => base.map { _.filterByClassName(filter) }
-					case None => base.map { d => d.onlyClasses }
-				}
-			else if (targetType == _package)
-				filter match {
-					case Some(filter) => base.map { _.filterByPackage(filter) }
-					case None => base
-				}
-			else if (targetType == _enums)
-				filter match {
-					case Some(filter) => base.map { _.filterByEnumName(filter) }
-					case None => base.map { _.onlyEnumerations }
-				}
-			else
-				filter match {
-					case Some(filter) => base.map { _.filter(filter) }
-					case None => base
-				}
+			targetType match {
+				case _class =>
+					filter match {
+						case Some(filter) => base.map { _.filterByClassName(filter) }
+						case None => base.map { d => d.onlyClasses }
+					}
+				case _package =>
+					filter match {
+						case Some(filter) => base.map { _.filterByPackage(filter) }
+						case None => base
+					}
+				case _enums =>
+					filter match {
+						case Some(filter) => base.map { _.filterByEnumName(filter) }
+						case None => base.map { _.onlyEnumerations }
+					}
+				case _ =>
+					filter match {
+						case Some(filter) => base.map { _.filter(filter) }
+						case None => base
+					}
+			}
 		}
 		
 		println()
@@ -190,8 +192,7 @@ object MainAppLogic extends CoderAppLogic
 				// Makes sure there is something to write
 				if (data.isEmpty)
 					Success(())
-				else
-				{
+				else {
 					println(s"Writing ${data.classes.size} classes, ${
 						data.enumerations.size} enumerations and ${
 						data.combinations.size } combinations for project ${data.projectName}${data.version match {
@@ -214,15 +215,15 @@ object MainAppLogic extends CoderAppLogic
 						else
 							Vector(mainMergeRoot, alternativeMergeRoot).flatten
 					}
-					implicit val setup: VaultProjectSetup = VaultProjectSetup(data.projectName, data.modelPackage,
-						data.databasePackage, directory, mergePaths,
-						directory/mergeFileName, data.version, data.modelCanReferToDB, data.prefixColumnNames)
+					implicit val setup: VaultProjectSetup = new VaultProjectSetup(data.projectName, data.modelPackage,
+						data.databasePackage, subDirectory(directory, "src"), subDirectory(directory, "backup"),
+						mergePaths, directory/mergeFileName, data.version, data.modelCanReferToDB,
+						data.prefixColumnNames)
 					
 					write(data)
 				}
 			}
-		} match
-		{
+		} match {
 			case Success(_) =>
 				println("All documents successfully written!")
 				filteredData.exists { _.nonEmpty }

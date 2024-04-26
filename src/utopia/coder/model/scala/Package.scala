@@ -93,6 +93,11 @@ case class Package(parts: Vector[String]) extends ScalaConvertible with MaybeEmp
 	def parent = if (isEmpty) this else Package(parts.dropRight(1))
 	
 	/**
+	 * @return Copy of this package where the root element is removed
+	 */
+	def tail = Package(parts.tail)
+	
+	/**
 	  * @param setup Implicit project-specific setup
 	  * @return A path to the directory matching this package
 	  */

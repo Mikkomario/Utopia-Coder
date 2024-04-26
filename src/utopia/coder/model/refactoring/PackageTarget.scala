@@ -1,15 +1,16 @@
 package utopia.coder.model.refactoring
 
 import utopia.coder.model.scala.Package
-import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.caching.LazyTree
+import utopia.flow.collection.immutable.caching.iterable.CachingSeq
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.logging.Logger
 
 import java.nio.file.Path
 
 /**
- * Used for targeting a specific package in a context where the path is only partially known
+ * Used for targeting a specific package in a context where the path is only partially known.
+ * Supports * as a package name, which means that all packages within that layer are included.
  * @param knownParents The package portion that should precede the targeted package,
  *                  but is not part of the targeted package
  * @param target Targeted package appearing under 'knownParents'
@@ -41,35 +42,51 @@ case class PackageTarget(knownParents: Package = Package.empty, target: Package)
 			// Case: Some parents are known => Locates those first
 			case Some(knownParents) =>
 				val topKnownParent = knownParents.parts.head
-				val subParents = knownParents.parts.tail
+				val subParents = knownParents.tail
 				tree.pathsToRootsWhereIterator { n => n.hasChildren && n.nav.fileName == topKnownParent }
+					// TODO: use flatMap (targeting all) or find (targeting one)?
 					.flatMap { pathToTopParent =>
-						val subParentPaths = subParents.foldLeftIterator(pathToTopParent.last.nav) { _/_ }.toVector
-						val bottomParent = subParentPaths.last
-						// Continues by identifying the targets under the located parent paths
-						val targetPaths = target.parts.foldLeftIterator(bottomParent) { _/_ }.toVector
-						
-						if (targetPaths.last.exists)
-							Some(LocatedPackage(pathToTopParent.map { _.nav } ++ subParentPaths, targetPaths))
-						else
-							None
+						lazy val topParentPaths = pathToTopParent.map { _.nav }
+						resolvePackagePaths(pathToTopParent.last, subParents).flatMap { parents =>
+							val bottomParent = parents.last
+							lazy val parentPaths = topParentPaths ++ parents.tail.map { _.nav }
+							// Continues by identifying the targets under the located parent paths
+							resolvePackagePaths(bottomParent, target).map { targetPath =>
+								LocatedPackage(parentPaths, targetPath.map { _.nav })
+							}
+						}
 					}
 			
 			// Case: No parents are known => Looks for the first target package instead
 			case None =>
 				val firstTargetDirName = target.parts.head
-				val subDirNames = target.parts.tail
 				tree.pathsToRootsWhereIterator { n => n.hasChildren && n.nav.fileName == firstTargetDirName }
 					.flatMap { pathToFirstTarget =>
-						val firstTarget = pathToFirstTarget.last.nav
-						val otherTargets = subDirNames.foldLeftIterator(firstTarget) { _/_ }.toVector
-						
-						if (otherTargets.lastOption.getOrElse(firstTarget).exists)
-							Some(LocatedPackage(pathToFirstTarget.dropRight(1).map { _.nav },
-								firstTarget +: otherTargets))
-						else
-							None
+						val firstTarget = pathToFirstTarget.last
+						lazy val parentPaths = pathToFirstTarget.map { _.nav }
+						resolvePackagePaths(firstTarget, target.tail).map { targetPaths =>
+							LocatedPackage(parentPaths, targetPaths.map { _.nav })
+						}
 					}
+		}
+	}
+	
+	// Returns whole package paths (i.e. lists all directories on each path)
+	// Branches if * is listed as a package
+	private def resolvePackagePaths(parent: LazyTree[Path], childPackages: Package) = {
+		// Iterates down one layer at a time
+		childPackages.parts.foldLeft(CachingSeq(Vector(parent))) { (parents, next) =>
+			// Case: Invalid path
+			if (parents.isEmpty)
+				parents
+			else {
+				// Case: Next part targets all sub-directories
+				if (next == "*")
+					parents.flatMap { p => p.last.children.map { p :+ _ } }
+				// Case: Next part targets a specific package / directory
+				else
+					parents.flatMap { p => p.last.children.find { _.nav.fileName == next }.map { p :+ _ } }
+			}
 		}
 	}
 }
