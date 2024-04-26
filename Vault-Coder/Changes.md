@@ -25,6 +25,7 @@
   - This method is now utilized in the generated filter functions, also, making the code slightly cleaner
 - Id-based many access -targeting now accepts **Iterable** instead of just **Set** 
   (it is left up to the caller to make sure the values are unique)
+- Unconditional single model access points now generate `.distinct(Condition)` instead of `.filterDistinct(Condition)`
 - Now generates scaladoc for the generated `.id` and `.ids` properties in access points
 - Generated scala file output is now placed under a subdirectory called `src`
 
