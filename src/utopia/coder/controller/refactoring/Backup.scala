@@ -38,10 +38,7 @@ class Backup(sourceRoots: Iterable[Path], backupRoot: Path)(implicit log: Logger
 						sourceRoots.mkString(", ") }")
 					backupRoot/s"other/${ file.fileName }"
 			}
-			destination.createDirectories().map { destination =>
-				println(s"Writes a backup to $destination")
-				file.copyAs(destination, Fail)
-			}.logFailure
+			destination.createDirectories().map { file.copyAs(_, Fail) }.logFailure
 		}
 	}
 }

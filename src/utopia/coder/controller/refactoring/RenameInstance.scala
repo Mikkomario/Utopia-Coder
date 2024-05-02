@@ -40,7 +40,7 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 	 * @param log Implicit logging implementation for recording certain file-access failures
 	 * @return Success or failure
 	 */
-	def apply(sourceRoot: Path)(implicit log: Logger) = {
+	def apply(sourceRoot: Path)(implicit backup: Backup, log: Logger) = {
 		// Locates the target packages
 		targetPackage.locate(sourceRoot)
 			.toVector
@@ -59,9 +59,11 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 							.toVector
 						
 						// Performs the renaming within the primary files
-						// TODO: Take backups
 						filesToRename
 							.tryMap { case (file, from, to) =>
+								// Takes a backup before making any edits
+								backup(file)
+								
 								file.edit { editor =>
 									// Finds the instance declaration line to replace
 									editor.nextLineIterator
@@ -94,7 +96,6 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 					.withDefaultValue(Map.empty)
 				val completedEditPerFile = flatEdits.map { case (_, file, from, _) => file -> from }.toMap
 				
-				// TODO: Again, take backups before editing
 				sourceRoot.toTree.nodesBelowIterator.filter { _.nav.fileType ~== "scala" }.tryForeach { fileNode =>
 					val file = fileNode.nav
 					// Reads the package and the imports section of the file in order to see whether
@@ -116,6 +117,9 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 							
 							// Case: There are edits to apply => Rewrites the file lines
 							if (editsToApply.nonEmpty) {
+								// Again, performs a backup before editing
+								backup(file)
+								
 								file.edit { editor =>
 									editor.mapRemaining { line =>
 										editsToApply.foldLeft(line) { case (line, (from, to)) =>
