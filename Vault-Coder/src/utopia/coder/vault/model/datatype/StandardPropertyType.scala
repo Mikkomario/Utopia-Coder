@@ -61,6 +61,8 @@ object StandardPropertyType
 			case _ =>
 				if (lowerTypeName.startsWith("text") || lowerTypeName.startsWith("string") || lowerTypeName.startsWith("varchar"))
 					Some(Text(appliedLength))
+				else if (lowerTypeName.startsWith("path") || lowerTypeName.startsWith("file"))
+					Some(FilePath(appliedLength))
 				else if (lowerTypeName.startsWith("option"))
 					interpretGenericType(lowerTypeName, length, propertyName).map { _.optional }
 				else if (lowerTypeName.startsWith("vector") ||
