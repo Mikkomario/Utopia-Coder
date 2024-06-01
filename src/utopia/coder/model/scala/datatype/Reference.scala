@@ -33,6 +33,7 @@ object Reference
 	
 	// Other Java
 	
+	lazy val path = apply("java.nio.file", "Path")
 	lazy val noSuchElementException = apply("java.util", "NoSuchElementException")
 	
 	
@@ -92,6 +93,7 @@ object Reference
 		lazy val timeExtensions = extensions(time, "TimeExtensions")
 		lazy val stringExtensions = extensions(utils, "StringExtensions")
 		lazy val equalsExtensions = extensions(operator/"equality", "EqualsExtensions")
+		lazy val fileExtensions = extensions(file, "FileExtensions")
 		
 		lazy val mutate = apply(utils, "Mutate")
 		lazy val notEmpty = apply(utils, "NotEmpty")
@@ -181,7 +183,7 @@ case class Reference private(packagePath: Package, importTarget: Vector[String],
 	  * @param newTarget Another target under this reference
 	  * @return Reference to that sub-item
 	  */
-	def /(newTarget: String) = subReference.notEmpty match {
+	def /(newTarget: String) = subReference.ifNotEmpty match {
 		case Some(oldSubRef) => copy(subReference = s"$oldSubRef.$newTarget")
 		case None => copy(importTarget = importTarget :+ newTarget)
 	}

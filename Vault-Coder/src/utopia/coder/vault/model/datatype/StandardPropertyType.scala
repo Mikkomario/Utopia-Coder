@@ -171,7 +171,7 @@ object StandardPropertyType
 			if (lowerName.contains("int")) {
 				// Int size may be specified in parentheses after the type name
 				// E.g. "Int(Tiny)" => TINYINT or "INT(320)" => SMALLINT
-				val lengthPart = lowerName.afterFirst("(").untilFirst(")").notEmpty
+				val lengthPart = lowerName.afterFirst("(").untilFirst(")").ifNotEmpty
 				val (size, maxValue) = lengthPart match {
 					case Some(s) =>
 						IntSize.values.find { size => (size.toString ~== s) || (size.toSql ~== s) } match {
@@ -649,6 +649,38 @@ object StandardPropertyType
 		}
 	}
 	
+	/**
+	 * Represents a path to a file or a directory
+	 * @param length Maximum number of characters allocated for this path
+	 */
+	case class FilePath(length: Int = 255) extends FacadePropertyType
+	{
+		// ATTRIBUTES   ------------------------
+		
+		override protected val delegate: PropertyType = Text(length)
+		
+		
+		// IMPLEMENTED  ------------------------
+		
+		override def scalaType: ScalaType = path
+		
+		override def emptyValue: CodePiece = CodePiece.empty
+		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
+		override def defaultPropertyName: Name = "file"
+		override def defaultPartNames: Seq[Name] = Vector.empty
+		
+		override def supportsDefaultJsonValues: Boolean = true
+		
+		override protected def yieldsTryFromDelegate: Boolean = false
+		
+		override protected def toDelegateCode(instanceCode: String): CodePiece =
+			CodePiece(s"$instanceCode.toJson", Set(fileExtensions))
+		override protected def fromDelegateCode(delegateCode: String): CodePiece =
+			CodePiece(s"$delegateCode: Path", Set(path, fileExtensions))
+		
+		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
+	}
+	
 	case class GenericValue(length: Int = 255) extends DirectlySqlConvertiblePropertyType
 	{
 		// ATTRIBUTES   ----------------------
@@ -980,12 +1012,9 @@ object StandardPropertyType
 				override lazy val target = idConversion.target.copy(columnNameSuffix = colNameSuffix)
 				
 				override def origin = scalaType
+				override def intermediate = Optional
 				
-				override def intermediate = idConversion.intermediate
-				
-				override def midConversion(originCode: String) =
-					idConversion.midConversion(s"e.${ enumeration.idPropName.prop }")
-						.mapText { fromId => s"$originCode.map { e => $fromId }" }
+				override def midConversion(originCode: String) = originCode
 			}
 		}
 		
@@ -994,11 +1023,9 @@ object StandardPropertyType
 			override lazy val target = idConversion.target.copy(columnNameSuffix = colNameSuffix)
 			
 			override def origin = scalaType
+			override def intermediate = optional
 			
-			override def intermediate = idConversion.intermediate
-			
-			override def midConversion(originCode: String) =
-				idConversion.midConversion(s"$originCode.${ enumeration.idPropName.prop }")
+			override def midConversion(originCode: String) = s"Some($originCode)"
 		}
 	}
 	

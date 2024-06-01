@@ -134,7 +134,7 @@ object ClassReader
 					// Finds the child class (child name match)
 					classes.find { c => c.name.variants.exists { _ ~== combo.childName } }.map { childClass =>
 						// Determines the combination type
-						val combinationType = combo.comboTypeName.notEmpty.flatMap(CombinationType.interpret)
+						val combinationType = combo.comboTypeName.ifNotEmpty.flatMap(CombinationType.interpret)
 							.getOrElse {
 								if (combo.childrenDefinedAsPlural)
 									MultiCombined
@@ -148,10 +148,10 @@ object ClassReader
 							}
 						def parseAlias(alias: String, pluralForm: String, pluralIsDefault: Boolean = false) = {
 							// Finds the alias name property, if defined
-							alias.notEmpty.map { alias =>
+							alias.ifNotEmpty.map { alias =>
 								val namingConvention = NamingConvention.of(alias, namingRules(ClassPropName))
 								// Finds the plural form, if defined
-								pluralForm.notEmpty match {
+								pluralForm.ifNotEmpty match {
 									// Case: Plural form is defined
 									case Some(pluralAlias) => Name(alias, pluralAlias, namingConvention)
 									// Case: Only one form is defined
@@ -169,11 +169,11 @@ object ClassReader
 						val childAlias = parseAlias(combo.childAlias, combo.pluralChildAlias,
 							combinationType.isOneToMany)
 						val parentAlias = parseAlias(combo.parentAlias, combo.pluralParentAlias)
-						val comboName = combo.name.notEmpty match {
+						val comboName = combo.name.ifNotEmpty match {
 							// Case: Custom name has been given
 							case Some(name) =>
 								val namingConvention = NamingConvention.of(name, namingRules(ClassName))
-								combo.pluralName.notEmpty match {
+								combo.pluralName.ifNotEmpty match {
 									// Case: Plural form has also been specified
 									case Some(pluralName) => Name(name, pluralName, namingConvention)
 									// Case: No plural form specified => Auto-pluralizes
@@ -366,12 +366,12 @@ object ClassReader
 		// val columnName = propModel("column_name").stringOr(NamingUtils.camelToUnderscore(name))
 		val tableReference = propModel("references", "ref").string.map { ref =>
 			val (tablePart, columnPart) = ref.splitAtFirst("(").toTuple
-			tablePart -> columnPart.untilLast(")").notEmpty.map { Name.interpret(_, ColumnName.style) }
+			tablePart -> columnPart.untilLast(")").ifNotEmpty.map { Name.interpret(_, ColumnName.style) }
 		}
 		val length = propModel("length", "len").int
 		val baseDataType = propModel("type").string.flatMap { typeName =>
 			val lowerTypeName = typeName.toLowerCase
-			val innermostTypeName = lowerTypeName.afterLast("[").notEmpty match {
+			val innermostTypeName = lowerTypeName.afterLast("[").ifNotEmpty match {
 				case Some(afterBracket) => afterBracket.untilFirst("]")
 				case None => lowerTypeName
 			}

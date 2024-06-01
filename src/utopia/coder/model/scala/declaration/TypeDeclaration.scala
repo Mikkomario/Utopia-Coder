@@ -29,7 +29,7 @@ case class TypeDeclaration(name: String, genericTypes: Seq[GenericType] = Vector
 {
 	override def keyword: CodePiece = TypeDeclaration.keyword
 	
-	override def documentation: Vector[ScalaDocPart] = description.notEmpty.map(ScalaDocPart.description).toVector
+	override def documentation: Vector[ScalaDocPart] = description.ifNotEmpty.map(ScalaDocPart.description).toVector
 	
 	// WET WET: Contains copy code from InstanceDeclaration
 	override def toCode: Code = {

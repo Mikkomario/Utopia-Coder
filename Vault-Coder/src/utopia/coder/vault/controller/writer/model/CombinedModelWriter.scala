@@ -66,8 +66,8 @@ object CombinedModelWriter
 					MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
 						Parameter("factory", parentRef))(s"copy($parentPropName = factory)")
 				),
-				description = data.description.notEmpty
-					.getOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
+				description = data.description
+					.nonEmptyOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
 				author = data.author, since = DeclarationDate.versionedToday, isCaseClass = true
 			)
 		).write().map { comboRef => CombinationReferences(parentRef, childRef, comboRef) }
