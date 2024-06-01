@@ -63,8 +63,7 @@ class InstanceBuilder(visibility: Visibility, prefixes: Set[DeclarationPrefix], 
 	  * @param refMap Map that contains reference targets as keys and references as values
 	  * @return Instance declaration based on collected data
 	  */
-	def result(refMap: Map[String, Reference]) =
-	{
+	def result(refMap: Map[String, Reference]) = {
 		val freeCodeLines = freeCodeBuilder.result()
 		val freeCode = Code(freeCodeLines, refMap.keySet
 			.filter { target => freeCodeLines.exists { _.code.contains(target) } }.map(refMap.apply))

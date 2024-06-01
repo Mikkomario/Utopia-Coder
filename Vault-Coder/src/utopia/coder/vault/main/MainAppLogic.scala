@@ -140,16 +140,22 @@ object MainAppLogic extends CoderAppLogic
 		// Applies filters
 		val filteredData = {
 			// May remove combo classes
-			val base = if (arguments("no-combos").getBoolean) data.map { _.withoutCombos } else data
+			val noCombos = arguments("no-combos").getBoolean
+			val base = if (noCombos) data.map { _.withoutCombos } else data
+			base.foreach { p =>
+				println(s"${p.projectName}: ${ p.classes.size } classes and ${ p.combinations.size } combinations")
+			}
 			targetType match {
 				case _class =>
 					filter match {
-						case Some(filter) => base.map { _.filterByClassName(filter) }
+						case Some(filter) => base.map { _.filterByClassName(filter, includeCombos = !noCombos) }
 						case None => base.map { d => d.onlyClasses }
 					}
 				case _package =>
 					filter match {
-						case Some(filter) => base.map { _.filterByPackage(filter) }
+						case Some(filter) =>
+							println("Filtering by package")
+							base.map { _.filterByPackage(filter, includeCombos = !noCombos) }
 						case None => base
 					}
 				case _enums =>
@@ -159,7 +165,9 @@ object MainAppLogic extends CoderAppLogic
 					}
 				case _ =>
 					filter match {
-						case Some(filter) => base.map { _.filter(filter) }
+						case Some(filter) =>
+							println("Filtering by any")
+							base.map { _.filter(filter) }
 						case None => base
 					}
 			}

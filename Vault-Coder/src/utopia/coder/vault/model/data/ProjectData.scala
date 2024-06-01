@@ -129,6 +129,7 @@ case class ProjectData(projectName: Name, modelPackage: Package, databasePackage
 		val filteredCombos = combinations.filter { c => comboInclusionCondition(c) ||
 			filteredClasses.contains(c.childClass) || filteredClasses.contains(c.parentClass) }
 		val comboClasses = filteredCombos.flatMap { c => Pair(c.parentClass, c.childClass) }
+		
 		(filteredClasses ++ comboClasses).distinct -> filteredCombos
 	}
 }
