@@ -4,6 +4,7 @@ import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.{ScalaTypeConvertible, ValueConvertibleType}
+import utopia.coder.vault.model.enumeration.Mutability
 
 /**
   * A common trait for property types which support both nullable (optional) and non-nullable (concrete) variants
@@ -33,6 +34,12 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	  * @return Names used for multi-column parts of this type when no other names have been specified, if applicable.
 	  */
 	def defaultPartNames: Seq[Name]
+	
+	/**
+	 * @return Mutability used for this property type by default.
+	 *         None if project-wide / common default should be used instead.
+	 */
+	def defaultMutability: Option[Mutability]
 	
 	/**
 	  * @return Whether the conversion from a Value may fail, meaning that fromValueCode
@@ -270,6 +277,7 @@ trait ConcreteSingleColumnPropertyType extends SingleColumnPropertyType
 		override def nonEmptyDefaultValue = CodePiece.empty
 		override def emptyValue = CodePiece.none
 		
+		override def defaultMutability: Option[Mutability] =  ConcreteSingleColumnPropertyType.this.defaultMutability
 		override def defaultPropertyName = ConcreteSingleColumnPropertyType.this.defaultPropertyName
 		
 		override def concrete = ConcreteSingleColumnPropertyType.this
@@ -469,6 +477,7 @@ trait FacadePropertyType extends PropertyType
 		override def emptyValue: CodePiece = CodePiece.none
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
 		
+		override def defaultMutability: Option[Mutability] = FacadePropertyType.this.defaultMutability
 		override def defaultPropertyName: Name = FacadePropertyType.this.defaultPropertyName
 		override def defaultPartNames: Seq[Name] = FacadePropertyType.this.defaultPartNames
 		

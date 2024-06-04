@@ -5,6 +5,7 @@ import utopia.flow.collection.CollectionExtensions._
 import utopia.coder.vault.model.datatype.StandardPropertyType.ClassReference
 import utopia.coder.vault.model.datatype.{PropertyType, SingleColumnPropertyType}
 import utopia.coder.model.scala.code.CodePiece
+import utopia.coder.vault.model.enumeration.Mutability
 
 object Property
 {
@@ -13,13 +14,16 @@ object Property
 	  * @param name Name of this property
 	  * @param dataType Type of this property
 	  * @param customDefaultValue Default value passed for this property, as code (empty if no default (default))
-	  * @param description Description of this property (Default = empty)
+	  * @param customMutability User-defined mutability of this property. Default = None = not defined (i.e. use defaults)
+	 * @param description Description of this property (Default = empty)
 	  * @return A new property
 	  */
 	def singleColumn(name: Name, dataType: SingleColumnPropertyType, customDefaultValue: CodePiece = CodePiece.empty,
-	                 dbPropertyOverrides: DbPropertyOverrides = DbPropertyOverrides.empty, withAccessName: String = "",
+	                 dbPropertyOverrides: DbPropertyOverrides = DbPropertyOverrides.empty,
+	                 customMutability: Option[Mutability] = None, withAccessName: String = "",
 	                 inAccessName: String = "", description: String = ""): Property =
-		apply(name, dataType, customDefaultValue, Vector(dbPropertyOverrides), withAccessName, inAccessName, description)
+		apply(name, dataType, customDefaultValue, Vector(dbPropertyOverrides), customMutability, withAccessName,
+			inAccessName, description)
 }
 
 /**
@@ -32,12 +36,14 @@ object Property
   *                           Empty if no override should be made. Default = empty.
   * @param dbPropertyOverrides User-defined overrides applied to the database-properties matching this class-property.
   *                            Default = empty = no overrides.
-  * @param withAccessName (Custom) name of the access (filter) method that targets an individual value
+  * @param customMutability User-defined mutability of this property. Default = None = not defined (i.e. use defaults)
+ * @param withAccessName (Custom) name of the access (filter) method that targets an individual value
   * @param inAccessName (Custom) name of the access (filter) method that targets multiple values using an "in" query
   * @param description Description of this property (may be empty). Default = empty = no description.
   */
 case class Property(name: Name, dataType: PropertyType, customDefaultValue: CodePiece = CodePiece.empty,
-                    dbPropertyOverrides: Vector[DbPropertyOverrides] = Vector(), withAccessName: String = "",
+                    dbPropertyOverrides: Vector[DbPropertyOverrides] = Vector(),
+                    customMutability: Option[Mutability] = None, withAccessName: String = "",
                     inAccessName: String = "", description: String = "")
 	extends Named
 {
@@ -88,6 +94,23 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 	  * @return Whether there exists an index based on this property
 	  */
 	def isIndexed = dbProperties.exists { _.isIndexed }
+	
+	/**
+	 * @param settings Implicit project settings that define the common default mutability
+	 * @return Mutability of this property
+	 */
+	def mutability(implicit settings: VaultProjectSetup) =
+		customMutability.getOrElse { dataType.defaultMutability.getOrElse(settings.defaultMutability) }
+	/**
+	 * @param settings Implicit project settings that define the common default mutability
+	 * @return Whether this property should be allowed (and expected) to change
+	 */
+	def isMutable(implicit settings: VaultProjectSetup) = mutability.isMutable
+	/**
+	 * @param settings Implicit project settings that define the common default mutability
+	 * @return Whether this property should not be allowed to change
+	 */
+	def isImmutable(implicit settings: VaultProjectSetup) = mutability.isImmutable
 	
 	/**
 	  * @return Some(DbProperty) if this property only matches to a single database-property. None otherwise.

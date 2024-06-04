@@ -16,8 +16,9 @@ import utopia.coder.vault.controller.writer.model.EnumerationWriter
 import utopia.coder.vault.model.data.{Class, Enum}
 import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.{Date, DateTime, DoubleNumber, IntNumber, LongNumber}
 import utopia.coder.vault.model.datatype.StandardPropertyType.TimeDuration.{fromValueReferences, toValueReferences}
-import utopia.coder.vault.model.enumeration.IntSize
+import utopia.coder.vault.model.enumeration.{IntSize, Mutability}
 import utopia.coder.vault.model.enumeration.IntSize.Default
+import utopia.coder.vault.model.enumeration.Mutability.{Immutable, Mutable}
 import utopia.coder.vault.util.VaultReferences._
 
 import java.util.concurrent.TimeUnit
@@ -130,20 +131,19 @@ object StandardPropertyType
 		
 		override def valueDataType = dataType / valueDataTypeName
 		
-		override def yieldsTryFromValue = false
+		override def defaultMutability: Option[Mutability] = None
 		
+		override def yieldsTryFromValue = false
 		override def yieldsTryFromJsonValue: Boolean = false
+		
+		override def toValueCode(instanceCode: String) = CodePiece(instanceCode, Set(valueConversions))
+		override def toJsonValueCode(instanceCode: String): CodePiece = toValueCode(instanceCode)
+		override def optionToValueCode(optionCode: String, isToJson: Boolean) =
+			CodePiece(optionCode, Set(valueConversions))
 		
 		override def fromValueCode(valueCode: String, isFromJson: Boolean) =
 			CodePiece(s"$valueCode.get${ fromValuePropName.capitalize }")
-		
-		override def toValueCode(instanceCode: String) = CodePiece(instanceCode, Set(valueConversions))
-		
-		override def toJsonValueCode(instanceCode: String): CodePiece = toValueCode(instanceCode)
-		
 		override def optionFromValueCode(valueCode: String, isFromJson: Boolean) = s"$valueCode.$fromValuePropName"
-		
-		override def optionToValueCode(optionCode: String, isToJson: Boolean) = CodePiece(optionCode, Set(valueConversions))
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) = ""
 	}
@@ -417,6 +417,8 @@ object StandardPropertyType
 		override def emptyValue = CodePiece.empty
 		override def nonEmptyDefaultValue = now.targetCode
 		
+		override def defaultMutability: Option[Mutability] = Some(Immutable)
+		
 		override def isFilterGenerationSupported: Boolean = false
 		override def supportsDefaultJsonValues = false
 		override def yieldsTryFromValue = false
@@ -439,11 +441,18 @@ object StandardPropertyType
 	  */
 	case object UpdateTime extends SingleColumnPropertyTypeWrapper
 	{
+		// ATTRIBUTES   -------------------------
+		
 		override lazy val sqlConversion =
 			wrapped.sqlConversion.modifyTarget(defaultValue = "CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP")
 		override lazy val defaultPropertyName = Name("lastUpdated", "lastUpdateTimes", CamelCase.lower)
 		
+		
+		// IMPLEMENTED  -------------------------
+		
 		override protected def wrapped = CreationTime
+		
+		override def defaultMutability: Option[Mutability] = Some(Mutable)
 		
 		override def optional = DateTime.optional
 		override def concrete = this
@@ -458,10 +467,17 @@ object StandardPropertyType
 	  */
 	case object Deprecation extends SingleColumnPropertyTypeWrapper
 	{
+		// ATTRIBUTES   -------------------------
+		
 		override lazy val sqlConversion = wrapped.sqlConversion.modifyTarget(indexByDefault = true)
 		override lazy val defaultPropertyName = Name("deprecatedAfter", "deprecationTimes", CamelCase.lower)
 		
+		
+		// IMPLEMENTED  -------------------------
+		
 		protected def wrapped = DateTime.OptionWrapped
+		
+		override def defaultMutability: Option[Mutability] = Some(Mutable)
 		
 		override def optional = this
 		override def concrete = Expiration
@@ -478,6 +494,8 @@ object StandardPropertyType
 		override lazy val defaultPropertyName = Name("expires", "expirationTimes", CamelCase.lower)
 		
 		protected def wrapped = DateTime
+		
+		override def defaultMutability: Option[Mutability] = None
 		
 		override def optional = Deprecation
 		override def concrete = this
@@ -504,6 +522,7 @@ object StandardPropertyType
 		
 		override def emptyValue = CodePiece.empty
 		
+		override def defaultMutability: Option[Mutability] = None
 		override def defaultPropertyName = "duration"
 		
 		override def isFilterGenerationSupported: Boolean = true
@@ -570,6 +589,7 @@ object StandardPropertyType
 		
 		override def concrete = this
 		
+		override def defaultMutability: Option[Mutability] = None
 		override def defaultPropertyName = "text"
 		
 		override def isFilterGenerationSupported: Boolean = true
@@ -610,6 +630,7 @@ object StandardPropertyType
 		override def concrete = this
 		override def optional = allowingEmpty
 		
+		override def defaultMutability: Option[Mutability] = None
 		override def defaultPropertyName = if (length < 100) "name" else "text"
 		
 		override def isFilterGenerationSupported: Boolean = true
@@ -670,9 +691,9 @@ object StandardPropertyType
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
 		override def defaultPropertyName: Name = "file"
 		override def defaultPartNames: Seq[Name] = Vector.empty
+		override def defaultMutability: Option[Mutability] = None
 		
 		override def supportsDefaultJsonValues: Boolean = true
-		
 		override protected def yieldsTryFromDelegate: Boolean = false
 		
 		override protected def toDelegateCode(instanceCode: String): CodePiece =
@@ -698,14 +719,15 @@ object StandardPropertyType
 		override def isFilterGenerationSupported: Boolean = true
 		override def yieldsTryFromValue = false
 		override def yieldsTryFromJsonValue: Boolean = false
+		override def supportsDefaultJsonValues = true
 		
 		override def nonEmptyDefaultValue = CodePiece.empty
 		override def emptyValue = CodePiece("Value.empty", Set(value))
-		override def supportsDefaultJsonValues = true
 		
 		override def concrete = this
 		
 		override def defaultPropertyName = "value"
+		override def defaultMutability: Option[Mutability] = None
 		
 		// Converts the value to a json string before converting it back to a value
 		override def toValueCode(instanceCode: String) =
@@ -754,6 +776,7 @@ object StandardPropertyType
 		override def concrete = this
 		
 		override def defaultPropertyName = "values"
+		override def defaultMutability: Option[Mutability] = None
 		
 		// Converts the value to a json string before converting it back to a value
 		// Empty models are not represented by json, are empty
@@ -828,6 +851,7 @@ object StandardPropertyType
 		override def nonEmptyDefaultValue = CodePiece("Duration.Zero", Set(Reference.duration))
 		
 		override def defaultPropertyName = "duration"
+		override def defaultMutability: Option[Mutability] = None
 		
 		override def isFilterGenerationSupported: Boolean = false
 		override def supportsDefaultJsonValues = true
@@ -885,6 +909,7 @@ object StandardPropertyType
 		
 		override def defaultPropertyName: Name = referencedTableName + "id"
 		override def defaultPartNames: Vector[Name] = Vector()
+		override def defaultMutability: Option[Mutability] = if (referencedType.isOptional) Some(Mutable) else None
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) =
 			s"${ referencedColumnName.doc.capitalize } of the ${ referencedTableName.doc } linked with this ${ className.doc }"
@@ -928,6 +953,7 @@ object StandardPropertyType
 		
 		override def defaultPropertyName = enumeration.name
 		override def defaultPartNames: Vector[Name] = Vector()
+		override def defaultMutability: Option[Mutability] = None
 		
 		override def yieldsTryFromValue = enumeration.hasNoDefault
 		override def yieldsTryFromJsonValue: Boolean = yieldsTryFromValue
@@ -968,6 +994,7 @@ object StandardPropertyType
 			
 			override def defaultPropertyName = EnumValue.this.defaultPropertyName
 			override def defaultPartNames: Vector[Name] = EnumValue.this.defaultPartNames
+			override def defaultMutability: Option[Mutability] = EnumValue.this.defaultMutability
 			
 			override def optional = this
 			override def concrete = EnumValue.this
@@ -1059,6 +1086,7 @@ object StandardPropertyType
 		// IMPLEMENTED  ---------------------------
 		
 		override def defaultPropertyName = "values"
+		override def defaultMutability: Option[Mutability] = None
 		
 		override def emptyValue = CodePiece("Vector.empty")
 		override def nonEmptyDefaultValue = CodePiece.empty
@@ -1158,6 +1186,7 @@ object StandardPropertyType
 			Name(inner.plural, inner.plural, inner.style)
 		}
 		override def defaultPartNames = propertyNames.map { Name(_) }
+		override def defaultMutability: Option[Mutability] = None
 		
 		// TODO: This type doesn't support option-wrapping at this time - Add when needed
 		override def optional: PropertyType = this
@@ -1285,6 +1314,8 @@ object StandardPropertyType
 		
 		override def scalaType: ScalaType = paradigm.angle
 		
+		override def defaultMutability: Option[Mutability] = None
+		
 		override def emptyValue: CodePiece = CodePiece.empty
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
 		override def defaultPropertyName: Name = "direction"
@@ -1352,6 +1383,7 @@ object StandardPropertyType
 		
 		override def defaultPropertyName: Name = "distance"
 		override def defaultPartNames: Vector[Name] = Vector()
+		override def defaultMutability: Option[Mutability] = None
 		
 		override def supportsDefaultJsonValues: Boolean = true
 		override protected def yieldsTryFromDelegate: Boolean = false
@@ -1375,6 +1407,7 @@ object StandardPropertyType
 		
 		override def defaultPropertyName: Name = "latLong"
 		override def defaultPartNames: Vector[Name] = Vector("latitude", "longitude")
+		override def defaultMutability: Option[Mutability] = None
 		
 		override def supportsDefaultJsonValues: Boolean = true
 		override protected def yieldsTryFromDelegate: Boolean = false

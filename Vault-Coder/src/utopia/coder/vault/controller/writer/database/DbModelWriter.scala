@@ -180,7 +180,8 @@ object DbModelWriter
 		concreteProp.oneOrManyDbVariants match {
 			// Case: The property matches a single column => generates one withX -method
 			case Left(dbProp) =>
-				Vector(withDbPropertyMethod(dbProp, concreteProp.description, calledMethodName = calledMethodName))
+				Vector(withDbPropertyMethod(dbProp, concreteProp.description, calledMethodName = calledMethodName,
+					returnDescriptionStart = returnDescriptionStart))
 			// Case: The property matches multiple columns => generates partial and full withX method
 			// variants
 			case Right(dbProps) =>

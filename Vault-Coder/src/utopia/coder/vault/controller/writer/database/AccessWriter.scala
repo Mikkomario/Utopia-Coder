@@ -825,11 +825,11 @@ object AccessWriter
 	}
 	private def propertySettersFor(classToWrite: Class, modelPropName: String = "model")
 	                              (methodNameFromPropName: Name => String)
-	                              (implicit naming: NamingRules) =
+	                              (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// TODO: Because of a technical limitation where accepted parameter type is not available, only single-column
 		//  properties are written
-		classToWrite.properties.map { _.concrete }.flatMap { prop =>
+		classToWrite.properties.filter { _.isMutable }.map { _.concrete }.flatMap { prop =>
 			prop.onlyDbVariant.map { dbProp =>
 				setter(prop, dbProp, classToWrite.name, modelPropName)(methodNameFromPropName)
 			}

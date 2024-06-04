@@ -5,6 +5,7 @@ import utopia.flow.collection.immutable.Pair
 import utopia.flow.operator.MaybeEmpty
 import utopia.flow.util.Version
 import utopia.coder.model.scala.Package
+import utopia.coder.vault.model.enumeration.Mutability
 
 /**
   * Contains project classes, enumerations etc.
@@ -20,14 +21,15 @@ import utopia.coder.model.scala.Package
   * @param instances Introduced class instances in this project
   * @param namingRules Naming rules to use in this project
   * @param version Project version
-  * @param modelCanReferToDB Whether model classes are allowed to refer to database classes
+  * @param defaultMutability Whether defined properties should be mutable or immutable by default
+ * @param modelCanReferToDB Whether model classes are allowed to refer to database classes
   * @param prefixColumnNames Whether column names should have a prefix
   */
 case class ProjectData(projectName: Name, modelPackage: Package, databasePackage: Package,
                        databaseName: Option[Name], enumerations: Vector[Enum],
                        classes: Vector[Class], combinations: Vector[CombinationData], instances: Vector[Instance],
-                       namingRules: NamingRules, version: Option[Version], modelCanReferToDB: Boolean,
-                       prefixColumnNames: Boolean)
+                       namingRules: NamingRules, version: Option[Version], defaultMutability: Mutability,
+                       modelCanReferToDB: Boolean, prefixColumnNames: Boolean)
 	extends MaybeEmpty[ProjectData]
 {
 	// COMPUTED ------------------------------

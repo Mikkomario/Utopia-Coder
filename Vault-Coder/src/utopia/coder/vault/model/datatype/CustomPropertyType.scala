@@ -17,6 +17,7 @@ import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.ValueConvertibleType
 import Reference.Flow._
 import utopia.coder.model.enumeration.NameContext.ClassPropName
+import utopia.coder.vault.model.enumeration.Mutability
 
 import scala.util.{Failure, Success}
 
@@ -66,7 +67,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 							model("from_json_value"), model("option_from_json_value"),
 							model("empty", "empty_value"), default,
 							model("prop_name", "property_name", "default_prop_name", "default_name"),
-							parts.flatMap { _.defaultName },
+							parts.flatMap { _.defaultName }, model("mutable").boolean.map(Mutability.forIsMutable),
 							model("description", "doc", "desc"),
 							fromValueYieldsTry,
 							model("from_json_value_can_fail", "json_yields_try", "json_try")
@@ -191,7 +192,7 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
                               fromJsonValue: CodePiece = CodePiece.empty, optionFromJsonValue: CodePiece = CodePiece.empty,
                               emptyValue: CodePiece = CodePiece.empty,
                               nonEmptyDefaultValue: CodePiece = CodePiece.empty, defaultPropName: Option[Name] = None,
-                              defaultPartNames: Seq[Name] = Vector(),
+                              defaultPartNames: Seq[Name] = Vector(), defaultMutability: Option[Mutability] = None,
                               autoDescription: String = "", yieldsTryFromValue: Boolean = false,
                               yieldsTryFromJsonValue: Boolean = false, isFilterGenerationSupported: Boolean = true)
 	extends PropertyType
@@ -292,6 +293,7 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
 		
 		override def defaultPropertyName = CustomPropertyType.this.defaultPropertyName
 		override def defaultPartNames: Seq[Name] = CustomPropertyType.this.defaultPartNames
+		override def defaultMutability: Option[Mutability] = CustomPropertyType.this.defaultMutability
 		
 		override def optional = this
 		override def concrete = CustomPropertyType.this

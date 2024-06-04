@@ -3,6 +3,7 @@ package utopia.coder.vault.model.data
 import utopia.coder.controller.refactoring.Backup
 import utopia.coder.model.data.{Name, ProjectSetup}
 import utopia.coder.model.scala.Package
+import utopia.coder.vault.model.enumeration.Mutability
 import utopia.flow.util.Version
 import utopia.flow.util.logging.Logger
 
@@ -18,14 +19,15 @@ import java.nio.file.Path
   * @param sourceRoot Path to the export source directory
   * @param mergeSourceRoots Paths to the source roots where existing versions are read from and merged (optional)
   * @param version Current project version
-  * @param modelCanReferToDB Whether model classes are allowed to refer to database classes
+  * @param defaultMutability Whether properties should be considered mutable or immutable by default
+ * @param modelCanReferToDB Whether model classes are allowed to refer to database classes
   * @param prefixSqlProperties Whether a prefix should be added to sql properties, making them unique
   */
 class VaultProjectSetup(val dbModuleName: Name, val modelPackage: Package, val databasePackage: Package,
                         override val sourceRoot: Path, backupRoot: Path,
                         override val mergeSourceRoots: Vector[Path], override val mergeConflictsFilePath: Path,
-                        override val version: Option[Version], val modelCanReferToDB: Boolean,
-                        val prefixSqlProperties: Boolean)
+                        override val version: Option[Version], val defaultMutability: Mutability,
+                        val modelCanReferToDB: Boolean, val prefixSqlProperties: Boolean)
                        (implicit log: Logger)
 	extends ProjectSetup
 {

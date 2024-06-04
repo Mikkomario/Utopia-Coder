@@ -16,6 +16,7 @@ import utopia.coder.vault.controller.writer.database._
 import utopia.coder.vault.controller.writer.documentation.DocumentationWriter
 import utopia.coder.vault.controller.writer.model.{CombinedModelWriter, DescribedModelWriter, EnumerationWriter, ModelWriter}
 import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, ProjectData, VaultProjectSetup}
+import utopia.coder.vault.model.enumeration.Mutability
 import utopia.coder.vault.util.Common
 
 import java.nio.file.Path
@@ -102,6 +103,7 @@ object MainAppLogic extends CoderAppLogic
 								ProjectData(pName, modelPackage, dbPackage, a.databaseName.orElse { b.databaseName },
 									a.enumerations ++ b.enumerations, a.classes ++ b.classes,
 									a.combinations ++ b.combinations, a.instances ++ b.instances, a.namingRules, version,
+									Mutability.forIsMutable(a.defaultMutability.isMutable || b.defaultMutability.isMutable),
 									a.modelCanReferToDB && b.modelCanReferToDB, a.prefixColumnNames && b.prefixColumnNames)
 							}
 						}
@@ -146,28 +148,24 @@ object MainAppLogic extends CoderAppLogic
 				println(s"${p.projectName}: ${ p.classes.size } classes and ${ p.combinations.size } combinations")
 			}
 			targetType match {
-				case _class =>
+				case t if t == _class =>
 					filter match {
 						case Some(filter) => base.map { _.filterByClassName(filter, includeCombos = !noCombos) }
 						case None => base.map { d => d.onlyClasses }
 					}
-				case _package =>
+				case t if t == _package =>
 					filter match {
-						case Some(filter) =>
-							println("Filtering by package")
-							base.map { _.filterByPackage(filter, includeCombos = !noCombos) }
+						case Some(filter) => base.map { _.filterByPackage(filter, includeCombos = !noCombos) }
 						case None => base
 					}
-				case _enums =>
+				case t if t == _enums =>
 					filter match {
 						case Some(filter) => base.map { _.filterByEnumName(filter) }
 						case None => base.map { _.onlyEnumerations }
 					}
 				case _ =>
 					filter match {
-						case Some(filter) =>
-							println("Filtering by any")
-							base.map { _.filter(filter) }
+						case Some(filter) => base.map { _.filter(filter) }
 						case None => base
 					}
 			}
@@ -225,8 +223,8 @@ object MainAppLogic extends CoderAppLogic
 					}
 					implicit val setup: VaultProjectSetup = new VaultProjectSetup(data.projectName, data.modelPackage,
 						data.databasePackage, subDirectory(directory, "src"), subDirectory(directory, "backup"),
-						mergePaths, directory/mergeFileName, data.version, data.modelCanReferToDB,
-						data.prefixColumnNames)
+						mergePaths, directory/mergeFileName, data.version, data.defaultMutability,
+						data.modelCanReferToDB, data.prefixColumnNames)
 					
 					write(data)
 				}

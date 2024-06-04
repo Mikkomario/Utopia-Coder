@@ -22,7 +22,7 @@ import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, E
 import utopia.coder.model.enumeration.NameContext.{ClassName, ClassPropName, ColumnName, DatabaseName, EnumName, EnumValueName, Header, TableName}
 import utopia.coder.model.enumeration.NamingConvention
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
-import utopia.coder.vault.model.enumeration.{CombinationType, IntSize}
+import utopia.coder.vault.model.enumeration.{CombinationType, IntSize, Mutability}
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.code.CodePiece
 
@@ -208,6 +208,7 @@ object ClassReader
 			val instances = classData.flatMap { _._3 }
 			ProjectData(projectName, modelPackage, dbPackage, databaseName,
 				enumerations, classes, combinations, instances, namingRules, root("version").string.map { Version(_) },
+				Mutability.forIsMutable(root("mutable_props", "mutable").getBoolean),
 				!root("models_without_vault").getBoolean, root("prefix_columns").getBoolean)
 		}
 	}
@@ -432,7 +433,8 @@ object ClassReader
 				partModels.map { dbPropertyOverridesFrom(_, readName = true) }
 		}
 		
-		Property(name, actualDataType, default, dbPropertyOverrides, propModel("with").getString,
+		Property(name, actualDataType, default, dbPropertyOverrides,
+			propModel("mutable").boolean.map(Mutability.forIsMutable), propModel("with").getString,
 			propModel("in").getString, doc)
 	}
 	

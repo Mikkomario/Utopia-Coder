@@ -66,6 +66,9 @@ The input .json file should contain a single object with following properties:
 - **"database_package" / "db_package": String (optional)** - Package where all the database -related classes are written
   - Defaults to base_package.database
 - **"database_name" / "db_name" / "database" / "db": String (optional)** - Name of the target database
+- **"mutable_props" / "mutable": Boolean (optional)** - True if properties should be considered mutable by default
+  - Note: Property type may override this default. Property-specific definitions always override this default, when present.
+  - `false` (i.e. immutable) by default
 - **"models_without_vault": Boolean (optional)** - Whether model classes can't contain database references 
   (Metropolis-style project) (default = `false`)
 - **"prefix_columns": Boolean (optional)** - Whether sql column names should have a table-name -based prefix 
@@ -252,6 +255,8 @@ Each property object should contain following properties:
   - **Any custom data type alias** - Results in that custom data type being used
   - If omitted or empty, defaults to `Int`, `String` if the `"length"` property is present
     - Alternatively, the parser may interpret the property type based on the property name
+- `"mutable": Boolean (optional)` - Whether this property should be considered mutable (`true`) or immutable (`false`)
+  - If omitted, data type -specific default or the project default will be used
 - `"index" / "indexed": Boolean (optional)` - Set to true if you want to force indexing and false if you want 
   to disable it
   - Omit or leave as null if you want the indexing to be determined by the data type
