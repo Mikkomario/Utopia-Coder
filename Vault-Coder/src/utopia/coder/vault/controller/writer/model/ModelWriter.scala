@@ -15,6 +15,7 @@ import utopia.coder.vault.controller.writer.database.AccessWriter
 import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences._
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 
 import scala.io.Codec
 
@@ -75,7 +76,7 @@ object ModelWriter
 		
 		File(factoryPackage,
 			TraitDeclaration(name = factoryTraitName,
-				genericTypes = Vector(genericType),
+				genericTypes = Single(genericType),
 				// Contains a withX(x) function for each data property
 				methods = classToWrite.properties.map { prop =>
 					MethodDeclaration.newAbstract((withPrefix + prop.name).function, genericType.toScalaType,
@@ -100,8 +101,8 @@ object ModelWriter
 		File(factoryPackage,
 			TraitDeclaration(
 				name = (classToWrite.name + factoryTraitAppendix + wrapperAppendix).className,
-				genericTypes = Vector(wrapped, repr),
-				extensions = Vector(factoryRef(repr.toScalaType)),
+				genericTypes = Pair(wrapped, repr),
+				extensions = Single(factoryRef(repr.toScalaType)),
 				properties = Vector(
 					PropertyDeclaration.newAbstract("wrappedFactory", wrapped.toScalaType,
 						description = "The factory wrapped by this instance",
@@ -146,9 +147,19 @@ object ModelWriter
 			val propNameInModel = prop.jsonPropName.quoted
 			prop.toJsonValueCode.withPrefix(s"$propNameInModel -> ")
 		}
-		val propWriteCode = if (propWrites.isEmpty) CodePiece("Model.empty", Set(model)) else
-			propWrites.reduceLeft { _.append(_, ", ") }.withinParenthesis.withPrefix("Vector")
-				.withinParenthesis.withPrefix("Model").referringTo(model)
+		val propWriteCode = {
+			if (propWrites.isEmpty)
+				CodePiece("Model.empty", Set(model))
+			else {
+				val collection = propWrites.size match {
+					case 1 => CodePiece("Single", Set(single))
+					case 2 => CodePiece("Pair", Set(pair))
+					case _ => CodePiece("Vector")
+				}
+				CodePiece("Model", Set(model)) +
+					(collection + propWrites.reduceLeft { _.append(_, ", ") }.withinParenthesis).withinParenthesis
+			}
+		}
 		val fromModelMayFail = classToWrite.fromDbModelConversionMayFail
 		
 		val modelDeclarationCode = modelDeclaration.targetCode +
@@ -320,7 +331,7 @@ object ModelWriter
 								description = s"Whether this ${ classToWrite.name.doc } is still valid (hasn't expired yet)")(
 								"!hasExpired")
 						)
-					case None => Vector()
+					case None => Empty
 				}
 		}
 	}

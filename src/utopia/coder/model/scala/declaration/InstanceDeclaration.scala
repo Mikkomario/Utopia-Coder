@@ -27,7 +27,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	/**
 	  * @return Comments presented before the main declaration, but not included in the scaladoc
 	  */
-	def headerComments: Vector[String]
+	def headerComments: Seq[String]
 	/**
 	  * @return parameters accepted by this instance's constructor, if it has one.
 	  */
@@ -35,11 +35,11 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	/**
 	  * @return Classes & traits this instance extends, including possible construction parameters etc.
 	  */
-	def extensions: Vector[Extension]
+	def extensions: Seq[Extension]
 	/**
 	 * @return Declared types
 	 */
-	def types: Vector[TypeDeclaration]
+	def types: Seq[TypeDeclaration]
 	/**
 	  * @return Code executed every time an instance is created
 	  */
@@ -47,7 +47,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	/**
 	  * @return Properties defined in this instance
 	  */
-	def properties: Vector[PropertyDeclaration]
+	def properties: Seq[PropertyDeclaration]
 	/**
 	  * @return Methods defined for this instance
 	  */
@@ -85,11 +85,11 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	  * @param headerComments New header comments
 	  * @return A modified copy of this instance
 	  */
-	protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType], extensions: Vector[Extension],
-	                       types: Vector[TypeDeclaration], creationCode: Code,
-	                       properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
+	protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType], extensions: Seq[Extension],
+	                       types: Seq[TypeDeclaration], creationCode: Code,
+	                       properties: Seq[PropertyDeclaration], methods: Set[MethodDeclaration],
 	                       nested: Set[InstanceDeclaration], annotations: Seq[Annotation], description: String,
-	                       author: String, headerComments: Vector[String], since: DeclarationDate): InstanceDeclaration
+	                       author: String, headerComments: Seq[String], since: DeclarationDate): InstanceDeclaration
 	
 	
 	// COMPUTED ------------------------------
@@ -204,7 +204,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 			conflictsBuilder += MergeConflict.note(s"Annotation ${ their.toScala } was (partially) overwritten")
 		}
 		
-		def _mergeDeclarations[A <: Mergeable[A, A] with Declaration](my: Vector[A], their: Vector[A]): Vector[A] = {
+		def _mergeDeclarations[A <: Mergeable[A, A] with Declaration](my: Seq[A], their: Seq[A]): Seq[A] = {
 			my.map { declaration =>
 				their.find { _ matches declaration } match {
 					case Some(otherVersion) =>

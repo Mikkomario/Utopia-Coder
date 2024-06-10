@@ -7,6 +7,7 @@ import utopia.flow.parse.string.Regex
 import utopia.flow.util.StringExtensions._
 import utopia.coder.model.scala.Package.separatorRegex
 import utopia.coder.model.scala.template.ScalaConvertible
+import utopia.flow.collection.immutable.Empty
 
 import java.nio.file.Path
 import scala.collection.StringOps
@@ -21,7 +22,7 @@ object Package
 	  */
 	val separatorRegex = Regex.escape('.')
 	
-	val empty = apply(Vector())
+	val empty = apply(Empty)
 	
 	// Java & Scala
 	
@@ -51,7 +52,7 @@ object Package
 	  * @return That path as a package
 	  */
 	def apply(path: String): Package =
-		apply(path.split(separatorRegex).toVector.filter { s => (s: StringOps).nonEmpty })
+		apply(path.split(separatorRegex).filter { s => (s: StringOps).nonEmpty })
 	
 	
 	// NESTED   -------------------------------
@@ -84,7 +85,7 @@ object Package
   * @author Mikko Hilpinen
   * @since 26.9.2021, v1.1
   */
-case class Package(parts: Vector[String]) extends ScalaConvertible with MaybeEmpty[Package]
+case class Package(parts: Seq[String]) extends ScalaConvertible with MaybeEmpty[Package]
 {
 	// COMPUTED ---------------------------
 	

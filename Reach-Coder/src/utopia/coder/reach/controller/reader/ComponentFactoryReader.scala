@@ -269,7 +269,7 @@ object ComponentFactoryReader
 	
 	// Used for resolving references, reattempting the cases where the references couldn't be resolved
 	@tailrec
-	private def resolveReferences[A](input: Vector[A])(processInput: (Vector[A], VectorBuilder[(A, String)]) => Unit): Unit =
+	private def resolveReferences[A](input: Seq[A])(processInput: (Seq[A], VectorBuilder[(A, String)]) => Unit): Unit =
 	{
 		if (input.nonEmpty) {
 			// Collects the unresolved cases

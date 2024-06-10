@@ -2,6 +2,7 @@ package utopia.coder.model.scala.datatype
 
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.template.ScalaConvertible
+import utopia.flow.collection.immutable.Empty
 
 import scala.language.implicitConversions
 
@@ -17,7 +18,7 @@ object Extension
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
-case class Extension(parentType: ScalaType, constructionAssignments: Vector[Vector[CodePiece]] = Vector())
+case class Extension(parentType: ScalaType, constructionAssignments: Seq[Seq[CodePiece]] = Empty)
 	extends ScalaConvertible
 {
 	// COMPUTED -----------------------------------------
@@ -30,8 +31,7 @@ case class Extension(parentType: ScalaType, constructionAssignments: Vector[Vect
 	
 	// IMPLEMENTED  -------------------------------------
 	
-	override def toScala =
-	{
+	override def toScala = {
 		val parametersPart = if (constructionAssignments.isEmpty) CodePiece.empty else
 			constructionAssignments
 				.map { _.reduceLeftOption { _.append(_, ", ") }.getOrElse(CodePiece.empty)
@@ -48,7 +48,7 @@ case class Extension(parentType: ScalaType, constructionAssignments: Vector[Vect
 	  * @param assignments Parameter assignments (a single parameter list)
 	  * @return A copy of this extension which includes a constructor call
 	  */
-	def withConstructor(assignments: Vector[CodePiece]) =
+	def withConstructor(assignments: Seq[CodePiece]) =
 		copy(constructionAssignments = constructionAssignments :+ assignments)
 	
 	/**
@@ -58,5 +58,5 @@ case class Extension(parentType: ScalaType, constructionAssignments: Vector[Vect
 	  * @return A copy of this extension which includes a constructor call
 	  */
 	def withConstructor(firstAssignment: CodePiece, moreAssignments: CodePiece*) =
-		copy(constructionAssignments = constructionAssignments :+ (firstAssignment +: moreAssignments.toVector))
+		copy(constructionAssignments = constructionAssignments :+ (firstAssignment +: moreAssignments))
 }

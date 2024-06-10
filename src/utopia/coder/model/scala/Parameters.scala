@@ -5,6 +5,7 @@ import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.ScalaType
 import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
 import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.immutable.{Empty, Single}
 import utopia.flow.operator.MaybeEmpty
 import utopia.flow.operator.equality.EqualsFunction
 
@@ -17,7 +18,7 @@ object Parameters
 	/**
 	  * An empty parameters list
 	  */
-	val empty = apply(Vector(), Vector())
+	val empty = apply(Empty, Empty)
 	
 	private val parameterEqualsByType: EqualsFunction[Parameter] =
 		EqualsFunction.by { p: Parameter => p.dataType }(ScalaType.matchFunction)
@@ -34,10 +35,10 @@ object Parameters
 	// IMPLICIT -----------------------------
 	
 	// Implicitly converts from parameter vectors
-	implicit def parametersFromVector(params: Vector[Parameter]): Parameters = apply(Vector(params))
-	implicit def parametersFromVectors(paramLists: Vector[Vector[Parameter]]): Parameters = apply(paramLists)
+	implicit def parametersFromVector(params: Seq[Parameter]): Parameters = apply(Single(params))
+	implicit def parametersFromVectors(paramLists: Seq[Seq[Parameter]]): Parameters = apply(paramLists)
 	// Implicitly converts from a single parameter
-	implicit def oneParamToMany(param: Parameter): Parameters = apply(Vector(Vector(param)))
+	implicit def oneParamToMany(param: Parameter): Parameters = apply(Single(Single(param)))
 	
 	/**
 	  * Creates a new parameter list
@@ -45,8 +46,7 @@ object Parameters
 	  * @param moreParams More parameters to include
 	  * @return A new parameters list
 	  */
-	def apply(firstParam: Parameter, moreParams: Parameter*): Parameters =
-		apply(Vector(firstParam +: moreParams.toVector))
+	def apply(firstParam: Parameter, moreParams: Parameter*): Parameters = apply(Single(firstParam +: moreParams))
 	
 	/**
 	  * Creates a new parameter list consisting of implicit parameters
@@ -54,8 +54,7 @@ object Parameters
 	  * @param moreParams More parameters
 	  * @return A parameters list
 	  */
-	def implicits(firstParam: Parameter, moreParams: Parameter*) =
-		apply(Vector(), firstParam +: moreParams.toVector)
+	def implicits(firstParam: Parameter, moreParams: Parameter*) = apply(Empty, firstParam +: moreParams)
 }
 
 /**
@@ -63,7 +62,7 @@ object Parameters
   * @author Mikko Hilpinen
   * @since 2.9.2021, v0.1
   */
-case class Parameters(lists: Vector[Vector[Parameter]] = Vector(), implicits: Vector[Parameter] = Vector())
+case class Parameters(lists: Seq[Seq[Parameter]] = Empty, implicits: Seq[Parameter] = Empty)
 	extends ScalaConvertible with Documented with MaybeEmpty[Parameters]
 {
 	// COMPUTED -----------------------------------
@@ -136,7 +135,7 @@ case class Parameters(lists: Vector[Vector[Parameter]] = Vector(), implicits: Ve
 	  * @return A copy of this parameters list with the specified implicit parameters
 	  */
 	def withImplicits(firstParam: Parameter, moreParams: Parameter*) =
-		copy(implicits = firstParam +: moreParams.toVector)
+		copy(implicits = firstParam +: moreParams)
 	
 	/**
 	  * @param other Another set of parameters

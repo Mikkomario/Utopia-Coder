@@ -5,6 +5,7 @@ import utopia.coder.model.scala.Visibility.Public
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.{Annotation, Parameter, Visibility}
 import utopia.coder.model.scala.template.ScalaConvertible
+import utopia.flow.collection.immutable.Empty
 
 /**
   * An enumeration for different types of property declarations
@@ -32,12 +33,12 @@ sealed trait PropertyDeclarationType extends ScalaConvertible
 	  */
 	def apply(name: String, references: Set[Reference] = Set(), visibility: Visibility = Public,
 	          explicitOutputType: Option[ScalaType] = None,
-	          implicitParams: Vector[Parameter] = Vector(), annotations: Seq[Annotation] = Vector(),
+	          implicitParams: Seq[Parameter] = Empty, annotations: Seq[Annotation] = Empty,
 	          description: String = "", isOverridden: Boolean = false,
 	          isImplicit: Boolean = false, isLowMergePriority: Boolean = false)
 	         (line1: String, moreLines: String*) =
-		PropertyDeclaration(this, name, Code.from(line1 +: moreLines.toVector).referringTo(references), visibility,
-			explicitOutputType, implicitParams, annotations, description, Vector(),
+		PropertyDeclaration(this, name, Code.from(line1 +: moreLines).referringTo(references), visibility,
+			explicitOutputType, implicitParams, annotations, description, Empty,
 			isOverridden, isImplicit, isLowMergePriority)
 }
 

@@ -9,6 +9,7 @@ import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
 import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration}
 import utopia.coder.vault.util.VaultReferences._
+import utopia.flow.collection.immutable.Pair
 
 import scala.io.Codec
 
@@ -43,7 +44,7 @@ object CombinedModelWriter
 			if (setup.modelCanReferToDB)
 				Vector[Extension](extender, vault.hasId, factory)
 			else
-				Vector(extender, factory)
+				Pair(extender, factory)
 		}
 		
 		val parentName = data.parentName

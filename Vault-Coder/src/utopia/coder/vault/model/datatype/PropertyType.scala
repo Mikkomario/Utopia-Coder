@@ -5,6 +5,7 @@ import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.{ScalaTypeConvertible, ValueConvertibleType}
 import utopia.coder.vault.model.enumeration.Mutability
+import utopia.flow.collection.immutable.{Empty, Single}
 
 /**
   * A common trait for property types which support both nullable (optional) and non-nullable (concrete) variants
@@ -18,7 +19,7 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	/**
 	  * @return The SQL / database representations of this type. Many if this property spans multiple columns.
 	  */
-	def sqlConversions: Vector[SqlTypeConversion]
+	def sqlConversions: Seq[SqlTypeConversion]
 	
 	/**
 	  * @return A non-empty default value for (construction) parameters of this type.
@@ -97,7 +98,7 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	  *                   of parts or components used by this type.
 	  * @return Code for accessing a value and converting it to this type (in Scala)
 	  */
-	def fromValueCode(valueCodes: Vector[String]): CodePiece
+	def fromValueCode(valueCodes: Seq[String]): CodePiece
 	/**
 	  * Writes a code that reads a vector of instances of this type from a vector of values
 	  * @param valuesCode Code that returns a vector of values
@@ -183,11 +184,11 @@ trait SingleColumnPropertyType extends PropertyType
 	
 	// IMPLEMENTED  --------------------
 	
-	override def sqlConversions = Vector(sqlConversion)
+	override def sqlConversions = Single(sqlConversion)
 	
-	override def defaultPartNames: Vector[Name] = Vector()
+	override def defaultPartNames: Seq[Name] = Empty
 	
-	override def fromValueCode(valueCodes: Vector[String]): CodePiece = valueCodes.headOption match {
+	override def fromValueCode(valueCodes: Seq[String]): CodePiece = valueCodes.headOption match {
 		case Some(valueCode) => fromValueCode(valueCode)
 		case None => emptyValue
 	}
@@ -342,7 +343,7 @@ trait PropertyTypeWrapper extends PropertyType
 	override def toValueCode(instanceCode: String) = wrapped.toValueCode(instanceCode)
 	override def toJsonValueCode(instanceCode: String): CodePiece = wrapped.toJsonValueCode(instanceCode)
 	
-	override def fromValueCode(valueCodes: Vector[String]) = wrapped.fromValueCode(valueCodes)
+	override def fromValueCode(valueCodes: Seq[String]) = wrapped.fromValueCode(valueCodes)
 	override def fromValuesCode(valuesCode: String) = wrapped.fromValuesCode(valuesCode)
 	override def fromJsonValueCode(valueCode: String): CodePiece = wrapped.fromJsonValueCode(valueCode)
 	override def fromConcreteCode(concreteCode: String): CodePiece = wrapped.fromConcreteCode(concreteCode)
@@ -416,7 +417,7 @@ trait FacadePropertyType extends PropertyType
 	override def toJsonValueCode(instanceCode: String): CodePiece =
 		toDelegateCode(instanceCode).flatMapText(delegate.toJsonValueCode)
 	
-	override def fromValueCode(valueCodes: Vector[String]): CodePiece =
+	override def fromValueCode(valueCodes: Seq[String]): CodePiece =
 		safeFromDelegateCode(delegate.fromValueCode(valueCodes), isTry = delegate.yieldsTryFromValue)
 	override def fromValuesCode(valuesCode: String): CodePiece =
 		delegate.fromValuesCode(valuesCode).flatMapText { delegates =>
@@ -467,7 +468,7 @@ trait FacadePropertyType extends PropertyType
 		
 		override def valueDataType: Reference = FacadePropertyType.this.valueDataType
 		
-		override def sqlConversions: Vector[SqlTypeConversion] =
+		override def sqlConversions: Seq[SqlTypeConversion] =
 			optionDelegate.sqlConversions
 				.map { lowerConversion => SqlTypeConversion.delegatingTo(lowerConversion, scalaType) { delegateOption =>
 					fromDelegateCode("v")
@@ -494,7 +495,7 @@ trait FacadePropertyType extends PropertyType
 		override def toJsonValueCode(instanceCode: String): CodePiece =
 			_toValueCode(instanceCode)(FacadePropertyType.this.toJsonValueCode)
 		
-		override def fromValueCode(valueCodes: Vector[String]): CodePiece =
+		override def fromValueCode(valueCodes: Seq[String]): CodePiece =
 			_fromValueCode(FacadePropertyType.this.fromValueCode(valueCodes),
 				isTry = FacadePropertyType.this.yieldsTryFromValue)
 		override def fromValuesCode(valuesCode: String): CodePiece =

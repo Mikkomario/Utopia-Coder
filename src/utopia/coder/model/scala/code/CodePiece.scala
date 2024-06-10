@@ -17,6 +17,7 @@ object CodePiece extends FromValueFactory[CodePiece]
 	
 	val empty = apply("")
 	val none = apply("None")
+	val emptySeq = apply("Empty", Set(Reference.flow.empty))
 	
 	
 	// IMPLICIT ---------------------------

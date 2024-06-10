@@ -7,6 +7,7 @@ import utopia.coder.model.scala.Visibility.{Protected, Public}
 import utopia.coder.model.scala.datatype.{GenericType, ScalaType}
 import utopia.coder.model.scala.{Annotation, Parameter, Parameters, Visibility}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
+import utopia.flow.collection.immutable.Empty
 
 object PropertyDeclaration
 {
@@ -23,9 +24,9 @@ object PropertyDeclaration
 	  *                           implementation when merging with another version
 	  * @return A new property declaration
 	  */
-	def newAbstract(name: String, outputType: ScalaType, implicitParams: Vector[Parameter] = Vector(),
-	                annotations: Seq[Annotation] = Vector(), description: String = "",
-	                headerComments: Vector[String] = Vector(),
+	def newAbstract(name: String, outputType: ScalaType, implicitParams: Seq[Parameter] = Empty,
+	                annotations: Seq[Annotation] = Empty, description: String = "",
+	                headerComments: Seq[String] = Empty,
 	                isProtected: Boolean = false, isOverridden: Boolean = false, isLowMergePriority: Boolean = false) =
 		apply(ComputedProperty, name, Code.empty, if (isProtected) Protected else Public, Some(outputType),
 			implicitParams, annotations, description, headerComments, isOverridden, isLowMergePriority)
@@ -38,8 +39,8 @@ object PropertyDeclaration
   */
 case class PropertyDeclaration(declarationType: PropertyDeclarationType, name: String, bodyCode: Code,
                                visibility: Visibility = Public, explicitOutputType: Option[ScalaType] = None,
-                               implicitParams: Vector[Parameter] = Vector(), annotations: Seq[Annotation] = Vector(),
-                               description: String = "", headerComments: Vector[String] = Vector(),
+                               implicitParams: Seq[Parameter] = Empty, annotations: Seq[Annotation] = Empty,
+                               description: String = "", headerComments: Seq[String] = Empty,
                                isOverridden: Boolean = false, isImplicit: Boolean = false,
                                isLowMergePriority: Boolean = false)
 	extends FunctionDeclaration[PropertyDeclaration] with Mergeable[PropertyDeclaration, PropertyDeclaration]
@@ -64,7 +65,7 @@ case class PropertyDeclaration(declarationType: PropertyDeclarationType, name: S
 	override def returnDescription = ""
 	
 	// Properties don't support generic types at this time
-	override def genericTypes = Vector()
+	override def genericTypes = Empty
 	
 	override protected def params =
 		if (implicitParams.nonEmpty) Some(Parameters(implicits = implicitParams)) else None
@@ -72,7 +73,7 @@ case class PropertyDeclaration(declarationType: PropertyDeclarationType, name: S
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
 	                                parameters: Option[Parameters], bodyCode: Code,
 	                                explicitOutputType: Option[ScalaType], annotations: Seq[Annotation],
-	                                description: String, returnDescription: String, headerComments: Vector[String],
+	                                description: String, returnDescription: String, headerComments: Seq[String],
 	                                isOverridden: Boolean, isImplicit: Boolean) =
 		PropertyDeclaration(declarationType, name, bodyCode, visibility, explicitOutputType,
 			parameters.map { _.implicits }.getOrElse(implicitParams), annotations,

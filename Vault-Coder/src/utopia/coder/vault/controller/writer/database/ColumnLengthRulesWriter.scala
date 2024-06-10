@@ -7,6 +7,7 @@ import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.Class
 import utopia.coder.model.enumeration.NameContext.DatabaseName
+import utopia.flow.collection.immutable.Single
 
 import java.nio.file.Path
 import scala.io.Codec
@@ -47,7 +48,7 @@ object ColumnLengthRulesWriter
 		if (ruleProps.nonEmpty) {
 			// Written document style depends on whether the database name has been specified or not
 			val json = databaseName match {
-				case Some(dbName) => Model(Vector(dbName(DatabaseName) -> Model.withConstants(ruleProps)))
+				case Some(dbName) => Model(Single(dbName(DatabaseName) -> Model.withConstants(ruleProps)))
 				case None => Model.withConstants(ruleProps)
 			}
 			path.createParentDirectories().flatMap { _.writeJson(json).map { Some(_) } }

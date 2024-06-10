@@ -1,7 +1,7 @@
 package utopia.coder.vault.controller.writer.database
 
 import utopia.coder.model.data.NamingRules
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Pair, Single}
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.model.scala.Visibility.Private
@@ -40,7 +40,7 @@ object TablesWriter
 			// Otherwise leaves the implementation to the user
 			val (applyImplementation, applyReferences) = {
 				if (classes.exists { _.isDescribed })
-					Vector("Tables(tableName)") -> Set[Reference](citadel.tables)
+					Single("Tables(tableName)") -> Set[Reference](citadel.tables)
 				else
 					Vector("// TODO: Refer to a tables instance of your choice",
 						"// If you're using the Citadel module, import utopia.citadel.database.Tables",
@@ -54,7 +54,7 @@ object TablesWriter
 						c.descriptionLinkClass match {
 							case Some(descriptionLinkClass) =>
 								Pair(tablePropertyFrom(c), descriptionLinkTablePropertyFrom(descriptionLinkClass))
-							case None => Vector(tablePropertyFrom(c))
+							case None => Single(tablePropertyFrom(c))
 						}
 					},
 					// Defines a private apply method but leaves the implementation open

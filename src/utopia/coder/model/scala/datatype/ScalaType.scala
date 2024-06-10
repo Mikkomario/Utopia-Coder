@@ -7,6 +7,7 @@ import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.ScalaTypeCategory.{CallByName, Standard}
 import utopia.coder.model.scala.template.ScalaConvertible
+import utopia.flow.collection.immutable.Empty
 import utopia.flow.operator.equality.EqualsFunction
 
 import scala.language.implicitConversions
@@ -53,6 +54,11 @@ object ScalaType
 	  */
 	def option(contentType: ScalaType) = generic("Option", contentType)
 	/**
+	 * @param contentType Vector content type
+	 * @return A vector type
+	 */
+	def seq(contentType: ScalaType) = generic("Seq", contentType)
+	/**
 	  * @param contentType Vector content type
 	  * @return A vector type
 	  */
@@ -93,7 +99,7 @@ object ScalaType
 			apply(basePart)
 		// Case: Generic data type => parses the type parameters, also (recursive)
 		else {
-			val typeParamStrings = typesPart.untilLast("]").split(typeParamsSeparator).toVector.map { _.trim }
+			val typeParamStrings = typesPart.untilLast("]").split(typeParamsSeparator).map { _.trim }
 			apply(basePart, typeParamStrings.map(apply))
 		}
 	}
@@ -106,7 +112,7 @@ object ScalaType
 	  * @return A generic type
 	  */
 	def generic(reference: Reference, firstParam: ScalaType, moreParams: ScalaType*) =
-		apply(Right(reference), firstParam +: moreParams.toVector)
+		apply(Right(reference), firstParam +: moreParams)
 	/**
 	  * Creates a generic type
 	  * @param name Name of the basic generic class
@@ -115,7 +121,7 @@ object ScalaType
 	  * @return A generic type
 	  */
 	def generic(name: String, firstParam: ScalaType, moreParams: ScalaType*) =
-		apply(Left(name), firstParam +: moreParams.toVector)
+		apply(Left(name), firstParam +: moreParams)
 	
 	/**
 	  * Creates a function scala type
@@ -125,7 +131,7 @@ object ScalaType
 	  * @return A functional scala type
 	  */
 	def function(paramTypes: ScalaType*)(resultType: Either[String, Reference], typeParams: ScalaType*) =
-		apply(resultType, typeParams.toVector, ScalaTypeCategory.Function(paramTypes.toVector))
+		apply(resultType, typeParams, ScalaTypeCategory.Function(paramTypes))
 }
 
 /**
@@ -133,7 +139,7 @@ object ScalaType
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
-case class ScalaType(data: Either[String, Reference], typeParameters: Vector[ScalaType] = Vector(),
+case class ScalaType(data: Either[String, Reference], typeParameters: Seq[ScalaType] = Empty,
                      category: ScalaTypeCategory = Standard)
 	extends ScalaConvertible
 {
@@ -176,27 +182,27 @@ case class ScalaType(data: Either[String, Reference], typeParameters: Vector[Sca
 	  * @param typeParameters The generic type parameters to assign to this type
 	  * @return A generic type that wraps the specified types
 	  */
-	def apply(typeParameters: Vector[ScalaType]) = copy(typeParameters = typeParameters)
+	def apply(typeParameters: Seq[ScalaType]) = copy(typeParameters = typeParameters)
 	/**
 	  * @param firstTypeParameter First type parameter to append
 	  * @param moreTypeParameters More type parameters to append
 	  * @return Copy of this type that uses the specified generic type parameters
 	  */
 	def apply(firstTypeParameter: ScalaType, moreTypeParameters: ScalaType*) =
-		copy(typeParameters = firstTypeParameter +: moreTypeParameters.toVector)
+		copy(typeParameters = firstTypeParameter +: moreTypeParameters)
 	
 	/**
 	  * @param parameterTypes A list of accepted parameter types
 	  * @return A functional data type that returns this data type
 	  */
-	def fromParameters(parameterTypes: Vector[ScalaType]) = category match {
+	def fromParameters(parameterTypes: Seq[ScalaType]) = category match {
 		// Functions that return functions don't handle references properly at this time
 		case _ :ScalaTypeCategory.Function =>
 			ScalaType(Left(toScala.text), category = ScalaTypeCategory.Function(parameterTypes))
 		case _ => copy(category = ScalaTypeCategory.Function(parameterTypes))
 	}
 	def fromParameters(firstParameter: ScalaType, moreParameters: ScalaType*): ScalaType =
-		fromParameters(firstParameter +: moreParameters.toVector)
+		fromParameters(firstParameter +: moreParameters)
 	
 	/**
 	  * @param other Another type

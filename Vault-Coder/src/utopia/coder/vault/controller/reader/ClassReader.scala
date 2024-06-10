@@ -25,6 +25,7 @@ import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
 import utopia.coder.vault.model.enumeration.{CombinationType, IntSize, Mutability}
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.code.CodePiece
+import utopia.flow.collection.immutable.Empty
 
 import java.nio.file.Path
 import scala.util.{Failure, Success, Try}
@@ -87,7 +88,7 @@ object ClassReader
 				.flatMap { _.string }
 				.map { enumPath =>
 					val (packagePart, enumName) = enumPath.splitAtLast(".").toTuple
-					Enum(enumName, packagePart, Vector())
+					Enum(enumName, packagePart, Empty)
 				}
 			val allEnumerations = enumerations ++ referencedEnumerations
 			
@@ -289,7 +290,7 @@ object ClassReader
 		
 		// Finds the combo indices
 		// The indices in the document are given as property names, but here they are converted to column names
-		val comboIndexColumnNames: Vector[Vector[String]] = classModel("index", "combo_index").vector
+		val comboIndexColumnNames: Seq[Seq[String]] = classModel("index", "combo_index").vector
 			.map[Vector[Vector[Name]]] { v =>
 				Vector(v.flatMap { _.string }.map { s => Name.interpret(s, ClassPropName.style) })
 			}
@@ -301,7 +302,7 @@ object ClassReader
 						}
 					}
 			}
-			.getOrElse(Vector())
+			.getOrElse(Empty)
 			.map { combo =>
 				combo.flatMap { propName =>
 					properties.view.flatMap { _.dbProperties }.find { _.name ~== propName }.map { _.columnName }

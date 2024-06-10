@@ -8,7 +8,7 @@ import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedPro
 import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, PropertyDeclaration, TraitDeclaration}
 import utopia.coder.model.scala.{DeclarationDate, Parameter}
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.coder.reach.model.data.{ComponentFactory, Property}
 import utopia.coder.reach.model.enumeration.ContextType
 import utopia.coder.reach.util.ReachReferences.Reach._
@@ -330,7 +330,7 @@ object ComponentFactoryWriter
 				Vector(GenericType("N", Some(TypeRequirement.childOf(context.reference)), Covariance,
 					description = "Type of context used and passed along by this factory"))
 			else
-				Vector()
+				Empty
 		}
 		// If no "FactoryLike" trait is applied, extends PartOfComponentHierarchy
 		val hierarchyExtension = if (factory.onlyContextual) Some(partOfHierarchy: Extension) else None
@@ -427,7 +427,7 @@ object ComponentFactoryWriter
 	{
 		ObjectDeclaration(
 			name = factory.componentName.className,
-			extensions = Vector(Extension(setupType, Vector(Vector()))),
+			extensions = Vector(Extension(setupType, Vector(Empty))),
 			// Provides a public apply function for settings-assignment
 			methods = Set(MethodDeclaration("apply")(Parameter("settings", settingsType))("withSettings(settings)")),
 			author = factory.author,
@@ -485,7 +485,7 @@ object ComponentFactoryWriter
 				case Some((deeperTarget, nextPrefix)) =>
 					val appliedPrefix = if (usePrefixes) prefix + nextPrefix else nextPrefix
 					referencedPropFunctionsFrom(prop, deeperTarget, appliedPrefix, allowNonPrefixed = !usePrefixes)
-				case None => Vector() -> Vector()
+				case None => Empty -> Empty
 			}
 			(directGet +: moreProps) -> ((directSet +: mapper.toVector) ++ moreMethods)
 		}

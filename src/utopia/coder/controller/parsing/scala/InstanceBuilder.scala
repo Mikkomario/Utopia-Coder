@@ -17,7 +17,7 @@ import scala.collection.immutable.VectorBuilder
   */
 class InstanceBuilder(visibility: Visibility, prefixes: Set[DeclarationPrefix], instanceType: InstanceDeclarationType,
                       name: String, genericTypes: Seq[GenericType], parameters: Option[Parameters],
-                      extensions: Vector[Extension], scalaDoc: ScalaDoc, commentsBefore: Vector[String],
+                      extensions: Seq[Extension], scalaDoc: ScalaDoc, commentsBefore: Seq[String],
                       annotations: Seq[Annotation])
 	extends InstanceBuilderLike
 {

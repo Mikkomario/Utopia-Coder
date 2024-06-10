@@ -34,7 +34,7 @@ object ReachCoderAppLogic extends CoderAppLogic
 	override protected def supportsAlternativeMergeRoots: Boolean = false
 	
 	override protected def run(args: CommandArguments, inputPath: Lazy[Path], outputPath: Lazy[Path],
-	                           mergeRoots: Lazy[Vector[Path]], filter: Lazy[Option[Filter]],
+	                           mergeRoots: Lazy[Seq[Path]], filter: Lazy[Option[Filter]],
 	                           targetGroup: Option[String]): Boolean =
 	{
 		val input = inputPath.value

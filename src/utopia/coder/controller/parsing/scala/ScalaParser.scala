@@ -14,12 +14,14 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocKeyword, ScalaDocPart}
 import utopia.coder.model.scala.{Annotation, Package, Parameter, Parameters}
 import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.immutable.Empty
 import utopia.flow.collection.mutable.builder.MultiMapBuilder
 import utopia.flow.collection.mutable.iterator.PollingIterator
 import utopia.flow.parse.string.{IterateLines, Regex}
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.flow.view.immutable.MutatingOnce
+import utopia.coder.model.scala.declaration.TypeDeclaration
 
 import java.nio.file.Path
 import scala.collection.immutable.VectorBuilder
@@ -226,7 +228,7 @@ object ScalaParser
 			val (beforeDeclarationLines, declarationLine) = {
 				if (namedDeclarationStartRegex.existsIn(afterScalaDocLine.code)) {
 					// println("First line was found to be a declaration")
-					Vector() -> Some(afterScalaDocLine)
+					Empty -> Some(afterScalaDocLine)
 				}
 				else
 					// Skips leading and trailing empty lines
@@ -301,7 +303,7 @@ object ScalaParser
 							genericTypesFrom(typesPart, refMap)._1 -> afterTypes
 						}
 						else
-							Vector() -> afterDeclarationStart
+							Empty -> afterDeclarationStart
 					}
 					// Parses parameter lists, if needed
 					val (parameters, afterParameterLists) = {
@@ -406,7 +408,7 @@ object ScalaParser
 								val implicitParameters = parameters match
 								{
 									case Some(parameters) => parameters.implicits
-									case None => Vector()
+									case None => Empty
 								}
 								parentBuilder.addProperty(PropertyDeclaration(propertyType, declarationName, body,
 									visibility, explicitType, implicitParameters, annotations,
@@ -433,7 +435,10 @@ object ScalaParser
 							parentBuilder.addNested(builder.result(refMap))
 							true
 						case TypeD =>
-							???
+							parentBuilder.addTypeDeclaration(new TypeDeclaration(
+								declarationName, afterParameterLists.getOrElse("").afterFirst("=").trim, genericTypes,
+								visibility, annotations, scalaDoc.description, beforeDeclarationComments))
+							true
 					}
 				// Case: No declaration found => adds read code lines as free code
 				case None =>
@@ -447,13 +452,13 @@ object ScalaParser
 		val (mainPart, rawParamsPart) = line.code.splitAtFirst("(").toTuple
 		val (namePart, typesPart) = mainPart.splitAtFirst("[").toTuple
 		val name = namePart.drop(1)
-		val types = if (typesPart.nonEmpty) scalaTypesFrom(typesPart, refMap)._1 else Vector()
+		val types = if (typesPart.nonEmpty) scalaTypesFrom(typesPart, refMap)._1 else Empty
 		val params = {
 			if (rawParamsPart.nonEmpty)
 				rawParamsPart.untilLast(")").splitIterator(commaOutsideQuotationsRegex)
 					.map(JsonBunny.valueOf).toVector
 			else
-				Vector()
+				Empty
 		}
 		Annotation(name, types, params)
 	}
@@ -566,7 +571,7 @@ object ScalaParser
 		}
 	}
 	
-	private def extensionsFrom(lines: Vector[String], refMap: Map[String, Reference]): Vector[Extension] =
+	private def extensionsFrom(lines: Vector[String], refMap: Map[String, Reference]): Seq[Extension] =
 	{
 		// println(s"Reading extensions from: ${lines.map { line => s"'$line'" }.mkString(" + ") }")
 		// Finds the line that contains the extends -keyword
@@ -599,7 +604,7 @@ object ScalaParser
 						Extension(parentType)
 				}
 			// Case: No extends -keyword found => no extensions
-			case None => Vector()
+			case None => Empty
 		}
 	}
 	
@@ -637,7 +642,7 @@ object ScalaParser
 		val implicitParameters = implicitList match
 		{
 			case Some(listString) => parameterListFrom(listString, refMap, scalaDoc)
-			case None => Vector()
+			case None => Empty
 		}
 		Parameters(standardParameters, implicitParameters)
 	}
@@ -647,7 +652,7 @@ object ScalaParser
 		// println(s"\nReading parameter list from: $parameterListString")
 		if (parameterListString.isEmpty) {
 			// println("\t=> Empty list")
-			Vector()
+			Empty
 		}
 		else
 		{
@@ -897,8 +902,7 @@ object ScalaParser
 	}
 	
 	// Block start line must have the initiating { -char removed
-	private def readBlock(blockStartLine: CodeLine, remainingLinesIter: Iterator[CodeLine]) =
-	{
+	private def readBlock(blockStartLine: CodeLine, remainingLinesIter: Iterator[CodeLine]) = {
 		val (blockLines, after) = readBlockLike(blockStartLine, remainingLinesIter, '{', '}')
 		// Removes the unnecessary indentation and possible leading and trailing empty lines
 		val actualLines = blockLines.dropWhile { _.isEmpty }.dropRightWhile { _.isEmpty }

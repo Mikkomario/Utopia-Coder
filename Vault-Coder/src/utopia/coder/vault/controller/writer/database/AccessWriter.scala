@@ -3,7 +3,7 @@ package utopia.coder.vault.controller.writer.database
 import utopia.coder.model.data
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{Class, CombinationData, DbProperty, Property, VaultProjectSetup}
@@ -144,7 +144,7 @@ object AccessWriter
 				MethodDeclaration("deprecate", Set(flow.now, flow.valueConversions),
 					description = s"Deprecates all accessible ${classToWrite.name.pluralDoc}",
 					returnDescription = "Whether any row was targeted")(
-					Parameters(Vector(Vector()), Vector(connectionParam)))(s"$propName = Now")
+					Parameters(Single(Empty), Single(connectionParam)))(s"$propName = Now")
 			}
 		}
 		// Root access points extend either the UnconditionalView or the NonDeprecatedView -trait,
@@ -204,7 +204,7 @@ object AccessWriter
 					.flatMap { singleIdAccessRef =>
 						writeSingleRootAccess(classToWrite.name, classToWrite.idType, modelRef,
 							singleRowModelAccess, uniqueAccessRef, singleIdAccessRef, singleAccessPackage,
-							Vector(modelProperty, factoryProperty), rootViewExtension, classToWrite.author,
+							Pair(modelProperty, factoryProperty), rootViewExtension, classToWrite.author,
 							isDeprecatable = classToWrite.isDeprecatable)
 							.map { _ -> genericUniqueTraitRef }
 					}
@@ -222,16 +222,16 @@ object AccessWriter
 		val uniqueAccessType = ScalaType.basic(uniqueAccessName)
 		val subViewName = s"_$uniqueAccessName"
 		val deprecationParent = deprecationReferenceFor(combo.parentClass).map[Extension] { _(uniqueAccessType) }
-		val uniqueTraitParents: Vector[Extension] = {
+		val uniqueTraitParents: Seq[Extension] = {
 			val base: Extension = genericUniqueAccessTraitRef(combinedModelRef, uniqueAccessType)
 			if (combo.combinationType.isOneToMany)
-				Vector(base) ++ deprecationParent
+				Single(base) ++ deprecationParent
 			else {
 				if (combo.parentClass.recordsIndexedCreationTime)
-					Vector[Extension](base, singleChronoRowModelAccess(combinedModelRef, uniqueAccessType)) ++
+					Pair[Extension](base, singleChronoRowModelAccess(combinedModelRef, uniqueAccessType)) ++
 						deprecationParent
 				else
-					Vector[Extension](base, singleRowModelAccess(combinedModelRef)) ++ deprecationParent
+					Pair[Extension](base, singleRowModelAccess(combinedModelRef)) ++ deprecationParent
 			}
 		}
 		val factoryProp = ComputedProperty("factory", Set(combinedFactoryRef), isOverridden = true)(
@@ -245,7 +245,7 @@ object AccessWriter
 			// Can't write one-to-many getters because they return a different data structure
 			// (i.e. can't be written with just pullColumn(...))
 			if (combo.combinationType.isOneToMany)
-				Vector()
+				Empty
 			else
 				propertyGettersFor(combo.childClass, childModelProp.name) { n => (combo.childName + n).prop }
 		}
@@ -278,12 +278,12 @@ object AccessWriter
 						ComputedProperty("idValue", idValueCode.references, isOverridden = true)(idValueCode.text))
 				}
 				else
-					Extension(singleIntIdModelAccess(combinedModelRef)) -> Vector()
+					Extension(singleIntIdModelAccess(combinedModelRef)) -> Empty
 			}
 			File(singleAccessPackage,
 				ClassDeclaration(singleIdAccessNameFor(combo.name),
-					constructionParams = Vector(Parameter("id", idType.toScala)),
-					extensions = Vector(uniqueRef, idAccessParentRef),
+					constructionParams = Single(Parameter("id", idType.toScala)),
+					extensions = Pair(uniqueRef, idAccessParentRef),
 					properties = idAccessParentProps,
 					description = s"An access point to individual ${ combo.name.pluralDoc }, based on their ${
 						combo.parentName.doc } id",
@@ -324,7 +324,7 @@ object AccessWriter
 		val pullIdCode = classToWrite.idType.optional.fromValueCode(s"pullColumn(index)")
 		val highestTraitProperties = modelProperty +:
 			propertyGettersFor(classToWrite, modelProperty.name) { _.prop } :+
-			ComputedProperty("id", pullIdCode.references, implicitParams = Vector(connectionParam),
+			ComputedProperty("id", pullIdCode.references, implicitParams = Single(connectionParam),
 				description = s"Unique id of the accessible ${ classToWrite.name }. None if no ${
 					classToWrite.name } was accessible.")(pullIdCode.text)
 		val highestTraitMethods = propertySettersFor(classToWrite, modelProperty.name) { _.prop } ++ deprecationMethod
@@ -338,7 +338,7 @@ object AccessWriter
 				File(singleAccessPackage,
 					TraitDeclaration(
 						name = (uniqueAccessTraitName + genericAccessSuffix).className,
-						genericTypes = Vector(item, repr),
+						genericTypes = Pair(item, repr),
 						// Extends SingleModelAccess instead of SingleRowModelAccess because sub-traits may vary
 						extensions = Vector(
 							singleModelAccess(itemType),
@@ -434,7 +434,7 @@ object AccessWriter
 						ComputedProperty("idValue", idValueCode.references, isOverridden = true)(idValueCode.text))
 				}
 				else
-					Extension(singleIntIdModelAccess(modelRef)) -> Vector()
+					Extension(singleIntIdModelAccess(modelRef)) -> Empty
 		}
 		File(singleAccessPackage,
 			ClassDeclaration(singleIdAccessNameFor(classToWrite.name),
@@ -455,7 +455,7 @@ object AccessWriter
 	private def writeSingleRootAccess(className: Name, idType: PropertyType, modelRef: Reference,
 	                                  singleModelAccessRef: Reference, uniqueAccessRef: Reference,
 	                                  singleIdAccessRef: Reference,
-	                                  singleAccessPackage: Package, baseProperties: Vector[PropertyDeclaration],
+	                                  singleAccessPackage: Package, baseProperties: Seq[PropertyDeclaration],
 	                                  rootViewExtension: Extension, author: String, isDeprecatable: Boolean)
 	                                 (implicit naming: NamingRules, codec: Codec, setup: VaultProjectSetup) =
 	{
@@ -623,7 +623,7 @@ object AccessWriter
 					(Some(parent), props, methods)
 				case None =>
 					val parent = if (parentRef.isDefined) None else Some(Extension(indexed))
-					(parent, Vector(), Set[MethodDeclaration]())
+					(parent, Empty, Set[MethodDeclaration]())
 			}
 			// Determines the inheritance, which is affected by:
 			// 1) Whether a generic version exists or not,
@@ -805,7 +805,7 @@ object AccessWriter
 					if (pullMany)
 						prop.dataType.fromValuesCode(pullColumn)
 					else
-						prop.dataType.optional.fromValueCode(Vector(pullColumn))
+						prop.dataType.optional.fromValueCode(Single(pullColumn))
 				}
 				val desc = {
 					if (pullMany)
@@ -819,7 +819,7 @@ object AccessWriter
 					}
 				}
 				ComputedProperty(parsePropName(dbProp.name), pullCode.references, description = desc,
-					implicitParams = Vector(connectionParam))(pullCode.text)
+					implicitParams = Single(connectionParam))(pullCode.text)
 			}
 		}
 	}

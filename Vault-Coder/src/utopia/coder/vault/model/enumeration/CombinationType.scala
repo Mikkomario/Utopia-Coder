@@ -144,9 +144,9 @@ object CombinationType
 		
 		override def isOneToMany = true
 		
-		override protected def childParamTypeFrom(childRef: Reference) = ScalaType.vector(childRef)
+		override protected def childParamTypeFrom(childRef: Reference) = ScalaType.seq(childRef)
 		
 		override protected def secondApplyParameterFrom(childRef: Reference) =
-			Parameter("children", ScalaType.vector(childRef))
+			Parameter("children", ScalaType.seq(childRef))
 	}
 }

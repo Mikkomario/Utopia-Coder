@@ -1,7 +1,7 @@
 package utopia.coder.vault.model.data
 
 import utopia.coder.model.data.{Filter, Name, NamingRules}
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.flow.operator.MaybeEmpty
 import utopia.flow.util.Version
 import utopia.coder.model.scala.Package
@@ -26,8 +26,8 @@ import utopia.coder.vault.model.enumeration.Mutability
   * @param prefixColumnNames Whether column names should have a prefix
   */
 case class ProjectData(projectName: Name, modelPackage: Package, databasePackage: Package,
-                       databaseName: Option[Name], enumerations: Vector[Enum],
-                       classes: Vector[Class], combinations: Vector[CombinationData], instances: Vector[Instance],
+                       databaseName: Option[Name], enumerations: Seq[Enum],
+                       classes: Seq[Class], combinations: Seq[CombinationData], instances: Seq[Instance],
                        namingRules: NamingRules, version: Option[Version], defaultMutability: Mutability,
                        modelCanReferToDB: Boolean, prefixColumnNames: Boolean)
 	extends MaybeEmpty[ProjectData]
@@ -37,20 +37,20 @@ case class ProjectData(projectName: Name, modelPackage: Package, databasePackage
 	/**
 	  * @return A copy of this project data with only classes remaining
 	  */
-	def onlyClasses = copy(enumerations = Vector())
+	def onlyClasses = copy(enumerations = Empty)
 	/**
 	  * @return A copy of this project data with only classes remaining (excluding combinations)
 	  */
-	def onlyBaseClasses = copy(enumerations = Vector(), combinations = Vector())
+	def onlyBaseClasses = copy(enumerations = Empty, combinations = Empty)
 	/**
 	  * @return A copy of this project data with only enumerations remaining
 	  */
-	def onlyEnumerations = copy(classes = Vector(), combinations = Vector())
+	def onlyEnumerations = copy(classes = Empty, combinations = Empty)
 	
 	/**
 	  * @return Copy of this data set without any combo-classes included
 	  */
-	def withoutCombos = copy(combinations = Vector.empty)
+	def withoutCombos = copy(combinations = Empty)
 	
 	
 	// IMPLEMENTED  ---------------------------
@@ -104,7 +104,7 @@ case class ProjectData(projectName: Name, modelPackage: Package, databasePackage
 	  * @return Classes accepted by the specified filter. Won't include any combos or related classes.
 	  */
 	def filterClassesOnly(f: Class => Boolean) =
-		copy(enumerations = Vector.empty, classes = classes.filter(f), combinations = Vector.empty)
+		copy(enumerations = Empty, classes = classes.filter(f), combinations = Empty)
 	/**
 	  * @param includeClass A function that returns true for classes that should be included in the results
 	  *                     (also includes their related combinations)
@@ -115,7 +115,7 @@ case class ProjectData(projectName: Name, modelPackage: Package, databasePackage
 	def filterByClassOrCombo(includeClass: Class => Boolean)(includeCombo: CombinationData => Boolean) = {
 		val remainingClasses = classes.filter(includeClass)
 		val (filteredClasses, filteredCombos) = comboInclusiveClasses(remainingClasses)(includeCombo)
-		copy(enumerations = Vector(), classes = filteredClasses, combinations = filteredCombos)
+		copy(enumerations = Empty, classes = filteredClasses, combinations = filteredCombos)
 	}
 	
 	/**
@@ -123,9 +123,9 @@ case class ProjectData(projectName: Name, modelPackage: Package, databasePackage
 	  * @return A copy of this data with only enumerations remaining which match the filter by their name
 	  */
 	def filterByEnumName(filter: Filter) =
-		copy(enumerations = enumerations.filter { e => filter(e.name) }, classes = Vector(), combinations = Vector())
+		copy(enumerations = enumerations.filter { e => filter(e.name) }, classes = Empty, combinations = Empty)
 	
-	private def comboInclusiveClasses(filteredClasses: Vector[Class])
+	private def comboInclusiveClasses(filteredClasses: Seq[Class])
 	                                 (comboInclusionCondition: CombinationData => Boolean) =
 	{
 		val filteredCombos = combinations.filter { c => comboInclusionCondition(c) ||

@@ -98,6 +98,8 @@ object Reference
 		lazy val mutate = apply(utils, "Mutate")
 		lazy val notEmpty = apply(utils, "NotEmpty")
 		
+		lazy val empty = apply(immutableCollection, "Empty")
+		lazy val single = apply(immutableCollection, "Single")
 		lazy val pair = apply(immutableCollection, "Pair")
 		lazy val span = apply(ranges, "Span")
 		lazy val numericSpan = apply(ranges, "NumericSpan")

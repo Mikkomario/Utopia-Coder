@@ -1,6 +1,7 @@
 package utopia.coder.model.merging
 
 import utopia.coder.model.scala.code.CodeLine
+import utopia.flow.collection.immutable.{Empty, Single}
 
 object MergeConflict
 {
@@ -17,7 +18,7 @@ object MergeConflict
 	  * @return A new merge conflict
 	  */
 	def line(read: String, generated: String, description: String = ""): MergeConflict =
-		apply(Vector(CodeLine(read)), Vector(CodeLine(generated)), description)
+		apply(Single(CodeLine(read)), Single(CodeLine(generated)), description)
 }
 
 /**
@@ -28,5 +29,5 @@ object MergeConflict
   * @param generatedVersion Conflicting generated code
   * @param description      Description of the merge conflict
   */
-case class MergeConflict(readVersion: Vector[CodeLine] = Vector(), generatedVersion: Vector[CodeLine] = Vector(),
+case class MergeConflict(readVersion: Seq[CodeLine] = Empty, generatedVersion: Seq[CodeLine] = Empty,
                          description: String = "")

@@ -25,7 +25,7 @@ import java.nio.file.Path
   */
 class VaultProjectSetup(val dbModuleName: Name, val modelPackage: Package, val databasePackage: Package,
                         override val sourceRoot: Path, backupRoot: Path,
-                        override val mergeSourceRoots: Vector[Path], override val mergeConflictsFilePath: Path,
+                        override val mergeSourceRoots: Seq[Path], override val mergeConflictsFilePath: Path,
                         override val version: Option[Version], val defaultMutability: Mutability,
                         val modelCanReferToDB: Boolean, val prefixSqlProperties: Boolean)
                        (implicit log: Logger)

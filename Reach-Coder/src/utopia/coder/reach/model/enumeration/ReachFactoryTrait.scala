@@ -6,6 +6,7 @@ import utopia.flow.util.StringExtensions._
 import utopia.coder.reach.model.data.Property
 import utopia.coder.reach.util.ReachReferences.Reach._
 import utopia.coder.reach.util.ReachReferences._
+import Reference.Flow._
 
 /**
   * Enumeration for different existing factory traits from Reach
@@ -75,8 +76,8 @@ object ReachFactoryTrait
 	case object CustomDrawableFactory extends ReachFactoryTrait
 	{
 		override val keyword: String = "draw"
-		override lazy val property: Property = Property("customDrawers", ScalaType.vector(firmament.customDrawer),
-			"withCustomDrawers", "drawers", "Vector.empty",
+		override lazy val property: Property = Property("customDrawers", ScalaType.seq(firmament.customDrawer),
+			"withCustomDrawers", "drawers", CodePiece.emptySeq,
 			description = "Custom drawers to assign to created components")
 		
 		override def reference: Reference = customDrawableFactory
@@ -87,8 +88,8 @@ object ReachFactoryTrait
 	case object FocusListenableFactory extends ReachFactoryTrait
 	{
 		override val keyword: String = "focus"
-		override lazy val property: Property = Property("focusListeners", ScalaType.vector(focusListener),
-			"withFocusListeners", "listeners", "Vector.empty",
+		override lazy val property: Property = Property("focusListeners", ScalaType.seq(focusListener),
+			"withFocusListeners", "listeners", CodePiece.emptySeq,
 			description = "Focus listeners to assign to created components")
 		
 		override def reference: Reference = focusListenableFactory

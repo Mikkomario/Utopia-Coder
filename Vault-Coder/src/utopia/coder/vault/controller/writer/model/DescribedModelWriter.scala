@@ -10,6 +10,7 @@ import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDecla
 import utopia.coder.model.scala.{DeclarationDate, Parameter, Parameters}
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Metropolis._
+import utopia.flow.collection.immutable.{Pair, Single}
 
 import scala.io.Codec
 
@@ -55,8 +56,8 @@ object DescribedModelWriter
 					description = s"${classToWrite.name} to wrap"),
 					Parameter("descriptions", ScalaType.set(linkedDescription),
 						description = s"Descriptions concerning the wrapped ${classToWrite.name}")),
-				extensions = Vector(describedWrapper(modelRef), simplyDescribed),
-				properties = Vector(ComputedProperty("wrapped", isOverridden = true)(modelParamName)),
+				extensions = Pair(describedWrapper(modelRef), simplyDescribed),
+				properties = Single(ComputedProperty("wrapped", isOverridden = true)(modelParamName)),
 				methods = Set(MethodDeclaration("simpleBaseModel", visibility = Protected, isOverridden = true,
 					isLowMergePriority = true)(Parameter("roles", ScalaType.iterable(descriptionRole)))(
 					"wrapped.toModel")),

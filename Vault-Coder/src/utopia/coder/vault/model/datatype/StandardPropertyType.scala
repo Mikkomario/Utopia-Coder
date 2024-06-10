@@ -8,7 +8,7 @@ import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.ValueConvertibleType
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.generic.casting.ValueConversions._
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.util.StringExtensions._
@@ -908,7 +908,7 @@ object StandardPropertyType
 			if (referencedType.isConcrete) this else copy(referencedType = referencedType.concrete)
 		
 		override def defaultPropertyName: Name = referencedTableName + "id"
-		override def defaultPartNames: Vector[Name] = Vector()
+		override def defaultPartNames: Seq[Name] = Empty
 		override def defaultMutability: Option[Mutability] = if (referencedType.isOptional) Some(Mutable) else None
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) =
@@ -923,7 +923,7 @@ object StandardPropertyType
 	{
 		// ATTRIBUTES   ----------------------------
 		
-		override lazy val sqlConversions: Vector[SqlTypeConversion] =
+		override lazy val sqlConversions: Seq[SqlTypeConversion] =
 			enumeration.idType.sqlConversions.map { new EnumIdSqlConversion(_) }
 		
 		private lazy val findForId = s"${ enumeration.name.enumName }.${ EnumerationWriter.findForIdName(enumeration) }"
@@ -952,7 +952,7 @@ object StandardPropertyType
 		override def emptyValue = CodePiece.empty
 		
 		override def defaultPropertyName = enumeration.name
-		override def defaultPartNames: Vector[Name] = Vector()
+		override def defaultPartNames: Seq[Name] = Empty
 		override def defaultMutability: Option[Mutability] = None
 		
 		override def yieldsTryFromValue = enumeration.hasNoDefault
@@ -963,9 +963,9 @@ object StandardPropertyType
 		override def toJsonValueCode(instanceCode: String): CodePiece = toValueCode(instanceCode)
 		
 		// NB: Doesn't support multi-column enumeration id types
-		override def fromValueCode(valueCodes: Vector[String]) =
+		override def fromValueCode(valueCodes: Seq[String]) =
 			CodePiece(s"${ enumeration.name.enumName }.fromValue(${ valueCodes.head })", Set(enumeration.reference))
-		override def fromJsonValueCode(valueCode: String): CodePiece = fromValueCode(Vector(valueCode))
+		override def fromJsonValueCode(valueCode: String): CodePiece = fromValueCode(Single(valueCode))
 		override def fromValuesCode(valuesCode: String) = {
 			val idFromValueCode = enumeration.idType.fromValueCode(Vector("v"))
 			idFromValueCode.mapText { convertToId =>
@@ -980,7 +980,7 @@ object StandardPropertyType
 		private object Optional extends PropertyType
 		{
 			private lazy val idType = enumeration.idType.optional
-			override lazy val sqlConversions: Vector[SqlTypeConversion] =
+			override lazy val sqlConversions: Seq[SqlTypeConversion] =
 				idType.sqlConversions.map { new EnumIdOptionSqlConversion(_) }
 			
 			override def scalaType = ScalaType.option(EnumValue.this.scalaType)
@@ -993,7 +993,7 @@ object StandardPropertyType
 			override def emptyValue = CodePiece.none
 			
 			override def defaultPropertyName = EnumValue.this.defaultPropertyName
-			override def defaultPartNames: Vector[Name] = EnumValue.this.defaultPartNames
+			override def defaultPartNames: Seq[Name] = EnumValue.this.defaultPartNames
 			override def defaultMutability: Option[Mutability] = EnumValue.this.defaultMutability
 			
 			override def optional = this
@@ -1008,7 +1008,7 @@ object StandardPropertyType
 					.referringTo(value)
 			override def toJsonValueCode(instanceCode: String): CodePiece = toValueCode(instanceCode)
 			
-			override def fromValueCode(valueCodes: Vector[String]) =
+			override def fromValueCode(valueCodes: Seq[String]) =
 				idType.fromValueCode(valueCodes)
 					.mapText { id =>
 						// Types which are at the same time concrete and non-concrete, are handled a bit differently
@@ -1026,7 +1026,7 @@ object StandardPropertyType
 						}
 					}
 					.referringTo(enumeration.reference)
-			override def fromJsonValueCode(valueCode: String): CodePiece = fromValueCode(Vector(valueCode))
+			override def fromJsonValueCode(valueCode: String): CodePiece = fromValueCode(Single(valueCode))
 			override def fromValuesCode(valuesCode: String) =
 				idType.fromValuesCode(valuesCode)
 					.mapText { ids => s"$ids.flatMap($findForId)" }
@@ -1203,7 +1203,7 @@ object StandardPropertyType
 		override def toValueCode(instanceCode: String): CodePiece = toValueCode(instanceCode, isForJson = false)
 		override def toJsonValueCode(instanceCode: String): CodePiece = toValueCode(instanceCode, isForJson = true)
 		
-		override def fromValueCode(valueCodes: Vector[String]): CodePiece = {
+		override def fromValueCode(valueCodes: Seq[String]): CodePiece = {
 			// Spits the input values into two parts
 			val codesPerPart = valueCodes.size / 2
 			val splitValueCodes = Pair(valueCodes.take(codesPerPart), valueCodes.drop(codesPerPart))
@@ -1296,7 +1296,7 @@ object StandardPropertyType
 	{
 		override def scalaType: ScalaType = dateRange
 		
-		override protected def toPairCode(instanceCode: String): CodePiece = s"$instanceCode.toPair"
+		override protected def toPairCode(instanceCode: String): CodePiece = s"$instanceCode.ends"
 		override protected def fromPairCode(pairCode: String): CodePiece =
 			CodePiece(s"${dateRange.target}.exclusive($pairCode)", Set(dateRange))
 	}
@@ -1382,7 +1382,7 @@ object StandardPropertyType
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
 		
 		override def defaultPropertyName: Name = "distance"
-		override def defaultPartNames: Vector[Name] = Vector()
+		override def defaultPartNames: Seq[Name] = Empty
 		override def defaultMutability: Option[Mutability] = None
 		
 		override def supportsDefaultJsonValues: Boolean = true
@@ -1406,7 +1406,7 @@ object StandardPropertyType
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
 		
 		override def defaultPropertyName: Name = "latLong"
-		override def defaultPartNames: Vector[Name] = Vector("latitude", "longitude")
+		override def defaultPartNames: Seq[Name] = Vector("latitude", "longitude")
 		override def defaultMutability: Option[Mutability] = None
 		
 		override def supportsDefaultJsonValues: Boolean = true

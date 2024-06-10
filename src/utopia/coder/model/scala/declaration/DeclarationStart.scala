@@ -6,10 +6,11 @@ import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.declaration.DeclarationPrefix.Override
 import utopia.coder.model.scala.declaration.FunctionDeclarationType.ValueD
 import utopia.coder.model.scala.template.ScalaConvertible
+import utopia.flow.collection.immutable.{Empty, Single}
 
 object DeclarationStart
 {
-	lazy val overrideVal = apply(ValueD, prefixes = Vector(Override))
+	lazy val overrideVal = apply(ValueD, prefixes = Single(Override))
 }
 
 /**
@@ -21,11 +22,10 @@ object DeclarationStart
   * @param prefixes Custom prefixes to apply (default = empty)
   */
 case class DeclarationStart(declarationType: DeclarationType, visibility: Visibility = Public,
-                            prefixes: Vector[DeclarationPrefix] = Vector())
+                            prefixes: Seq[DeclarationPrefix] = Empty)
 	extends ScalaConvertible
 {
-	override def toScala =
-	{
+	override def toScala = {
 		val mainPart = if (visibility == Public) CodePiece(declarationType.keyword) else
 			visibility.toScala.append(declarationType.keyword, " ")
 		

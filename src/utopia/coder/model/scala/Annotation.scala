@@ -3,7 +3,7 @@ package utopia.coder.model.scala
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.ScalaConvertible
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.flow.generic.casting.ValueConversions._
 import utopia.flow.generic.model.immutable.Value
 import utopia.flow.operator.ordering.CombinedOrdering
@@ -29,8 +29,7 @@ object Annotation
 	  * @param parameters Parameters applied to this annotation, as values (default = empty)
 	  * @return A new annotation
 	  */
-	def apply(name: String, genericTypes: Vector[ScalaType] = Vector(),
-	          parameters: Vector[Value] = Vector()): Annotation =
+	def apply(name: String, genericTypes: Seq[ScalaType] = Empty, parameters: Seq[Value] = Empty): Annotation =
 		_Annotation(name, genericTypes, parameters)
 	
 	/**
@@ -56,12 +55,12 @@ object Annotation
 	case class Deprecation(description: String, sinceVersion: Version) extends Annotation
 	{
 		override def name = "deprecated"
-		override def genericTypes = Vector()
-		override def parameters = Vector(description, sinceVersion.toString)
+		override def genericTypes = Empty
+		override def parameters = Pair(description, sinceVersion.toString)
 	}
 	
-	private case class _Annotation(name: String, genericTypes: Vector[ScalaType] = Vector(),
-	                               parameters: Vector[Value] = Vector())
+	private case class _Annotation(name: String, genericTypes: Seq[ScalaType] = Empty,
+	                               parameters: Seq[Value] = Empty)
 		extends Annotation
 }
 
@@ -81,11 +80,11 @@ trait Annotation extends ScalaConvertible
 	/**
 	  * @return Generic type parameters that apply to this annotation
 	  */
-	def genericTypes: Vector[ScalaType]
+	def genericTypes: Seq[ScalaType]
 	/**
 	  * @return Parameters that apply to this annotation
 	  */
-	def parameters: Vector[Value]
+	def parameters: Seq[Value]
 	
 	
 	// IMPLEMENTED  -----------------------

@@ -13,6 +13,7 @@ import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
+import utopia.flow.collection.immutable.Empty
 
 import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
@@ -225,7 +226,7 @@ object DbModelWriter
 	{
 		def extensionFor(dbModelClass: ScalaType): Extension
 		
-		def properties(implicit naming: NamingRules): Vector[PropertyDeclaration]
+		def properties(implicit naming: NamingRules): Seq[PropertyDeclaration]
 		
 		def methods: Set[MethodDeclaration]
 	}
@@ -259,7 +260,7 @@ object DbModelWriter
 			(if (isDefault) deprecatableAfter else nullDeprecatable)(dbModelClass)
 		
 		override def properties(implicit naming: NamingRules) =
-			if (isDefault) Vector() else Vector(
+			if (isDefault) Empty else Vector(
 				ImmutableValue("deprecationAttName", isOverridden = true)(prop.dbProperties.head.modelName.quoted))
 		// withDeprecatedAfter(...) must be provided separately for custom property names
 		override def methods = if (isDefault) Set() else Set(

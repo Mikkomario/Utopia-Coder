@@ -18,6 +18,7 @@ import utopia.coder.model.scala.template.ValueConvertibleType
 import Reference.Flow._
 import utopia.coder.model.enumeration.NameContext.ClassPropName
 import utopia.coder.vault.model.enumeration.Mutability
+import utopia.flow.collection.immutable.{Empty, Single}
 
 import scala.util.{Failure, Success}
 
@@ -184,7 +185,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
   *                                    Set to false if this type is based on fractional values where individual
   *                                    value search is not a realistic use case.
   */
-case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlPropertyType, Vector[CustomPartConversion]],
+case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlPropertyType, Seq[CustomPartConversion]],
                               valueDataType: Reference,
                               fromValue: CodePiece, optionFromValue: CodePiece,
                               toValue: CodePiece, toJsonValue: CodePiece = CodePiece.empty,
@@ -192,7 +193,7 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
                               fromJsonValue: CodePiece = CodePiece.empty, optionFromJsonValue: CodePiece = CodePiece.empty,
                               emptyValue: CodePiece = CodePiece.empty,
                               nonEmptyDefaultValue: CodePiece = CodePiece.empty, defaultPropName: Option[Name] = None,
-                              defaultPartNames: Seq[Name] = Vector(), defaultMutability: Option[Mutability] = None,
+                              defaultPartNames: Seq[Name] = Empty, defaultMutability: Option[Mutability] = None,
                               autoDescription: String = "", yieldsTryFromValue: Boolean = false,
                               yieldsTryFromJsonValue: Boolean = false, isFilterGenerationSupported: Boolean = true)
 	extends PropertyType
@@ -233,15 +234,15 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
 		}
 	}
 	
-	override def fromValueCode(valueCodes: Vector[String]): CodePiece = fromValueCode(fromValue, valueCodes)
+	override def fromValueCode(valueCodes: Seq[String]): CodePiece = fromValueCode(fromValue, valueCodes)
 	override def fromJsonValueCode(valueCode: String): CodePiece = fromJsonValue.notEmpty match {
-		case Some(fromValue) => fromValueCode(fromValue, Vector(valueCode))
-		case None => fromValueCode(Vector(valueCode))
+		case Some(fromValue) => fromValueCode(fromValue, Single(valueCode))
+		case None => fromValueCode(Single(valueCode))
 	}
 	// TODO: Current version doesn't support multi-column types, hence the Vector("v")
 	override def fromValuesCode(valuesCode: String) =
 		fromValueCode(Vector("v")).mapText { fromValue => s"$valuesCode.map { v => $fromValue }" }
-	private def optionFromValueCode(valueCodes: Vector[String], isFromJson: Boolean = false): CodePiece = {
+	private def optionFromValueCode(valueCodes: Seq[String], isFromJson: Boolean = false): CodePiece = {
 		val appliedOptionFromValue = if (isFromJson) optionFromJsonValue.nonEmptyOrElse(optionFromValue) else optionFromValue
 		fromValueCode(appliedOptionFromValue, valueCodes)
 	}
@@ -255,7 +256,7 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
 	
 	// OTHER    ----------------------------
 	
-	private def fromValueCode(userCode: CodePiece, valueCodes: Vector[String]) = {
+	private def fromValueCode(userCode: CodePiece, valueCodes: Seq[String]) = {
 		// Case: Parsing from multiple parameters (multiple parts)
 		if (valueCodes.size > 1)
 			valueCodes.zipWithIndex.foldLeft(userCode) { case (code, (valueCode, index)) =>
@@ -280,7 +281,7 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
 	{
 		override lazy val scalaType = ScalaType.option(CustomPropertyType.this.scalaType)
 		override lazy val sqlConversions = conversion match {
-			case Left(targetType) => Vector(DirectSqlTypeConversion(OptionWrappedMidType, targetType.nullable))
+			case Left(targetType) => Single(DirectSqlTypeConversion(OptionWrappedMidType, targetType.nullable))
 			case Right(parts) => parts.map { new PartToSqlConversion(_, extractFromOption = true) }
 		}
 		
@@ -304,12 +305,12 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
 		override def toValueCode(instanceCode: String) = optionToValueCode(instanceCode)
 		override def toJsonValueCode(instanceCode: String): CodePiece = optionToValueCode(instanceCode, isToJson = true)
 		
-		override def fromValueCode(valueCodes: Vector[String]) = optionFromValueCode(valueCodes)
+		override def fromValueCode(valueCodes: Seq[String]) = optionFromValueCode(valueCodes)
 		override def fromJsonValueCode(valueCode: String): CodePiece =
-			optionFromValueCode(Vector(valueCode), isFromJson = true)
+			optionFromValueCode(Single(valueCode), isFromJson = true)
 		// TODO: No multi-column support exists here either
 		override def fromValuesCode(valuesCode: String) =
-			fromValueCode(Vector("v")).mapText { fromValue => s"$valuesCode.flatMap { v => $fromValue }" }
+			fromValueCode(Single("v")).mapText { fromValue => s"$valuesCode.flatMap { v => $fromValue }" }
 		override def fromConcreteCode(concreteCode: String): CodePiece = s"Some($concreteCode)"
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) =

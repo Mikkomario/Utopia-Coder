@@ -6,6 +6,7 @@ import utopia.coder.vault.model.datatype.StandardPropertyType.ClassReference
 import utopia.coder.vault.model.datatype.{PropertyType, SingleColumnPropertyType}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.vault.model.enumeration.Mutability
+import utopia.flow.collection.immutable.Empty
 
 object Property
 {
@@ -42,7 +43,7 @@ object Property
   * @param description Description of this property (may be empty). Default = empty = no description.
   */
 case class Property(name: Name, dataType: PropertyType, customDefaultValue: CodePiece = CodePiece.empty,
-                    dbPropertyOverrides: Vector[DbPropertyOverrides] = Vector(),
+                    dbPropertyOverrides: Seq[DbPropertyOverrides] = Empty,
                     customMutability: Option[Mutability] = None, withAccessName: String = "",
                     inAccessName: String = "", description: String = "")
 	extends Named

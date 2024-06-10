@@ -18,6 +18,7 @@ import utopia.coder.vault.controller.writer.model.{CombinedModelWriter, Describe
 import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, ProjectData, VaultProjectSetup}
 import utopia.coder.vault.model.enumeration.Mutability
 import utopia.coder.vault.util.Common
+import utopia.flow.collection.immutable.{Empty, Pair}
 
 import java.nio.file.Path
 import java.time.LocalTime
@@ -59,7 +60,7 @@ object MainAppLogic extends CoderAppLogic
 		ArgumentSchema.flag("no-combos", "NC", help = "Whether combo-class writing should be disabled")
 	
 	override protected def run(args: CommandArguments, inputPath: Lazy[Path], outputPath: Lazy[Path],
-	                           mergeRoots: Lazy[Vector[Path]], filter: Lazy[Option[Filter]],
+	                           mergeRoots: Lazy[Seq[Path]], filter: Lazy[Option[Filter]],
 	                           targetGroup: Option[String]): Boolean =
 	{
 		lazy val targetType = targetGroup match {
@@ -213,13 +214,13 @@ object MainAppLogic extends CoderAppLogic
 					val mergePaths = {
 						// Case: Merging is disabled
 						if (arguments("nomerge").getBoolean)
-							Vector()
+							Empty
 						// Case: Single module project
 						else if (data.modelCanReferToDB)
 							mainMergeRoot.toVector
 						// Case: Multi-module project
 						else
-							Vector(mainMergeRoot, alternativeMergeRoot).flatten
+							Pair(mainMergeRoot, alternativeMergeRoot).flatten
 					}
 					implicit val setup: VaultProjectSetup = new VaultProjectSetup(data.projectName, data.modelPackage,
 						data.databasePackage, subDirectory(directory, "src"), subDirectory(directory, "backup"),

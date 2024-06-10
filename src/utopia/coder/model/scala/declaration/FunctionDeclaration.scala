@@ -30,7 +30,7 @@ trait FunctionDeclaration[+Repr]
 	/**
 	  * @return Comments presented above this function declaration, but not included in the scaladoc
 	  */
-	def headerComments: Vector[String]
+	def headerComments: Seq[String]
 	
 	/**
 	  * @return Whether this declaration overrides a base declaration
@@ -80,7 +80,7 @@ trait FunctionDeclaration[+Repr]
 	  */
 	protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType], parameters: Option[Parameters],
 	                       bodyCode: Code, explicitOutputType: Option[ScalaType], annotations: Seq[Annotation],
-	                       description: String, returnDescription: String, headerComments: Vector[String],
+	                       description: String, returnDescription: String, headerComments: Seq[String],
 	                       isOverridden: Boolean, isImplicit: Boolean): Repr
 	
 	

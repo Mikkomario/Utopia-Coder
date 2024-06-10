@@ -29,7 +29,7 @@ object DescriptionLinkInterfaceWriter
 	  *         reference to the linked description factories. Failure if file writing failed.
 	  *         None if there weren't any classes that used descriptions.
 	  */
-	def apply(classes: Vector[Class], tablesRef: Reference)
+	def apply(classes: Seq[Class], tablesRef: Reference)
 	         (implicit setup: VaultProjectSetup, codec: Codec,
 	          naming: NamingRules): Try[Option[(Reference, Reference, Reference)]] =
 	{

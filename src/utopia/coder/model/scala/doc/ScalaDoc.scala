@@ -5,13 +5,14 @@ import utopia.coder.model.scala.DeclarationDate
 import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.doc.ScalaDocKeyword.{Author, Param, Return, Since}
 import utopia.coder.model.scala.template.CodeConvertible
+import utopia.flow.collection.immutable.Empty
 
 object ScalaDoc
 {
 	/**
 	  * An empty scaladoc
 	  */
-	val empty = apply(Vector())
+	val empty = apply(Empty)
 }
 
 /**
@@ -19,7 +20,7 @@ object ScalaDoc
   * @author Mikko Hilpinen
   * @since 1.11.2021, v1.3
   */
-case class ScalaDoc(parts: Vector[ScalaDocPart]) extends CodeConvertible with MaybeEmpty[ScalaDoc]
+case class ScalaDoc(parts: Seq[ScalaDocPart]) extends CodeConvertible with MaybeEmpty[ScalaDoc]
 {
 	// COMPUTED ----------------------------------
 	

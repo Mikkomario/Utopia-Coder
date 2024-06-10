@@ -13,6 +13,7 @@ import Reference._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{Enum, VaultProjectSetup}
 import utopia.coder.vault.model.datatype.StandardPropertyType.Text
+import utopia.flow.collection.immutable.Single
 
 import scala.io.Codec
 
@@ -116,7 +117,7 @@ object EnumerationWriter
 		File(e.packagePath,
 			// Writes the enumeration trait first
 			TraitDeclaration(enumName,
-				extensions = Vector(valueConvertible),
+				extensions = Single(valueConvertible),
 				// Each value contains an id so that it can be referred from the database
 				properties = Vector(
 					PropertyDeclaration.newAbstract(idPropName, e.idType.toScala,
@@ -130,7 +131,7 @@ object EnumerationWriter
 			// Enumeration values are nested within a companion object
 			ObjectDeclaration(enumName,
 				// Contains the .values -property
-				properties = Vector(values) ++ defaultProp,
+				properties = Single(values) ++ defaultProp,
 				// Contains an id to enum value -function (one with Try, another with Option)
 				methods = Set(
 					MethodDeclaration(_findForIdName,
@@ -152,7 +153,7 @@ object EnumerationWriter
 				),
 				// Contains an object for each value
 				nested = e.values.map { value =>
-					ObjectDeclaration(value.name.enumValue, Vector(Extension(enumDataType)),
+					ObjectDeclaration(value.name.enumValue, Single(Extension(enumDataType)),
 						// The objects don't contain other properties except for 'id'
 						properties = Vector(
 							ImmutableValue(idPropName, value.id.references, isOverridden = true)(value.id.text)),

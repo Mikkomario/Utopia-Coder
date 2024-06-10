@@ -4,7 +4,8 @@ import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.TypeVariance.{Contravariance, Covariance, Invariance}
 import utopia.coder.model.scala.doc.ScalaDocKeyword.TypeParam
 import utopia.coder.model.scala.doc.ScalaDocPart
-import utopia.coder.model.scala.template.{ScalaConvertible, Documented}
+import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
+import utopia.flow.collection.immutable.Empty
 
 object GenericType
 {
@@ -67,8 +68,7 @@ case class GenericType(name: String, requirement: Option[TypeRequirement] = None
 	
 	// IMPLEMENTED  ------------------------------
 	
-	override def toScala =
-	{
+	override def toScala = {
 		val mainPart = CodePiece(variance.typePrefix + name)
 		requirement match {
 			case Some(r) => mainPart.append(r.toScala, " ")
@@ -77,5 +77,5 @@ case class GenericType(name: String, requirement: Option[TypeRequirement] = None
 	}
 	
 	override def documentation =
-		if (description.isEmpty) Vector() else Vector(ScalaDocPart(TypeParam(name), description))
+		if (description.isEmpty) Empty else Vector(ScalaDocPart(TypeParam(name), description))
 }

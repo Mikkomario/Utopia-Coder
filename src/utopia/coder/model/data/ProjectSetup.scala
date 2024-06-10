@@ -3,6 +3,7 @@ package utopia.coder.model.data
 import utopia.coder.controller.refactoring.Backup
 import utopia.coder.model.merging.MergeConflict
 import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.immutable.{Empty, Single}
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.flow.util.Version
@@ -24,7 +25,7 @@ object ProjectSetup
 	 * @return A new project setup instance
 	  */
 	def apply(mergeConflictsFilePath: Path, sourceRoot: Path, backupRoot: Path,
-	          mergeSourceRoots: Vector[Path] = Vector(), version: Option[Version] = None)
+	          mergeSourceRoots: Seq[Path] = Empty, version: Option[Version] = None)
 	         (implicit log: Logger): ProjectSetup =
 		new _ProjectSetup(sourceRoot, backupRoot, mergeSourceRoots, mergeConflictsFilePath, version)
 	
@@ -32,7 +33,7 @@ object ProjectSetup
 	// NESTED   -------------------------
 	
 	private class _ProjectSetup(override val sourceRoot: Path, backupRoot: Path,
-	                            override val mergeSourceRoots: Vector[Path],
+	                            override val mergeSourceRoots: Seq[Path],
 	                            override val mergeConflictsFilePath: Path, override val version: Option[Version])
 	                           (implicit log: Logger)
 		extends ProjectSetup
@@ -57,7 +58,7 @@ trait ProjectSetup
 	/**
 	  * @return Paths to the source roots where existing versions are read from and merged (may be empty)
 	  */
-	def mergeSourceRoots: Vector[Path]
+	def mergeSourceRoots: Seq[Path]
 	/**
 	  * @return Path to the text file where merge conflicts shall be documented
 	  */
@@ -79,7 +80,7 @@ trait ProjectSetup
 	  * @param conflicts Merge conflicts to record
 	  * @param header Header to assign for these conflicts (call-by-name)
 	  */
-	def recordConflicts(conflicts: Vector[MergeConflict], header: => String) = {
+	def recordConflicts(conflicts: Seq[MergeConflict], header: => String) = {
 		if (conflicts.nonEmpty) {
 			mergeConflictsFilePath.createParentDirectories().flatMap { path =>
 				path.appendLines(Vector("", "", s"// $header ${"-" * 10}") ++ conflicts.flatMap { conflict =>
@@ -88,7 +89,7 @@ trait ProjectSetup
 							("// Old Version" +: conflict.readVersion.map { _.toString }) ++
 							("// New Version" +: conflict.generatedVersion.map { _.toString })
 					else
-						Vector(s"// ${conflict.description}")
+						Single(s"// ${conflict.description}")
 				})
 			}.failure.foreach { error =>
 				println(s"Failed to write conflicts document due to an error: ${error.getMessage}")

@@ -5,7 +5,8 @@ import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.ScalaType
 import utopia.coder.model.scala.declaration.DeclarationStart
 import utopia.coder.model.scala.doc.ScalaDocPart
-import utopia.coder.model.scala.template.{ScalaConvertible, Documented}
+import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
+import utopia.flow.collection.immutable.{Empty, Single}
 
 /**
   * Represents a scala method parameter
@@ -46,7 +47,7 @@ case class Parameter(name: String, dataType: ScalaType, default: CodePiece = Cod
 	}
 	
 	override def documentation =
-		if (description.nonEmpty) Vector(ScalaDocPart(Param(name), description.linesIterator.toVector)) else Vector()
+		if (description.nonEmpty) Vector(ScalaDocPart(Param(name), description.linesIterator.toVector)) else Empty
 	
 	
 	// OTHER    ------------------------------
@@ -58,5 +59,5 @@ case class Parameter(name: String, dataType: ScalaType, default: CodePiece = Cod
 	  * @return A new parameters list
 	  */
 	def withImplicits(firstParam: Parameter, moreParams: Parameter*) =
-		Parameters(Vector(Vector(this)), firstParam +: moreParams.toVector)
+		Parameters(Single(Single(this)), firstParam +: moreParams)
 }

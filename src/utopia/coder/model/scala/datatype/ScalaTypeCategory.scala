@@ -1,7 +1,10 @@
 package utopia.coder.model.scala.datatype
 
+import utopia.flow.collection.immutable.Empty
+
 /**
   * An enumeration for different data type categories
+ *
   * @author Mikko Hilpinen
   * @since 1.11.2021, v1.3
   */
@@ -21,5 +24,5 @@ object ScalaTypeCategory
 	  * Represents a function type
 	  * @param parameterTypes Types of the parameters this function accepts
 	  */
-	case class Function(parameterTypes: Vector[ScalaType] = Vector()) extends ScalaTypeCategory
+	case class Function(parameterTypes: Seq[ScalaType] = Empty) extends ScalaTypeCategory
 }

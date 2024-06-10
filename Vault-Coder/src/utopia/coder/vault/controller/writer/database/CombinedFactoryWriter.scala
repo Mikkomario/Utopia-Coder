@@ -7,6 +7,7 @@ import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProp
 import utopia.coder.model.scala.declaration.{File, ObjectDeclaration}
 import utopia.coder.vault.model.data.{CombinationData, CombinationReferences, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
+import utopia.flow.collection.immutable.Single
 
 import scala.io.Codec
 
@@ -74,7 +75,7 @@ object CombinedFactoryWriter
 		
 		File(setup.factoryPackage/data.packageName,
 			ObjectDeclaration((data.name + DbFactoryWriter.classNameSuffix).className,
-				Vector(data.combinationType.extensionWith(references)) ++
+				Single(data.combinationType.extensionWith(references)) ++
 					creation.map { _._1 } ++ deprecation.map { _._1 },
 				properties = Vector(
 					ComputedProperty("parentFactory", Set(parentFactoryRef), isOverridden = true)(

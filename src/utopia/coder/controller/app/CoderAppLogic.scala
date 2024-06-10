@@ -4,6 +4,7 @@ import utopia.coder.controller.parsing.file.InputFiles
 import utopia.coder.model.data.{Filter, ProjectPaths}
 import utopia.flow.async.AsyncExtensions._
 import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.parse.file.container.ObjectMapFileContainer
 import utopia.flow.parse.json.{JsonParser, JsonReader}
@@ -57,7 +58,7 @@ trait CoderAppLogic extends AppLogic
 	  * @return Whether the parsing process succeeded
 	  */
 	protected def run(args: CommandArguments, inputPath: Lazy[Path], outputPath: Lazy[Path],
-	                  mergeRoots: Lazy[Vector[Path]], filter: Lazy[Option[Filter]], targetGroup: Option[String]): Boolean
+	                  mergeRoots: Lazy[Seq[Path]], filter: Lazy[Option[Filter]], targetGroup: Option[String]): Boolean
 	
 	
 	// IMPLEMENTED  --------------------------
@@ -213,13 +214,13 @@ trait CoderAppLogic extends AppLogic
 				else
 					None
 			}
-			Vector(mainRoot, alternativeMergeRoot).flatten
+			Pair(mainRoot, alternativeMergeRoot).flatten
 		}
 		
 		// Runs the actual application logic
 		// Merge roots may not be given if specifically denied with -N
 		val didSucceed = run(arguments, inputPath, outputPath,
-			if (arguments("nomerge").getBoolean) Lazy.initialized(Vector()) else mergeRoots, filter, targetType)
+			if (arguments("nomerge").getBoolean) Lazy.initialized(Empty) else mergeRoots, filter, targetType)
 		
 		// May store the project settings for future use
 		if (didSucceed && project.isEmpty &&
@@ -252,7 +253,7 @@ trait CoderAppLogic extends AppLogic
 									else
 										None
 								}
-								Vector(mainRoot) ++ altSrc
+								Single(mainRoot) ++ altSrc
 							}
 					}
 					projectMergeRoots match {

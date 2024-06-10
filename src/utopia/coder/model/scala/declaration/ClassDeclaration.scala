@@ -5,19 +5,20 @@ import utopia.coder.model.scala.Visibility.Public
 import utopia.coder.model.scala.datatype.{Extension, GenericType}
 import utopia.coder.model.scala.declaration.InstanceDeclarationType.ClassD
 import utopia.coder.model.scala.{Annotation, DeclarationDate, Parameters, Visibility}
+import utopia.flow.collection.immutable.Empty
 
 /**
   * Used for declaring scala classes
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
-case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Vector(),
-                            constructionParams: Parameters = Parameters.empty, extensions: Vector[Extension] = Vector(),
-                            types: Vector[TypeDeclaration] = Vector.empty,
-                            creationCode: Code = Code.empty, properties: Vector[PropertyDeclaration] = Vector(),
+case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Empty,
+                            constructionParams: Parameters = Parameters.empty, extensions: Seq[Extension] = Empty,
+                            types: Seq[TypeDeclaration] = Empty,
+                            creationCode: Code = Code.empty, properties: Seq[PropertyDeclaration] = Empty,
                             methods: Set[MethodDeclaration] = Set(), nested: Set[InstanceDeclaration] = Set(),
-                            visibility: Visibility = Public, annotations: Seq[Annotation] = Vector(),
-                            description: String = "", author: String = "", headerComments: Vector[String] = Vector(),
+                            visibility: Visibility = Public, annotations: Seq[Annotation] = Empty,
+                            description: String = "", author: String = "", headerComments: Seq[String] = Empty,
                             since: DeclarationDate = DeclarationDate.today, isCaseClass: Boolean = false)
 	extends InstanceDeclaration
 {
@@ -33,11 +34,11 @@ case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Vecto
 	override protected def constructorParams = Some(constructionParams)
 	
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
-	                                extensions: Vector[Extension], types: Vector[TypeDeclaration], creationCode: Code,
-	                                properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
+	                                extensions: Seq[Extension], types: Seq[TypeDeclaration], creationCode: Code,
+	                                properties: Seq[PropertyDeclaration], methods: Set[MethodDeclaration],
 	                                nested: Set[InstanceDeclaration], annotations: Seq[Annotation],
 	                                description: String, author: String,
-	                                headerComments: Vector[String], since: DeclarationDate) =
+	                                headerComments: Seq[String], since: DeclarationDate) =
 		ClassDeclaration(name, genericTypes, constructionParams, extensions, types, creationCode, properties, methods,
 			nested, visibility, annotations, description, author, headerComments, since, isCaseClass)
 }

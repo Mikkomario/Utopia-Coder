@@ -12,6 +12,7 @@
 - The input file no longer supports classes defined as a single `class` property
 - A package property no longer supports an object as a value
 - Generated **UniqueXAccessLike** traits now extend **FilterableView**
+- The child-property in multi-linked combined models is now **Seq** instead of **Vector**
 - The `.values` property in enumerations with exactly two values is now of type **Pair** instead of **Vector**
 - Setters are no longer always generated in access points (see new feature of mutability)
 ### Bugfixes

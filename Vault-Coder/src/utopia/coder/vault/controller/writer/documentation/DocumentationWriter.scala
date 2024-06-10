@@ -67,8 +67,8 @@ object DocumentationWriter
 						case _ => None
 					}
 				}
-			}.asMultiMap
-			val combinationsByParent = data.combinations.map { c => c.parentClass -> c }.asMultiMap
+			}.groupMap { _._1 } { _._2 }
+			val combinationsByParent = data.combinations.groupBy { _.parentClass }
 			
 			// Writes the table of contents
 			writer.println("\n## Table of Contents")

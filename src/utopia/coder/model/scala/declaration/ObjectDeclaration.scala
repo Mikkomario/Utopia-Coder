@@ -4,19 +4,20 @@ import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.Visibility.Public
 import utopia.coder.model.scala.datatype.{Extension, GenericType}
 import utopia.coder.model.scala.{Annotation, DeclarationDate, Visibility}
+import utopia.flow.collection.immutable.Empty
 
 /**
   * Used for declaring objects in scala files
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
-case class ObjectDeclaration(name: String, extensions: Vector[Extension] = Vector(),
-                             types: Vector[TypeDeclaration] = Vector.empty,
-                             creationCode: Code = Code.empty, properties: Vector[PropertyDeclaration] = Vector(),
+case class ObjectDeclaration(name: String, extensions: Seq[Extension] = Empty,
+                             types: Seq[TypeDeclaration] = Empty,
+                             creationCode: Code = Code.empty, properties: Seq[PropertyDeclaration] = Empty,
                              methods: Set[MethodDeclaration] = Set(), nested: Set[InstanceDeclaration] = Set(),
-                             visibility: Visibility = Public, annotations: Seq[Annotation] = Vector(),
+                             visibility: Visibility = Public, annotations: Seq[Annotation] = Empty,
                              description: String = "", author: String = "",
-                             headerComments: Vector[String] = Vector(), since: DeclarationDate = DeclarationDate.today,
+                             headerComments: Seq[String] = Empty, since: DeclarationDate = DeclarationDate.today,
                              isCaseObject: Boolean = false)
 	extends InstanceDeclaration
 {
@@ -25,14 +26,14 @@ case class ObjectDeclaration(name: String, extensions: Vector[Extension] = Vecto
 	override protected def constructorParams = None
 	
 	// Objects can't have generic type parameters since they're never abstract
-	override def genericTypes = Vector()
+	override def genericTypes = Empty
 	
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
-	                                extensions: Vector[Extension], types: Vector[TypeDeclaration], creationCode: Code,
-	                                properties: Vector[PropertyDeclaration], methods: Set[MethodDeclaration],
+	                                extensions: Seq[Extension], types: Seq[TypeDeclaration], creationCode: Code,
+	                                properties: Seq[PropertyDeclaration], methods: Set[MethodDeclaration],
 	                                nested: Set[InstanceDeclaration], annotations: Seq[Annotation],
 	                                description: String, author: String,
-	                                headerComments: Vector[String], since: DeclarationDate) =
+	                                headerComments: Seq[String], since: DeclarationDate) =
 		ObjectDeclaration(name, extensions, types, creationCode, properties, methods, nested, visibility, annotations,
 			description, author, headerComments, since, isCaseObject)
 }

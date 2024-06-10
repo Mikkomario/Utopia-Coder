@@ -5,6 +5,7 @@ import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.Visibility.{Protected, Public}
 import utopia.coder.model.scala.datatype.{GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.{Annotation, Parameters, Visibility}
+import utopia.flow.collection.immutable.Empty
 import utopia.flow.util.Mutate
 
 object MethodDeclaration
@@ -30,14 +31,14 @@ object MethodDeclaration
 	  * @return A new method
 	  */
 	def apply(name: String, codeReferences: Set[Reference] = Set(), visibility: Visibility = Public,
-	          genericTypes: Seq[GenericType] = Vector(), explicitOutputType: Option[ScalaType] = None,
-	          annotations: Seq[Annotation] = Vector(), description: String = "", returnDescription: String = "",
-	          headerComments: Vector[String] = Vector(), isOverridden: Boolean = false, isImplicit: Boolean = false,
+	          genericTypes: Seq[GenericType] = Empty, explicitOutputType: Option[ScalaType] = None,
+	          annotations: Seq[Annotation] = Empty, description: String = "", returnDescription: String = "",
+	          headerComments: Seq[String] = Empty, isOverridden: Boolean = false, isImplicit: Boolean = false,
 	          isLowMergePriority: Boolean = false)
 	         (params: Parameters = Parameters.empty)
 	         (firstLine: String, moreLines: String*): MethodDeclaration =
 		apply(visibility, name, genericTypes, params,
-			Code.from(firstLine +: moreLines.toVector).referringTo(codeReferences),
+			Code.from(firstLine +: moreLines).referringTo(codeReferences),
 			explicitOutputType, annotations, description, returnDescription, headerComments, isOverridden, isImplicit,
 			isLowMergePriority)
 	
@@ -57,13 +58,13 @@ object MethodDeclaration
 	  * @param params             Method parameters (0-n)
 	  * @return A new abstract method declaration
 	  */
-	def newAbstract(name: String, outputType: ScalaType, genericTypes: Seq[GenericType] = Vector.empty,
-	                annotations: Seq[Annotation] = Vector(), description: String = "", returnDescription: String = "",
+	def newAbstract(name: String, outputType: ScalaType, genericTypes: Seq[GenericType] = Empty,
+	                annotations: Seq[Annotation] = Empty, description: String = "", returnDescription: String = "",
 	                isProtected: Boolean = false, isOverridden: Boolean = false, isImplicit: Boolean = false,
 	                isLowMergePriority: Boolean = false)
 	               (params: Parameters = Parameters.empty) =
 		apply(if (isProtected) Protected else Public, name, genericTypes, params, Code.empty, Some(outputType),
-			annotations, description, returnDescription, Vector(), isOverridden, isImplicit, isLowMergePriority)
+			annotations, description, returnDescription, Empty, isOverridden, isImplicit, isLowMergePriority)
 }
 
 /**
@@ -85,7 +86,7 @@ object MethodDeclaration
 case class MethodDeclaration(visibility: Visibility, name: String, genericTypes: Seq[GenericType],
                              parameters: Parameters, bodyCode: Code, explicitOutputType: Option[ScalaType],
                              annotations: Seq[Annotation], description: String, returnDescription: String,
-                             headerComments: Vector[String], isOverridden: Boolean, isImplicit: Boolean,
+                             headerComments: Seq[String], isOverridden: Boolean, isImplicit: Boolean,
                              isLowMergePriority: Boolean)
 	extends FunctionDeclaration[MethodDeclaration] with Mergeable[MethodDeclaration, MethodDeclaration]
 {
@@ -97,7 +98,7 @@ case class MethodDeclaration(visibility: Visibility, name: String, genericTypes:
 	override protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType],
 	                                parameters: Option[Parameters], bodyCode: Code,
 	                                explicitOutputType: Option[ScalaType], annotations: Seq[Annotation],
-	                                description: String, returnDescription: String, headerComments: Vector[String],
+	                                description: String, returnDescription: String, headerComments: Seq[String],
 	                                isOverridden: Boolean, isImplicit: Boolean) =
 		MethodDeclaration(visibility, name, genericTypes, parameters.getOrElse(this.parameters), bodyCode,
 			explicitOutputType, annotations, description, returnDescription, headerComments, isOverridden, isImplicit,

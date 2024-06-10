@@ -9,6 +9,7 @@ import utopia.coder.model.scala.code.{CodeBuilder, CodePiece}
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.model.scala.declaration.MethodDeclaration
 import Reference.Flow._
+import utopia.flow.collection.immutable.Empty
 
 /**
   * Used for constructing class-specific methods
@@ -43,9 +44,9 @@ object ClassMethodFactory
 			MethodDeclaration(methodName, code.references, isOverridden = true)(param)(code.text)
 		}
 		else
-			new MethodDeclaration(Public, methodName, Vector(), param,
-				tryApplyCode(targetClass, validatedModelCode, isFromJson)(wrapAssignments), None, Vector(),
-				"", "", Vector(), isOverridden = true, isImplicit = false,
+			new MethodDeclaration(Public, methodName, Empty, param,
+				tryApplyCode(targetClass, validatedModelCode, isFromJson)(wrapAssignments), None, Empty,
+				"", "", Empty, isOverridden = true, isImplicit = false,
 				isLowMergePriority = false)
 	}
 	

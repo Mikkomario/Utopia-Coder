@@ -6,7 +6,7 @@ import utopia.coder.model.scala.{Annotation, Visibility}
 import utopia.coder.model.scala.code.{Code, CodeBuilder, CodePiece}
 import utopia.coder.model.scala.datatype.GenericType
 import utopia.coder.model.scala.doc.ScalaDocPart
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.flow.util.StringExtensions._
 
 import scala.collection.immutable.VectorBuilder
@@ -22,9 +22,9 @@ private object TypeDeclaration
  * @author Mikko Hilpinen
  * @since 28/03/2024, v1.0.2
  */
-case class TypeDeclaration(name: String, genericTypes: Seq[GenericType] = Vector.empty, visibility: Visibility = Public,
-                           annotations: Seq[Annotation] = Vector.empty, description: String = "",
-                           headerComments: Vector[String] = Vector.empty)
+case class TypeDeclaration(name: String, code: CodePiece, genericTypes: Seq[GenericType] = Empty,
+                           visibility: Visibility = Public, annotations: Seq[Annotation] = Empty,
+                           description: String = "", headerComments: Seq[String] = Empty)
 	extends Declaration with Mergeable[TypeDeclaration, TypeDeclaration]
 {
 	override def keyword: CodePiece = TypeDeclaration.keyword
@@ -42,6 +42,10 @@ case class TypeDeclaration(name: String, genericTypes: Seq[GenericType] = Vector
 		builder ++= annotationsPart
 		// Writes the declaration
 		builder += basePart
+		
+		// Writes the actual declaration
+		builder += " = "
+		builder += code
 		
 		builder.result()
 	}

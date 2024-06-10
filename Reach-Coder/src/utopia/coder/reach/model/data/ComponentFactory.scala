@@ -4,6 +4,7 @@ import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.reach.model.enumeration.{ContainerStyle, ContextType, ReachFactoryTrait}
+import utopia.flow.collection.immutable.Empty
 
 /**
   * Used for declaring component factories and related classes
@@ -25,11 +26,11 @@ import utopia.coder.reach.model.enumeration.{ContainerStyle, ContextType, ReachF
   *                           fixed value (default = false)
   */
 case class ComponentFactory(pck: Package, componentName: Name, contextType: Option[ContextType] = None,
-                            parentTraits: Vector[ReachFactoryTrait] = Vector(),
+                            parentTraits: Seq[ReachFactoryTrait] = Empty,
                             containerType: Option[ContainerStyle] = None,
-                            properties: Vector[Property] = Vector(),
-                            nonContextualProperties: Vector[Property] = Vector(),
-                            contextualProperties: Vector[Property] = Vector(),
+                            properties: Seq[Property] = Empty,
+                            nonContextualProperties: Seq[Property] = Empty,
+                            contextualProperties: Seq[Property] = Empty,
                             author: String = "", onlyContextual: Boolean = false, useVariableContext: Boolean = false)
 {
 	/**

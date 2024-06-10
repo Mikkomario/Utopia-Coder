@@ -1,6 +1,7 @@
 package utopia.coder.model.scala.code
 
 import utopia.coder.model.scala.datatype.Reference
+import utopia.flow.collection.immutable.{Empty, Single}
 import utopia.flow.operator.MaybeEmpty
 
 object ReadCodeBlock
@@ -8,13 +9,13 @@ object ReadCodeBlock
 	/**
 	  * An empty code block
 	  */
-	val empty = apply(Vector())
+	val empty = apply(Empty)
 	
 	/**
 	  * @param line A line of code (should not contain '{' or '}' at the ends)
 	  * @return That line of code, wrapped in a block
 	  */
-	def apply(line: String): ReadCodeBlock = apply(Vector(CodeLine(line)))
+	def apply(line: String): ReadCodeBlock = apply(Single(CodeLine(line)))
 }
 
 /**
@@ -22,7 +23,7 @@ object ReadCodeBlock
   * @author Mikko Hilpinen
   * @since 1.11.2021, v1.3
   */
-case class ReadCodeBlock(lines: Vector[CodeLine]) extends MaybeEmpty[ReadCodeBlock]
+case class ReadCodeBlock(lines: Seq[CodeLine]) extends MaybeEmpty[ReadCodeBlock]
 {
 	// COMPUTED ----------------------
 	

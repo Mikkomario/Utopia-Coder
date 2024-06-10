@@ -9,6 +9,7 @@ import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
 import utopia.flow.util.console.ConsoleExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.controller.reader.TableReader
+import utopia.flow.collection.immutable.Empty
 import utopia.vault.database.Connection
 
 import java.nio.file.Path
@@ -47,9 +48,9 @@ object TableReadAppLogic extends AppLogic
 		args("database").string
 			.orElse { StdIn.readNonEmptyLine("What's the name of the read database? (empty cancels)") }
 			.foreach { dbName =>
-				val tableNames: Vector[String] = {
+				val tableNames: Seq[String] = {
 					if (args("all").getBoolean)
-						Vector()
+						Empty
 					else
 						args("table").vector
 							.map { _.flatMap { _.string } }

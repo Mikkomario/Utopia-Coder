@@ -7,6 +7,7 @@ import utopia.coder.vault.model.enumeration.IntSize.Default
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, CreationTime, Deprecation, EnumValue, Expiration, UpdateTime}
 import utopia.coder.model.enumeration.NameContext.{ColumnName, DbModelPropName}
+import utopia.flow.collection.immutable.{Empty, Pair}
 
 object Class
 {
@@ -30,8 +31,8 @@ object Class
 	  *                           (default = false)
 	  * @return A new class
 	  */
-	def apply(name: Name, properties: Vector[Property], packageName: String = "", customSubPackageName: String = "",
-	          comboIndexColumnNames: Vector[Vector[String]] = Vector(), idName: Name = defaultIdName,
+	def apply(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
+	          comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	          description: String = "", author: String = "", useLongId: Boolean = false,
 	          writeGenericAccess: Boolean = false): Class =
 		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None,
@@ -55,8 +56,8 @@ object Class
 	  * @return A new class
 	  */
 	// WET WET
-	def described(name: Name, properties: Vector[Property], packageName: String = "", customSubPackageName: String = "",
-	              comboIndexColumnNames: Vector[Vector[String]] = Vector(), idName: Name = defaultIdName,
+	def described(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
+	              comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	              description: String = "", author: String = "", descriptionLinkName: Option[Name] = None,
 	              useLongId: Boolean = false, writeGenericAccess: Boolean = false): Class =
 	{
@@ -86,8 +87,8 @@ object Class
   * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
   */
 // TODO: customTableName should be Option[Name]
-case class Class(name: Name, customTableName: Option[String], idName: Name, properties: Vector[Property],
-                 packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Vector[Vector[String]],
+case class Class(name: Name, customTableName: Option[String], idName: Name, properties: Seq[Property],
+                 packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
                  descriptionLinkName: Option[Name], description: String, author: String, useLongId: Boolean,
                  writeGenericAccess: Boolean)
 {
@@ -101,7 +102,7 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 			case Some(n) => n: Name
 			case None => name
 		}
-		val props = Vector(
+		val props = Pair(
 			Property(linkColumnName, ClassReference(tableName, idName, idType),
 				description = s"Id of the described $name"),
 			Property(data.Name("descriptionId", CamelCase.lower), ClassReference("description"),

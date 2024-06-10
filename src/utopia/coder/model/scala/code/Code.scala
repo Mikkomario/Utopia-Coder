@@ -5,6 +5,7 @@ import utopia.flow.operator.MaybeEmpty
 import utopia.coder.model.merging.MergeConflict
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.model.scala.template.{CodeConvertible, Referencing}
+import utopia.flow.collection.immutable.{Empty, Single}
 
 import scala.language.implicitConversions
 
@@ -15,13 +16,13 @@ object Code
 	/**
 	  * An empty set of code
 	  */
-	val empty = Code(Vector())
+	val empty = Code(Empty)
 	
 	
 	// IMPLICIT ----------------------------------
 	
-	implicit def lineToCode(line: CodeLine): Code = if (line.isEmpty) empty else apply(Vector(line))
-	implicit def stringToCode(codeLine: String): Code = if (codeLine.isEmpty) empty else apply(Vector(CodeLine(codeLine)))
+	implicit def lineToCode(line: CodeLine): Code = if (line.isEmpty) empty else apply(Single(line))
+	implicit def stringToCode(codeLine: String): Code = if (codeLine.isEmpty) empty else apply(Single(CodeLine(codeLine)))
 	
 	
 	// OTHER    ----------------------------------
@@ -31,13 +32,13 @@ object Code
 	  * @param line A line of code
 	  * @return That line of code wrapped
 	  */
-	def apply(line: String): Code = apply(Vector(CodeLine(line)))
+	def apply(line: String): Code = apply(Single(CodeLine(line)))
 	
 	/**
 	  * @param lines Code line strings
 	  * @return A code based on those lines
 	  */
-	def from(lines: Vector[String]) = apply(lines.map { CodeLine(_) })
+	def from(lines: Seq[String]) = apply(lines.map { CodeLine(_) })
 }
 
 /**
@@ -45,7 +46,7 @@ object Code
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
-case class Code(lines: Vector[CodeLine], references: Set[Reference] = Set())
+case class Code(lines: Seq[CodeLine], references: Set[Reference] = Set())
 	extends Referencing with CodeConvertible with MaybeEmpty[Code]
 {
 	// COMPUTED ------------------------------

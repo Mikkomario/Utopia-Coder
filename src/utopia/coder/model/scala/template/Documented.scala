@@ -17,7 +17,7 @@ trait Documented
 	/**
 	  * @return scaladoc based on this item
 	  */
-	def documentation: Vector[ScalaDocPart]
+	def documentation: Seq[ScalaDocPart]
 	
 	
 	// COMPUTED --------------------------

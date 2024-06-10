@@ -3,6 +3,7 @@ package utopia.coder.model.scala.doc
 import utopia.flow.parse.string.Regex
 import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.template.CodeConvertible
+import utopia.flow.collection.immutable.Pair
 
 object ScalaDocPart
 {
@@ -11,7 +12,7 @@ object ScalaDocPart
 	  * @param content Documentation
 	  * @return A new scaladoc part
 	  */
-	def apply(keyword: ScalaDocKeyword, content: Vector[String]): ScalaDocPart = apply(content, Some(keyword))
+	def apply(keyword: ScalaDocKeyword, content: Seq[String]): ScalaDocPart = apply(content, Some(keyword))
 	/**
 	  * @param keyword Scaladoc keyword
 	  * @param firstLine First line of documentation
@@ -19,7 +20,7 @@ object ScalaDocPart
 	  * @return A new scaladoc part
 	  */
 	def apply(keyword: ScalaDocKeyword, firstLine: String, secondLine: String, moreLines: String*): ScalaDocPart =
-		apply(Vector(firstLine, secondLine) ++ moreLines, Some(keyword))
+		apply(Pair(firstLine, secondLine) ++ moreLines, Some(keyword))
 	/**
 	  * @param keyword Scaladoc keyword
 	  * @param content Documentation content. May contain multiple lines.
@@ -35,7 +36,7 @@ object ScalaDocPart
 	  * @return A new scaladoc part
 	  */
 	def description(firstLine: String, secondLine: String, moreLines: String*): ScalaDocPart =
-		apply(Vector(firstLine, secondLine) ++ moreLines, None)
+		apply(Pair(firstLine, secondLine) ++ moreLines, None)
 	/**
 	  * Creates a scaladoc part without keyword (the general description)
 	  * @param content Documentation as a string (may contain multiple lines)
@@ -52,7 +53,7 @@ object ScalaDocPart
   * @author Mikko Hilpinen
   * @since 3.9.2021, v0.1
   */
-case class ScalaDocPart(content: Vector[String], keyword: Option[ScalaDocKeyword]) extends CodeConvertible
+case class ScalaDocPart(content: Seq[String], keyword: Option[ScalaDocKeyword]) extends CodeConvertible
 {
 	override def toCode = {
 		if (content.isEmpty)
