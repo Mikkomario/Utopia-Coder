@@ -5,15 +5,16 @@ import utopia.coder.model.data.{Name, Named, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.Protected
 import utopia.coder.model.scala.datatype.Reference._
-import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
+import utopia.coder.model.scala.datatype.TypeVariance.Covariance
+import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
-import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, PropertyDeclaration}
-import utopia.coder.model.scala.{DeclarationDate, Parameter}
+import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, PropertyDeclaration, TraitDeclaration}
+import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
+import utopia.coder.vault.model.data.{Class, ClassModelReferences, DbProperty, Property, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
-import utopia.flow.collection.immutable.Empty
+import utopia.flow.collection.immutable.{Empty, Single}
 
 import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
@@ -30,9 +31,14 @@ object DbModelWriter
 	/**
 	  * Suffix added to class name in order to make it a database model class name
 	  */
-	val classNameSuffix = data.Name("Model", "Models", CamelCase.capitalized)
+	private val modelSuffix = Name("Model", "Models", CamelCase.capitalized)
+	private val factorySuffix = Name("Factory", "Factories", CamelCase.capitalized)
+	private val likeSuffix = Name("Like", "Like", CamelCase.capitalized)
 	
-	private val withMethodPrefix = data.Name("with", "with", CamelCase.lower)
+	private val configSuffix = Name("config", "configurations", CamelCase.lower)
+	
+	private val copyPrefix = Name("copy", "copy", CamelCase.lower)
+	private val withPrefix = Name("with", "with", CamelCase.lower)
 	
 	
 	// OTHER    -----------------------------------------
@@ -40,20 +46,17 @@ object DbModelWriter
 	/**
 	  * Generates the DB model class and the associated companion object
 	  * @param classToWrite The base class
-	  * @param modelRef     Reference to the stored model class
-	  * @param dataRef      Reference to the data class
-	  * @param factoryRef   Reference to the factory trait for copy-constructing
-	  * @param tablesRef    Reference to the table access object
+	  * @param modelRefs    References to various model-related classes and traits
 	  * @param codec        Implicit codec used when writing the file
 	  * @param setup        Target project -specific setup (implicit)
 	  * @return Reference to the generated class. Failure if writing failed.
 	  */
-	def apply(classToWrite: Class, modelRef: Reference, dataRef: Reference, factoryRef: Reference,
+	def apply(classToWrite: Class, modelRefs: ClassModelReferences,
 	          tablesRef: Reference)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val parentPackage = setup.dbModelPackage / classToWrite.packageName
-		val className = (classToWrite.name + classNameSuffix).className
+		val className = (classToWrite.name + modelSuffix).className
 		val classType = ScalaType.basic(className)
 		val deprecation = DeprecationStyle.of(classToWrite)
 		
@@ -88,19 +91,17 @@ object DbModelWriter
 		// The generated file contains the model class and the associated companion object
 		File(parentPackage,
 			ObjectDeclaration(className,
-				factoryExtensionsFor(className, modelRef, dataRef, factoryRef, deprecation),
+				factoryExtensionsFor(className, modelRefs, deprecation),
 				// Contains an access property for each property, as well as a table -property
 				properties = propertiesBuilder.result(),
 				// Implements .apply(...) and .complete(id, data)
 				methods = Set(
-					MethodDeclaration("apply", isOverridden = true)(Parameter("data", dataRef))(
+					MethodDeclaration("apply", isOverridden = true)(Parameter("data", modelRefs.data))(
 						s"apply($applyParametersCode)"),
-					MethodDeclaration("complete", Set(modelRef), visibility = Protected, isOverridden = true)(
-						Vector(Parameter("id", flow.value), Parameter("data", dataRef)))(
-						s"${ modelRef.target }(id.get${ if (classToWrite.useLongId) "Long" else "Int" }, data)"),
-					MethodDeclaration("withId", isOverridden = true)(
-						Parameter("id", classToWrite.idType.toScala))(
-						"apply(Some(id))")
+					MethodDeclaration("complete", Set(modelRefs.stored), visibility = Protected, isOverridden = true)(
+						Vector(Parameter("id", flow.value), Parameter("data", modelRefs.data)))(
+						s"${ modelRefs.stored.target }(id.get${ if (classToWrite.useLongId) "Long" else "Int" }, data)"),
+					withIdMethod(classToWrite, "apply")
 					// Also includes withX(...) methods for each property
 				) ++ classToWrite.properties.flatMap { withPropertyMethods(_) } ++
 					deprecation.iterator.flatMap { _.methods },
@@ -118,7 +119,7 @@ object DbModelWriter
 						Parameter(prop.name.prop, inputType.scalaType, defaultValue)
 					}.toVector,
 				// Extends Storable with the factory traits
-				extensions = Vector(storable, factoryRef(classType), fromIdFactory(ScalaType.int, classType)),
+				extensions = Vector(storable, modelRefs.factory(classType), fromIdFactory(ScalaType.int, classType)),
 				// Implements the required properties: factory & valueProperties
 				properties = Vector(
 					ComputedProperty("table", isOverridden = true)(s"$className.table"),
@@ -134,15 +135,128 @@ object DbModelWriter
 		).write()
 	}
 	
-	private def factoryExtensionsFor(className: String, modelRef: Reference, dataRef: Reference, factoryRef: Reference,
+	// Writes XModelLike trait used with generic traits
+	private def writeModelLike(classToWrite: Class, storablePackage: Package,
+	                           modelRefs: ClassModelReferences, configRef: Reference)
+	                          (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		val repr = GenericType.covariant("Repr")
+		val reprType = repr.toScalaType
+		
+		val hasId = vault.hasId(classToWrite.idType.optional.toScala)
+		val factory = modelRefs.factory(reprType)
+		val fromIdFactory = vault.fromIdFactory(classToWrite.idType.toScala, reprType)
+		
+		val configName = (classToWrite.name + configSuffix).prop
+		val config = ComputedProperty.newAbstract(configName, configRef,
+			description = "Configurations used to determine how database interactions are performed")
+		val table = ComputedProperty("table", isOverridden = true)(s"$configName.table")
+		val optionalProps = classToWrite.dbProperties
+			.map { prop => ComputedProperty.newAbstract(prop.name.prop, prop.conversion.intermediate.scalaType) }
+			.toVector
+		val valueProps = valuePropertiesPropertyFor(classToWrite, configName)
+		
+		val buildCopyName = (copyPrefix +: classToWrite.name).function
+		val buildCopyParams = classToWrite.dbProperties
+			.map { prop =>
+				val propType = prop.conversion.intermediate
+				Parameter(prop.name.prop, propType.scalaType, propType.emptyValue,
+					description = s"${ prop.name } to assign to the new model (default = currently assigned value)")
+			}
+			.toVector
+		val buildCopy = MethodDeclaration.newAbstract(buildCopyName, reprType,
+			returnDescription = s"Copy of this model with the specified ${ classToWrite.name } properties",
+			isProtected = true)(buildCopyParams)
+		val withMethods = classToWrite.properties.flatMap { withPropertyMethods(_, buildCopyName,
+			"A new copy of this model with the specified ") }
+		val withId = withIdMethod(classToWrite, buildCopyName)
+		
+		val modelLike = TraitDeclaration(
+			name = (classToWrite.name + modelSuffix + likeSuffix).className,
+			genericTypes = Single(repr),
+			extensions = Vector(storable, hasId, factory, fromIdFactory),
+			properties = optionalProps ++ Vector(config, table, valueProps),
+			methods = withMethods.toSet ++ Set(withId, buildCopy),
+			description = s"Common trait for database models used for interacting with ${
+				classToWrite.name } data in the database",
+			author = classToWrite.author,
+			since = DeclarationDate.versionedToday
+		)
+		
+		File(storablePackage, modelLike).write()
+	}
+	
+	// Writes XModelFactoryLike used for constructing XModels when generic traits are used
+	private def writeModelFactoryLike(classToWrite: Class, storablePackage: Package, factoryRef: Reference)
+	                                 (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		val dbModel = GenericType.childOf("DbModel", storable, Covariance)
+		val dbModelType = dbModel.toScalaType
+		val stored = GenericType.covariant("A")
+		val data = GenericType.contravariant("Data")
+		
+		val factoryLike = TraitDeclaration(
+			name = (classToWrite.name + factorySuffix + likeSuffix).className,
+			genericTypes = Vector(dbModel, stored, data),
+			extensions = Vector(
+				storableFactory(dbModelType, stored.toScalaType, data.toScalaType),
+				factoryRef(dbModelType),
+				fromIdFactory(classToWrite.idType.toScala, dbModelType)
+			),
+			description = s"Common trait for factories used for constructing ${ classToWrite.name } database models",
+			author = classToWrite.author,
+			since = DeclarationDate.versionedToday
+		)
+		
+		File(storablePackage, factoryLike).write()
+	}
+	
+	/*
+	private def companionObjectFor(classToWrite: Class)(implicit setup: VaultProjectSetup, naming: NamingRules) = {
+	
+	}*/
+	
+	// TODO: Utilize above and add support for generic type
+	private def classDeclarationFor(classToWrite: Class, className: String, classType: ScalaType,
+	                                modelRefs: ClassModelReferences)
+	                               (implicit setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		// Prepares class data
+		val optionalIdType = classToWrite.idType.optional
+		
+		ClassDeclaration(className,
+			// Accepts a copy of all properties where each appears in the "intermediate "(db property) state
+			constructionParams = Parameter("id", optionalIdType.toScala, optionalIdType.emptyValue,
+				description = s"${ classToWrite.name.doc } database id") +:
+				classToWrite.dbProperties.map { prop =>
+					val inputType = prop.conversion.intermediate
+					val defaultValue = inputType.emptyValue
+					Parameter(prop.name.prop, inputType.scalaType, defaultValue)
+				}.toVector,
+			// Extends Storable with the factory traits
+			extensions = Vector(storable, modelRefs.factory(classType),
+				fromIdFactory(classToWrite.idType.toScala, classType)),
+			// Implements the required properties: factory & valueProperties
+			properties = Vector(
+				ComputedProperty("table", isOverridden = true)(s"$className.table"),
+				valuePropertiesPropertyFor(classToWrite, className)
+			),
+			// adds withX(...) -methods for convenience
+			methods = classToWrite.properties.flatMap { withPropertyMethods(_, "copy",
+				"A new copy of this model with the specified ") }.toSet + withIdMethod(classToWrite, "copy"),
+			description = s"Used for interacting with ${ classToWrite.name.plural } in the database",
+			author = classToWrite.author, since = DeclarationDate.versionedToday, isCaseClass = true)
+	}
+	
+	private def factoryExtensionsFor(className: String, modelRefs: ClassModelReferences,
 	                                 deprecation: Option[DeprecationStyle]): Vector[Extension] =
 	{
 		// The class itself doesn't need to be imported (same file)
 		val classType = ScalaType.basic(className)
 		// All factories extend the StorableFactory trait, the factory trait and FromIdFactory trait
 		val baseExtensions = Vector[Extension](
-			vault.storableFactory(classType, modelRef, dataRef),
-			factoryRef(classType),
+			vault.storableFactory(classType, modelRefs.stored, modelRefs.data),
+			modelRefs.factory(classType),
 			fromIdFactory(ScalaType.int, classType)
 		)
 		// They may also extend a deprecation-related trait
@@ -170,8 +284,9 @@ object DbModelWriter
 		}
 	}
 	
-	private def withMethodNameFor(prop: Named)(implicit naming: NamingRules): String = withMethodNameFor(prop.name)
-	private def withMethodNameFor(name: Name)(implicit naming: NamingRules) = (withMethodPrefix + name).prop
+	private def withIdMethod(classToWrite: Class, assignFunctionName: String) =
+		MethodDeclaration("withId", isOverridden = true)(
+			Parameter("id", classToWrite.idType.toScala))(s"$assignFunctionName(id = Some(id))")
 	
 	private def withPropertyMethods(property: Property, calledMethodName: String = "apply",
 	                                returnDescriptionStart: String = "A model containing only the specified ")
@@ -196,12 +311,14 @@ object DbModelWriter
 					s" (sets all ${dbProps.size} values)", calledMethodName, returnDescriptionStart)
 		}
 	}
+	
 	private def withDbPropertyMethod(property: DbProperty, paramDescription: String = "",
 	                                 returnDescriptionAppendix: String = "", calledMethodName: String = "apply",
 	                                 returnDescriptionStart: String = "A model containing only the specified ")
 	                                (implicit naming: NamingRules) =
 		withMethod(property, Vector(property), property.conversion.origin, paramDescription, returnDescriptionAppendix,
 			calledMethodName, returnDescriptionStart)
+			
 	private def withMethod(source: Named, properties: Seq[DbProperty], parameterType: ScalaType,
 	                       paramDescription: String = "", returnDescriptionAppendix: String = "",
 	                       calledMethodName: String = "apply",
@@ -218,6 +335,9 @@ object DbModelWriter
 			Parameter(paramName, parameterType, description = paramDescription))(
 			s"$calledMethodName($constructionParamsCode)")
 	}
+	
+	private def withMethodNameFor(prop: Named)(implicit naming: NamingRules): String = withMethodNameFor(prop.name)
+	private def withMethodNameFor(name: Name)(implicit naming: NamingRules) = (withPrefix + name).prop
 	
 	
 	// NESTED   --------------------------------------

@@ -109,6 +109,7 @@ object Reference
 		lazy val constant = apply(immutableGenericModels, "Constant")
 		lazy val templateModel = apply(genericModelTemplates, "ModelLike")
 		lazy val model = apply(immutableGenericModels, "Model")
+		lazy val anyModel = model/"AnyModel"
 		lazy val valueConvertible = apply(genericModelTemplates, "ValueConvertible")
 		lazy val modelConvertible = apply(genericModelTemplates, "ModelConvertible")
 		lazy val modelDeclaration = apply(immutableGenericModels, "ModelDeclaration")

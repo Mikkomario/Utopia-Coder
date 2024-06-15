@@ -283,17 +283,17 @@ object MainAppLogic extends CoderAppLogic
 	          descriptionLinkObjects: Option[(Reference, Reference, Reference)])
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
-		ModelWriter(classToWrite).flatMap { case (modelRef, dataRef, factoryRef, factoryWrapperRef) =>
-			DbModelWriter(classToWrite, modelRef, dataRef, factoryRef, tablesRef)
+		ModelWriter(classToWrite).flatMap { modelRefs =>
+			DbModelWriter(classToWrite, modelRefs, tablesRef)
 				.flatMap { dbModelRef =>
-					DbFactoryWriter(classToWrite, modelRef, dataRef, dbModelRef).flatMap { dbFactoryRef =>
+					DbFactoryWriter(classToWrite, modelRefs, dbModelRef).flatMap { dbFactoryRef =>
 						// Adds description-specific references if applicable
 						(descriptionLinkObjects match {
 							// Case: At least one class uses descriptions
 							case Some((linkModels, _, linkedDescriptionFactories)) =>
 								classToWrite.descriptionLinkClass match {
 									case Some(descriptionLinkClass) =>
-										DescribedModelWriter(classToWrite, modelRef).flatMap { describedRef =>
+										DescribedModelWriter(classToWrite, modelRefs.stored).flatMap { describedRef =>
 											DbDescriptionAccessWriter(descriptionLinkClass,
 												classToWrite.name, linkModels, linkedDescriptionFactories)
 												.map { case (singleAccessRef, manyAccessRef) =>
@@ -306,10 +306,10 @@ object MainAppLogic extends CoderAppLogic
 							case None => Success(None)
 						}).flatMap { descriptionReferences =>
 							// Finally writes the access points
-							AccessWriter(classToWrite, modelRef, dbFactoryRef, dbModelRef,
+							AccessWriter(classToWrite, modelRefs.stored, dbFactoryRef, dbModelRef,
 								descriptionReferences)
 								.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
-									classToWrite -> ClassReferences(modelRef, dataRef, factoryRef, factoryWrapperRef,
+									classToWrite -> ClassReferences(modelRefs,
 										dbFactoryRef, dbModelRef, genericUniqueAccessRef, genericManyAccessRef)
 								}
 						}
@@ -323,7 +323,7 @@ object MainAppLogic extends CoderAppLogic
 	{
 		val parentRefs = classRefsMap(combination.parentClass)
 		val childRefs = classRefsMap(combination.childClass)
-		CombinedModelWriter(combination, parentRefs.model, parentRefs.data, childRefs.model, parentRefs.factoryWrapper)
+		CombinedModelWriter(combination, parentRefs.stored, parentRefs.data, childRefs.stored, parentRefs.factoryWrapper)
 			.flatMap { combinedRefs =>
 				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory)
 					.flatMap { comboFactoryRef =>

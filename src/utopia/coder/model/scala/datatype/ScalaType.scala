@@ -27,12 +27,7 @@ object ScalaType
 	/**
 	  * A function that matches types that have the same base type
 	  */
-	implicit val matchFunction: EqualsFunction[ScalaType] = EqualsFunction.by { t: ScalaType =>
-		t.data match {
-			case Right(ref) => ref.target
-			case Left(str) => str
-		}
-	}
+	implicit val matchFunction: EqualsFunction[ScalaType] = EqualsFunction.by { t: ScalaType => t.code.text }
 	
 	
 	// IMPLICIT  ------------------------------
@@ -73,26 +68,26 @@ object ScalaType
 	  * @param name Name of the (basic) data type
 	  * @return A data type with that name and no import
 	  */
-	def basic(name: String) = apply(Left(name))
+	def basic(name: String) = apply(CodePiece(name))
 	
 	/**
 	  * @param reference A reference
 	  * @return A data type based on that reference
 	  */
-	def apply(reference: Reference): ScalaType = apply(Right(reference))
+	def apply(reference: Reference): ScalaType = apply(reference.targetCode)
 	
 	/**
 	  * Parses a scala type from a string, which may be a reference and/or a generic type
 	  * @param typeString A string representing a scala data type
 	  * @return Data type parsed from that string
 	  */
-	def apply(typeString: String): ScalaType = {
+	def parse(typeString: String): ScalaType = {
 		val (beforeTypes, typesPart) = typeString.splitAtFirst("[").toTuple
 		val basePart = {
 			if (Package.separatorRegex.existsIn(beforeTypes))
-				Right(Reference(beforeTypes))
+				Reference(beforeTypes).targetCode
 			else
-				Left(beforeTypes)
+				CodePiece(beforeTypes)
 		}
 		// Case: Standard (ie. non-generic) data type
 		if (typesPart.isEmpty)
@@ -100,7 +95,7 @@ object ScalaType
 		// Case: Generic data type => parses the type parameters, also (recursive)
 		else {
 			val typeParamStrings = typesPart.untilLast("]").split(typeParamsSeparator).map { _.trim }
-			apply(basePart, typeParamStrings.map(apply))
+			apply(basePart, typeParamStrings.map(parse))
 		}
 	}
 	
@@ -112,7 +107,7 @@ object ScalaType
 	  * @return A generic type
 	  */
 	def generic(reference: Reference, firstParam: ScalaType, moreParams: ScalaType*) =
-		apply(Right(reference), firstParam +: moreParams)
+		apply(reference.targetCode, firstParam +: moreParams)
 	/**
 	  * Creates a generic type
 	  * @param name Name of the basic generic class
@@ -121,7 +116,7 @@ object ScalaType
 	  * @return A generic type
 	  */
 	def generic(name: String, firstParam: ScalaType, moreParams: ScalaType*) =
-		apply(Left(name), firstParam +: moreParams)
+		apply(CodePiece(name), firstParam +: moreParams)
 	
 	/**
 	  * Creates a function scala type
@@ -130,7 +125,7 @@ object ScalaType
 	  * @param typeParams Generic type arguments for the resulting data type (default = empty)
 	  * @return A functional scala type
 	  */
-	def function(paramTypes: ScalaType*)(resultType: Either[String, Reference], typeParams: ScalaType*) =
+	def function(paramTypes: ScalaType*)(resultType: CodePiece, typeParams: ScalaType*) =
 		apply(resultType, typeParams, ScalaTypeCategory.Function(paramTypes))
 }
 
@@ -139,22 +134,17 @@ object ScalaType
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
-case class ScalaType(data: Either[String, Reference], typeParameters: Seq[ScalaType] = Empty,
-                     category: ScalaTypeCategory = Standard)
+case class ScalaType(code: CodePiece, typeParameters: Seq[ScalaType] = Empty, category: ScalaTypeCategory = Standard)
 	extends ScalaConvertible
 {
 	// ATTRIBUTES   ------------------------------
 	
 	override lazy val toScala: CodePiece = {
-		val base = data match {
-			case Left(basic) => CodePiece(basic)
-			case Right(reference) => CodePiece(reference.target, Set(reference))
-		}
 		val withTypeParams = {
 			if (typeParameters.isEmpty)
-				base
+				code
 			else
-				base + typeParameters.map { _.toScala }.reduceLeft { _.append(_, ", ") }.withinSquareBrackets
+				code + typeParameters.map { _.toScala }.reduceLeft { _.append(_, ", ") }.withinSquareBrackets
 		}
 		category match {
 			case Standard => withTypeParams
@@ -198,7 +188,7 @@ case class ScalaType(data: Either[String, Reference], typeParameters: Seq[ScalaT
 	def fromParameters(parameterTypes: Seq[ScalaType]) = category match {
 		// Functions that return functions don't handle references properly at this time
 		case _ :ScalaTypeCategory.Function =>
-			ScalaType(Left(toScala.text), category = ScalaTypeCategory.Function(parameterTypes))
+			ScalaType(toScala, category = ScalaTypeCategory.Function(parameterTypes))
 		case _ => copy(category = ScalaTypeCategory.Function(parameterTypes))
 	}
 	def fromParameters(firstParameter: ScalaType, moreParameters: ScalaType*): ScalaType =
@@ -208,15 +198,5 @@ case class ScalaType(data: Either[String, Reference], typeParameters: Seq[ScalaT
 	  * @param other Another type
 	  * @return Whether these types are similar, when considering their base types
 	  */
-	def matches(other: ScalaType) = {
-		val myPart = data match {
-			case Right(ref) => ref.target
-			case Left(str) => str
-		}
-		val theirPart = other.data match {
-			case Right(ref) => ref.target
-			case Left(str) => str
-		}
-		myPart == theirPart
-	}
+	def matches(other: ScalaType) = code.text == other.code.text
 }

@@ -344,9 +344,11 @@ object ClassReader
 		val readClass = new Class(name, tableName.map { _.table }, idName.getOrElse(Class.defaultIdName),
 			properties, packageName, classModel("access_package", "sub_package", "access").getString, comboIndexColumnNames,
 			descriptionLinkColumnName, classModel("doc").getString, classModel("author").stringOr(defaultAuthor),
-			classModel("use_long_id").getBoolean,
+			useLongId = classModel("use_long_id").getBoolean,
 			// Writes generic access point if this class has combinations, or if explicitly specified
-			classModel("has_combos", "generic_access", "tree_inheritance").booleanOr(comboInfo.nonEmpty))
+			writeGenericAccess = classModel("has_combos", "generic_access", "tree_inheritance")
+				.booleanOr(comboInfo.nonEmpty),
+			isGeneric = classModel("is_generic", "generic", "is_trait", "trait").getBoolean)
 		
 		// Also parses class instances if they are present
 		val instances = classModel("instance").model match {

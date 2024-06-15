@@ -3,7 +3,7 @@ package utopia.coder.vault.controller.writer.model
 import utopia.coder.model.data
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
-import utopia.coder.model.scala.Visibility.Protected
+import utopia.coder.model.scala.Visibility.{Private, Protected, Public}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference.Flow._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType, TypeRequirement}
@@ -12,25 +12,33 @@ import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDecla
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.controller.writer.database.AccessWriter
-import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
+import utopia.coder.vault.model.data.{Class, ClassModelReferences, DbProperty, Property, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 
 import scala.io.Codec
+import scala.util.Success
 
 /**
   * Used for writing model data from class data
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
+// TODO: Add supports for trait extensions
 object ModelWriter
 {
 	// ATTRIBUTES   -------------------------
 	
-	private val dataClassAppendix = data.Name("Data", "Data", CamelCase.capitalized)
-	private val factoryTraitAppendix = data.Name("Factory", "Factories", CamelCase.capitalized)
-	private val wrapperAppendix = Name("Wrapper", "Wrappers", CamelCase.capitalized)
+	private val dataClassSuffix = data.Name("Data", "Data", CamelCase.capitalized)
+	private val factoryTraitSuffix = data.Name("Factory", "Factories", CamelCase.capitalized)
+	private val wrapperSuffix = Name("Wrapper", "Wrappers", CamelCase.capitalized)
+	private val traitPropsPrefix = Name("Has", "Has", CamelCase.capitalized)
+	private val traitPropsSuffix = Name("Props", "Props", CamelCase.capitalized)
+	private val storedPrefix = Name("Stored", "Stored", CamelCase.capitalized)
+	private val likeSuffix = Name("Like", "Like", CamelCase.capitalized)
+	
+	private val copyPrefix = Name("copy", "copy", CamelCase.lower)
 	
 	/**
 	  * Prefix to apply to "withX" functions
@@ -45,24 +53,49 @@ object ModelWriter
 	  * @param classToWrite class being written
 	  * @param codec        Implicit codec used when writing files (implicit)
 	  * @param setup        Target project -specific settings (implicit)
-	  * @return References to:
-	 *              1) Stored model version,
-	 *              2) Data model version,
-	 *              3) Factory trait and
-	 *              4) Factory wrapper trait
-	 *
-	 *          Failure if file-writing failed
+	  * @return References to generated classes
 	  */
 	def apply(classToWrite: Class)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// Writes the factory trait, then the data model, and then teh stored model
+		// Writes the factory traits
 		val factoryPackage = setup.modelPackage / s"factory.${ classToWrite.packageName }"
 		writeFactoryTrait(classToWrite, factoryPackage).flatMap { factoryRef =>
 			writeFactoryWrapperTrait(classToWrite, factoryRef, factoryPackage).flatMap { factoryWrapperRef =>
-				writeDataModel(classToWrite, factoryRef).flatMap { dataRef =>
-					writeStoredModel(classToWrite, factoryWrapperRef, dataRef)
-						.map { storedRef => (storedRef, dataRef, factoryRef, factoryWrapperRef) }
+				val dataPackage = setup.modelPackage / s"partial.${ classToWrite.packageName }"
+				lazy val storePackage = setup.modelPackage / s"stored.${ classToWrite.packageName }"
+				
+				// For generic classes / traits, writes some traits
+				// Will contain: 1) XDataLike, 2) XLike and 3) name of the buildCopy function used
+				val traitWriteResult = {
+					if (classToWrite.isGeneric)
+						writeHasProps(classToWrite, dataPackage)
+							.flatMap { hasPropsRef =>
+								writeDataLikeTrait(classToWrite, dataPackage, hasPropsRef, factoryRef)
+							}
+							.flatMap { case (dataLikeRef, buildCopyName) =>
+								writeStoredLike(classToWrite, storePackage, dataLikeRef, factoryWrapperRef)
+									.map { storedLikeRef => Some((dataLikeRef, storedLikeRef, buildCopyName)) }
+							}
+					else
+						Success(None)
+				}
+				
+				traitWriteResult.flatMap { traitData =>
+					val (dataLikeRef, storedLikeRef, buildCopyName) = traitData match {
+						case Some((dataLikeRef, storedLikeRef, buildCopyName)) =>
+							(Some(dataLikeRef), Some(storedLikeRef), buildCopyName)
+						case None => (None, None, "")
+					}
+					// Writes the data class & stored class
+					writeDataClass(classToWrite, dataPackage, factoryRef, dataLikeRef, buildCopyName).flatMap { dataRef =>
+						writeStored(classToWrite, storePackage, factoryWrapperRef, dataRef, storedLikeRef, buildCopyName)
+							.map { storedRef =>
+								// Returns references to generated classes
+								ClassModelReferences(dataRef, storedRef, factoryRef, factoryWrapperRef,
+									traitData.map { case (dataLike, stored, _) => Pair(dataLike, stored) })
+							}
+					}
 				}
 			}
 		}
@@ -71,7 +104,7 @@ object ModelWriter
 	private def writeFactoryTrait(classToWrite: Class, factoryPackage: Package)
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val factoryTraitName = (classToWrite.name + factoryTraitAppendix).className
+		val factoryTraitName = (classToWrite.name + factoryTraitSuffix).className
 		val genericType = GenericType.covariant("A")
 		
 		File(factoryPackage,
@@ -100,7 +133,7 @@ object ModelWriter
 		
 		File(factoryPackage,
 			TraitDeclaration(
-				name = (classToWrite.name + factoryTraitAppendix + wrapperAppendix).className,
+				name = (classToWrite.name + factoryTraitSuffix + wrapperSuffix).className,
 				genericTypes = Pair(wrapped, repr),
 				extensions = Single(factoryRef(repr.toScalaType)),
 				properties = Vector(
@@ -134,41 +167,131 @@ object ModelWriter
 		).write()
 	}
 	
-	// Writes the XData model
-	// Returns a reference to it
-	private def writeDataModel(classToWrite: Class, factoryRef: Reference)
+	// HasXProps for generic traits
+	private def writeHasProps(classToWrite: Class, dataPackage: Package)
+	                         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		val traitName = (traitPropsPrefix +: classToWrite.name) + traitPropsSuffix
+		
+		// Defines the properties as abstract
+		val propertyDeclarations = classToWrite.properties.map { prop =>
+			ComputedProperty.newAbstract(prop.name.prop, prop.dataType.scalaType, description = prop.description)
+		}
+		// Also defines an abstract property for additional model properties
+		// - Removed because this may cause issues in multiple inheritance
+		/*
+		val additionalModelProp = ComputedProperty.newAbstract("additionalPropsModel", model,
+			description = s"A model which contains toModel implementation outside of the properties defined in this trait ($traitName)",
+			isProtected = true)
+		 */
+		val toModelCode = toModelImplementationFor(classToWrite) // + " ++ additionalPropsModel"
+		
+		File(dataPackage, TraitDeclaration(
+			name = traitName.className,
+			extensions = Single(modelConvertible),
+			properties = propertyDeclarations :+
+				ComputedProperty("toModel", toModelCode.references, isOverridden = true)(toModelCode.text),
+			description = s"Common trait for classes which provide access to ${ classToWrite.name } properties",
+			author = classToWrite.author,
+			since = DeclarationDate.versionedToday
+		)).write()
+	}
+	
+	// XDataLike for generic traits
+	private def writeDataLikeTrait(classToWrite: Class, dataPackage: Package,
+	                               hasPropsRef: Reference, factoryRef: Reference)
+	                              (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		val repr = GenericType.covariant("Repr")
+		// Introduces a function for creating copies
+		val buildCopy = MethodDeclaration.newAbstract((copyPrefix +: classToWrite.name).function, repr.toScalaType,
+			description = s"Builds a modified copy of this ${ classToWrite.name }",
+			returnDescription = s"A copy of this ${ classToWrite.name } with the specified properties")(
+			classToWrite.properties
+				.map { prop =>
+					val propName = prop.name.prop
+					Parameter(propName, prop.dataType.toScala, propName,
+						description = s"New ${ prop.name } to assign. Default = current value.")
+				})
+		// Utilizes that function in the withX functions
+		val withMethods = concreteWithMethodsFor(classToWrite, buildCopy.name)
+		
+		File(dataPackage, TraitDeclaration(
+			name = (classToWrite.name + dataClassSuffix + likeSuffix).className,
+			genericTypes = Single(repr),
+			extensions = Vector(hasPropsRef, factoryRef(repr.toScalaType)),
+			methods = withMethods + buildCopy,
+			description = s"Common trait for classes which provide read and copy access to ${
+				classToWrite.name } properties",
+			author = classToWrite.author,
+			since = DeclarationDate.versionedToday
+		)).write()
+			// Includes the buildCopy function name in the return value since it is needed later
+			.map { _ -> buildCopy.name }
+	}
+	
+	// Writes the XData model, including its companion object
+	private def writeDataClass(classToWrite: Class, dataPackage: Package,
+	                           factoryRef: Reference, dataLikeRef: Option[Reference], buildCopyName: String)
 	                          (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val dataClassName = (classToWrite.name + dataClassAppendix).className
-		val packageName = setup.modelPackage / s"partial.${ classToWrite.packageName }"
-		
-		// Code pieces for writing properties into a Model
-		val propWrites = classToWrite.properties.map { prop =>
-			val propNameInModel = prop.jsonPropName.quoted
-			prop.toJsonValueCode.withPrefix(s"$propNameInModel -> ")
-		}
-		val propWriteCode = {
-			if (propWrites.isEmpty)
-				CodePiece("Model.empty", Set(model))
-			else {
-				val collection = propWrites.size match {
-					case 1 => CodePiece("Single", Set(single))
-					case 2 => CodePiece("Pair", Set(pair))
-					case _ => CodePiece("Vector")
-				}
-				CodePiece("Model", Set(model)) +
-					(collection + propWrites.reduceLeft { _.append(_, ", ") }.withinParenthesis).withinParenthesis
-			}
-		}
-		val fromModelMayFail = classToWrite.fromDbModelConversionMayFail
-		
-		val modelDeclarationCode = modelDeclaration.targetCode +
-			(CodePiece("Vector") +
-				classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
-					.getOrElse(CodePiece.empty).withinParenthesis
-				).withinParenthesis
-		
+		// Prepares common data
+		val dataClassName = (classToWrite.name + dataClassSuffix).className
 		val dataClassType = ScalaType.basic(dataClassName)
+		
+		// Prepares class data
+		// Accepts a copy of each property. Uses default values where possible.
+		val constructionParams = classToWrite.properties.map { prop =>
+			Parameter(prop.name.prop, prop.dataType.toScala, prop.defaultValue,
+				description = prop.description)
+		}
+		val deprecationProps = deprecationPropertiesFor(classToWrite)
+		
+		// Some of the data differs based on whether the class is generic or not
+		val (extensions, customProps, customMethods) = dataLikeRef match {
+			// Case: Abstract class => Extends XDataLike trait
+			case Some(dataLikeRef) =>
+				val extensions: Seq[Extension] = Single(dataLikeRef(dataClassType))
+				(extensions, Empty, Set[MethodDeclaration]())
+				
+			// Case: Concrete class => Extends XFactory, implements toModel and withX methods
+			case None =>
+				val extensions: Seq[Extension] = Pair(factoryRef(dataClassType), modelConvertible)
+				val toModelCode = toModelImplementationFor(classToWrite)
+				val withMethods = concreteWithMethodsFor(classToWrite, "copy")
+				(extensions,
+					Single(ComputedProperty("toModel", toModelCode.references, isOverridden = true)(toModelCode.text)),
+					withMethods)
+		}
+		
+		// Defines either a trait or a class
+		val dataClass = {
+			if (classToWrite.isGeneric)
+				TraitDeclaration(
+					name = dataClassName,
+					extensions = extensions,
+					properties = deprecationProps ++ customProps,
+					methods = customMethods,
+					description = classToWrite.description,
+					author = classToWrite.author,
+					since = DeclarationDate.versionedToday
+				)
+			else
+				ClassDeclaration(
+					name = dataClassName,
+					constructionParams = constructionParams,
+					extensions = extensions,
+					properties = deprecationProps ++ customProps,
+					methods = customMethods,
+					description = classToWrite.description,
+					author = classToWrite.author,
+					since = DeclarationDate.versionedToday,
+					isCaseClass = true
+				)
+		}
+		
+		// Prepares the companion object
+		val fromModelMayFail = classToWrite.fromDbModelConversionMayFail
 		val dataFactoryExtension: Extension = {
 			if (fromModelMayFail)
 				fromModelFactory(dataClassType)
@@ -176,133 +299,261 @@ object ModelWriter
 				fromModelFactoryWithSchema(dataClassType)
 		}
 		
-		File(packageName,
-			// The companion object allows parsing from a JSON model
-			ObjectDeclaration(dataClassName, Vector(dataFactoryExtension),
-				properties = Vector(
-					LazyValue("schema", modelDeclarationCode.references, isOverridden = !fromModelMayFail,
-						isLowMergePriority = true)(modelDeclarationCode.text)
-				),
-				methods = Set(fromModelFor(classToWrite, dataClassName).copy(isLowMergePriority = true))
+		val modelDeclarationCode = modelDeclaration.targetCode +
+			(CodePiece("Vector") +
+				classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
+					.getOrElse(CodePiece.empty).withinParenthesis
+				).withinParenthesis
+		val schema = LazyValue("schema", modelDeclarationCode.references,
+			visibility = if (classToWrite.isGeneric) Public else Private,
+			isOverridden = !fromModelMayFail, isLowMergePriority = true)(modelDeclarationCode.text)
+		
+		val fromModel = fromModelFor(classToWrite, dataClassName).copy(isLowMergePriority = true)
+		
+		// Some of the implementation differs between abstract and concrete classes
+		val (additionalCompanionMethod, nestedInCompanion) = {
+			// Case: Generic trait => Generates a private concrete implementation and an apply function for it
+			if (classToWrite.isGeneric) {
+				val concreteClassName = s"_$dataClassName"
+				val constructConcrete = s"$concreteClassName(${ constructionParams.map { _.name }.mkString(", ") })"
+				val nestedClass = ClassDeclaration(
+					name = concreteClassName,
+					constructionParams = constructionParams,
+					extensions = Vector(dataClassType),
+					methods = Set(
+						MethodDeclaration(buildCopyName, visibility = Protected, isOverridden = true)(
+							constructionParams)(constructConcrete)
+					),
+					visibility = Private,
+					description = s"Concrete implementation of the ${ classToWrite.name } data trait",
+					author = classToWrite.author,
+					isCaseClass = true)
+				
+				val applyFunction = MethodDeclaration("apply", explicitOutputType = Some(dataClassType),
+					description = s"Creates a new ${ classToWrite.name }",
+					returnDescription = s"${ classToWrite.name } with the specified properties")(
+					constructionParams)(constructConcrete)
+				
+				Some(applyFunction) -> Some(nestedClass)
+			}
+			// Case: Concrete class => No additional features required
+			else
+				None -> None
+		}
+		
+		// Writes the file
+		File(dataPackage,
+			ObjectDeclaration(dataClassName,
+				extensions = Single(dataFactoryExtension),
+				properties = Single(schema),
+				methods = Set(fromModel) ++ additionalCompanionMethod,
+				nested = nestedInCompanion.toSet
 			),
-			// The data model contains the basic properties without the id property
-			ClassDeclaration(
-				name = dataClassName,
-				// Accepts a copy of each property. Uses default values where possible.
-				constructionParams = classToWrite.properties.map { prop =>
-					Parameter(prop.name.prop, prop.dataType.toScala, prop.defaultValue,
-						description = prop.description)
-				},
-				// Extends XFactory and ModelConvertible
-				extensions = Vector(factoryRef(dataClassType), modelConvertible),
-				// Implements the toModel -property
-				properties = deprecationPropertiesFor(classToWrite) :+
-					ComputedProperty("toModel", propWriteCode.references, isOverridden = true)(propWriteCode.text),
-				// Implements the withX(...) methods
-				methods = withMethodsFor(classToWrite) { (prop, propName) =>
-					prop.dataType.fromConcreteCode(propName)
-						.mapText { wrappedValue => s"copy($propName = $wrappedValue)" }
-				},
-				description = classToWrite.description,
-				author = classToWrite.author,
-				since = DeclarationDate.versionedToday,
-				isCaseClass = true)
+			dataClass
 		).write()
+	}
+	
+	// Writes XLike trait for generic implementations
+	private def writeStoredLike(classToWrite: Class, storedPackage: Package,
+	                            dataLikeRef: Reference, factoryWrapperRef: Reference)
+	                           (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		val dataType = ScalaType.basic("Data")
+		val data = GenericType.childOf("Data", dataLikeRef(dataType))
+		val repr = GenericType.covariant("Repr")
+		val reprType = repr.toScalaType
+		
+		// Certain extensions are different if Vault references are enabled
+		val (customExtensions, accessor, withId) = {
+			if (setup.modelCanReferToDB) {
+				val stored = vault.stored(dataType, classToWrite.idType.toScala)
+				val fromIdFactory = vault.fromIdFactory(ScalaType.int, reprType)
+				val accessor = accessorFor(classToWrite)
+				val withId = withIdFor(classToWrite)
+				
+				(Pair[Extension](stored, fromIdFactory), Some(accessor), Some(withId))
+			}
+			else {
+				val stored = metropolis.stored(dataType)
+				(Single[Extension](stored), None, None)
+			}
+		}
+		
+		val wrappedFactory = ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)("data")
+		val propertyAccessors = classToWrite.properties.map { prop =>
+			val propName = prop.name.prop
+			ComputedProperty(propName, isOverridden = true)(s"data.$propName")
+		}
+		
+		File(storedPackage, TraitDeclaration(
+			name = ((storedPrefix +: classToWrite.name) + likeSuffix).className,
+			genericTypes = Pair(data, repr),
+			extensions = customExtensions ++
+				Pair[Extension](factoryWrapperRef(dataType, reprType), dataLikeRef(reprType)),
+			properties = (propertyAccessors :+ wrappedFactory) ++ accessor,
+			methods = withId.toSet,
+			description = s"Common trait for ${ classToWrite.name.pluralDoc } which have been stored in the database",
+			author = classToWrite.author,
+			since = DeclarationDate.versionedToday
+		)).write()
 	}
 	
 	// Writes the stored model version
 	// Returns a reference
-	private def writeStoredModel(classToWrite: Class, factoryWrapperRef: Reference, dataClassRef: Reference)
-	                            (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	private def writeStored(classToWrite: Class, storedPackage: Package, factoryWrapperRef: Reference,
+	                        dataClassRef: Reference, storedLikeRef: Option[Reference], buildCopyName: String)
+	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val name = classToWrite.name.className
-		val classType = ScalaType.basic(name)
-		val storePackage = setup.modelPackage / s"stored.${ classToWrite.packageName }"
-		// Writes the stored model and object next
+		// Prepares common data
+		val className = classToWrite.name.className
+		val classType = ScalaType.basic(className)
+		
+		val idType = classToWrite.idType.toScala
+		// Accepts id and data -parameters
+		val constructionParams = Vector(
+			Parameter("id", idType, description = s"id of this ${ classToWrite.name.doc } in the database"),
+			Parameter("data", dataClassRef, description = s"Wrapped ${ classToWrite.name.doc } data")
+		)
+		val wrap = MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
+			Parameter("data", dataClassRef))("copy(data = data)")
+		
+		// Prepares class data
 		val storedClass = {
-			val idType = classToWrite.idType.toScala
-			// Accepts id and data -parameters
-			val constructionParams = Vector(
-				Parameter("id", idType, description = s"id of this ${ classToWrite.name.doc } in the database"),
-				Parameter("data", dataClassRef, description = s"Wrapped ${ classToWrite.name.doc } data")
-			)
-			// May provide a utility access method
-			val accessProperty = {
-				if (setup.modelCanReferToDB) {
-					val singleAccessRef = AccessWriter.singleIdReferenceFor(classToWrite)
-					Some(ComputedProperty("access", Set(singleAccessRef),
-						description = s"An access point to this ${ classToWrite.name.doc } in the database")(
-						s"${ singleAccessRef.target }(id)"))
-				}
-				else
-					None
-			}
-			
-			// FromIdFactory extension is only available if Vault is available
-			val withId = {
-				if (setup.modelCanReferToDB)
-					Some(MethodDeclaration("withId", isOverridden = true)(
-						Parameter("id", classToWrite.idType.toScala))("copy(id = id)"))
-				else
-					None
-			}
-			val factoryWrapper = factoryWrapperRef(dataClassRef, classType)
-			val factoryParents: Vector[Extension] = {
-				if (setup.modelCanReferToDB)
-					Vector[Extension](factoryWrapper, vault.fromIdFactory(ScalaType.int, classType))
-				else
-					Vector(factoryWrapper)
-			}
-			
-			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database"
-			// ModelConvertible extension & implementation differs based on id type
-			// Also, the Stored extension differs based on whether Vault-dependency is allowed
-			val (parent, properties) = {
-				if (classToWrite.useLongId) {
-					vault.stored(dataClassRef, idType) -> Vector(
-						ComputedProperty("toModel", Set(valueConversions, constant),
-							isOverridden = true)("Constant(\"id\", id) + data.toModel"),
-					)
-				}
-				else {
-					val parent = {
-						if (setup.modelCanReferToDB)
-							vault.storedModelConvertible(dataClassRef)
-						else
-							metropolis.storedModelConvertible(dataClassRef)
+			// Some of the implementation differs greatly between abstract and concrete implementations
+			val (extensions, properties, methods) = storedLikeRef match {
+				// Case: Abstract trait => Only extends the "like" trait and the data trait, supplying the Repr type
+				case Some(storedLikeRef) =>
+					val storedLike = storedLikeRef(dataClassRef, classType)
+					
+					(Pair[Extension](storedLike, dataClassRef), Empty, Set[MethodDeclaration]())
+				
+				// Case: Concrete class => Specifies the implementation required for a stored class
+				case None =>
+					val factoryWrapper = factoryWrapperRef(dataClassRef, classType)
+					val wrappedFactory = ComputedProperty("wrappedFactory", visibility = Protected,
+						isOverridden = true)("data")
+					
+					// If Vault references are allowed, provides certain custom features
+					val (customExtensions, customProperties, withId) = {
+						if (setup.modelCanReferToDB) {
+							val fromIdFactory = vault.fromIdFactory(ScalaType.int, classType)
+							val (stored, toModel) = {
+								if (classToWrite.useLongId) {
+									val stored = vault.stored(dataClassRef, idType)
+									val toModel = ComputedProperty("toModel", Set(valueConversions, constant),
+										isOverridden = true)("Constant(\"id\", id) + data.toModel")
+									
+									Pair[Extension](stored, modelConvertible) -> Some(toModel)
+								}
+								else
+									Single[Extension](vault.storedModelConvertible(dataClassRef)) -> None
+							}
+							val accessor = accessorFor(classToWrite)
+							val withId = withIdFor(classToWrite)
+							
+							(stored :+[Extension] fromIdFactory, Single(accessor) ++ toModel, Some(withId))
+						}
+						else {
+							val stored = metropolis.storedModelConvertible(dataClassRef)
+							(Single[Extension](stored), Empty, None)
+						}
 					}
-					parent -> Vector.empty
-				}
+					
+					(customExtensions :+[Extension] factoryWrapper, wrappedFactory +: customProperties,
+						Set(wrap) ++ withId)
 			}
-			ClassDeclaration(name,
-				constructionParams = constructionParams,
-				extensions = parent +: factoryParents,
-				properties = (ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)("data") +:
-					properties) ++
-					accessProperty,
-				methods = Set(
-					MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
-						Parameter("data", dataClassRef))("copy(data = data)")
-				) ++ withId,
-				description = description,
-				author = classToWrite.author,
-				since = DeclarationDate.versionedToday,
-				isCaseClass = true
+			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database"
+			
+			// Writes either a class or a trait
+			if (classToWrite.isGeneric)
+				TraitDeclaration(
+					name = className,
+					extensions = extensions,
+					properties = properties,
+					methods = methods,
+					description = description,
+					author = classToWrite.author,
+					since = DeclarationDate.versionedToday
+				)
+			else
+				ClassDeclaration(
+					name = className,
+					constructionParams = constructionParams,
+					extensions = extensions,
+					properties = properties,
+					methods = methods,
+					description = description,
+					author = classToWrite.author,
+					since = DeclarationDate.versionedToday,
+					isCaseClass = true
+				)
+		}
+		
+		// Prepares the companion object
+		val companionObject = {
+			// The type of model parsing used depends on whether Vault references are enabled
+			val dataFactory = ComputedProperty("dataFactory", Set(dataClassRef),
+				visibility = if (setup.modelCanReferToDB) Public else Protected, isOverridden = true)(
+				dataClassRef.target)
+			val (fromModelFactory, complete) = {
+				if (setup.modelCanReferToDB) {
+					val storedFromModelFactory = vault.storedFromModelFactory(dataClassRef, classType)
+					val idExtractor = if (classToWrite.useLongId) "Long" else "Int"
+					val complete = MethodDeclaration("complete", visibility = Protected, isOverridden = true)(
+						Pair(Parameter("model", anyModel), Parameter("data", dataClassRef)))(
+						s"model(\"id\").try$idExtractor.map { apply(_, data) }")
+					
+					storedFromModelFactory -> Some(complete)
+				}
+				else
+					metropolis.storedFromModelFactory(dataClassRef, classType) -> None
+			}
+			
+			val (applyToConcrete, nestedConcrete) = {
+				// Case: Generic trait => Provides access to a concrete implementation + from model parsing
+				if (classToWrite.isGeneric) {
+					val concreteClassName = s"_$className"
+					val constructConcrete = s"$concreteClassName(${
+						constructionParams.map { _.name }.mkString(", ") })"
+					
+					val copyParams = classToWrite.properties
+						.map { prop => Parameter(prop.name.prop, prop.dataType.toScala) }
+					val buildCopy = MethodDeclaration(buildCopyName, visibility = Protected, isOverridden = true)(
+						copyParams)(s"copy(data = data.$buildCopyName(${ copyParams.map { _.name }.mkString(", ") }))")
+					
+					val nestedClass = ClassDeclaration(
+						name = concreteClassName,
+						constructionParams = constructionParams,
+						extensions = Single(classType),
+						methods = Set(buildCopy, wrap),
+						visibility = Private,
+						description = s"Concrete implementation of the ${ classToWrite.name } trait",
+						author = classToWrite.author,
+						isCaseClass = true)
+					
+					val applyFunction = MethodDeclaration("apply", explicitOutputType = Some(classType),
+						description = s"Creates a new ${ classToWrite.name }",
+						returnDescription = s"${ classToWrite.name } with the specified id and wrapped data")(
+						constructionParams)(constructConcrete)
+					
+					Some(applyFunction) -> Some(nestedClass)
+				}
+				// Case: Concrete class => Only implements from model parsing
+				else
+					None -> None
+			}
+			
+			ObjectDeclaration(
+				name = className,
+				extensions = Single(fromModelFactory),
+				properties = Single(dataFactory),
+				methods = complete.toSet ++ applyToConcrete,
+				nested = nestedConcrete.toSet
 			)
 		}
-		// If Metropolis is enabled, writes the fromModelFactory as well
-		val storedObject = {
-			if (setup.modelCanReferToDB)
-				None
-			else
-				Some(ObjectDeclaration(storedClass.name,
-					Vector(metropolis.storedFromModelFactory(ScalaType.basic(storedClass.name), dataClassRef)),
-					properties = Vector(
-						ComputedProperty("dataFactory", Set(dataClassRef), isOverridden = true)(dataClassRef.target)
-					)
-				))
-		}
-		File(storePackage, storedObject.toVector :+ storedClass, "", Set[Reference]()).write()
+		
+		// Writes the file
+		File(storedPackage, companionObject, storedClass).write()
 	}
 	
 	// Deprecation-supporting classes can have custom properties
@@ -336,6 +587,20 @@ object ModelWriter
 		}
 	}
 	
+	private def accessorFor(classToWrite: Class)(implicit naming: NamingRules, setup: VaultProjectSetup) = {
+		val singleAccessRef = AccessWriter.singleIdReferenceFor(classToWrite)
+		ComputedProperty("access", Set(singleAccessRef),
+			description = s"An access point to this ${ classToWrite.name.doc } in the database")(
+			s"${ singleAccessRef.target }(id)")
+	}
+	
+	// Defines the withX methods in data class context
+	private def concreteWithMethodsFor(classToWrite: Class, copyFunctionName: String)(implicit naming: NamingRules) =
+		withMethodsFor(classToWrite) { (prop, propName) =>
+			prop.dataType.fromConcreteCode(propName)
+				.mapText { wrappedValue => s"$copyFunctionName($propName = $wrappedValue)" }
+		}
+	
 	// code accepts a property and parameter name and returns the implementing code
 	private def withMethodsFor(classToWrite: Class)(writeCode: (Property, String) => CodePiece)(implicit naming: NamingRules) =
 	{
@@ -347,7 +612,38 @@ object ModelWriter
 		}.toSet
 	}
 	
-	private def withMethodNameFor(prop: Property)(implicit naming: NamingRules) = (withPrefix + prop.name).function
+	private def withIdFor(classToWrite: Class) =
+		MethodDeclaration("withId", isOverridden = true)(Parameter("id", classToWrite.idType.toScala))("copy(id = id)")
+	
+	private def fromModelFor(classToWrite: Class, dataClassName: String)(implicit naming: NamingRules) = {
+		def _modelFromAssignments(assignments: CodePiece) =
+			assignments.withinParenthesis.withPrefix(dataClassName)
+		
+		if (classToWrite.fromJsonMayFail)
+			ClassMethodFactory.classFromModel(classToWrite, "schema.validate(model)",
+				isFromJson = true)(_modelFromAssignments)
+		else
+			ClassMethodFactory.classFromValidatedModel(classToWrite, isFromJson = true)(_modelFromAssignments)
+	}
+	
+	private def toModelImplementationFor(classToWrite: Class)(implicit naming: NamingRules) = {
+		// Code pieces for writing properties into a Model
+		val propWrites = classToWrite.properties.map { prop =>
+			val propNameInModel = prop.jsonPropName.quoted
+			prop.toJsonValueCode.withPrefix(s"$propNameInModel -> ")
+		}
+		if (propWrites.isEmpty)
+			CodePiece("Model.empty", Set(model))
+		else {
+			val collection = propWrites.size match {
+				case 1 => CodePiece("Single", Set(single))
+				case 2 => CodePiece("Pair", Set(pair))
+				case _ => CodePiece("Vector")
+			}
+			CodePiece("Model", Set(model)) +
+				(collection + propWrites.reduceLeft { _.append(_, ", ") }.withinParenthesis).withinParenthesis
+		}
+	}
 	
 	// Writes a property declaration for the model schema
 	private def propertyDeclarationFrom(prop: Property)(implicit naming: NamingRules): CodePiece = {
@@ -377,14 +673,5 @@ object ModelWriter
 		propertyDeclaration.targetCode + paramsCode.withinParenthesis
 	}
 	
-	private def fromModelFor(classToWrite: Class, dataClassName: String)(implicit naming: NamingRules) = {
-		def _modelFromAssignments(assignments: CodePiece) =
-			assignments.withinParenthesis.withPrefix(dataClassName)
-		
-		if (classToWrite.fromJsonMayFail)
-			ClassMethodFactory.classFromModel(classToWrite, "schema.validate(model)",
-				isFromJson = true)(_modelFromAssignments)
-		else
-			ClassMethodFactory.classFromValidatedModel(classToWrite, isFromJson = true)(_modelFromAssignments)
-	}
+	private def withMethodNameFor(prop: Property)(implicit naming: NamingRules) = (withPrefix + prop.name).function
 }

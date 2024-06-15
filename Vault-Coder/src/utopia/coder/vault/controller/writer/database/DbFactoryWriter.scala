@@ -8,7 +8,7 @@ import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
 import utopia.coder.model.scala.declaration.{File, ObjectDeclaration, PropertyDeclaration}
-import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
+import utopia.coder.vault.model.data.{Class, ClassModelReferences, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences.Vault._
 
@@ -35,22 +35,21 @@ object DbFactoryWriter
 	/**
 	  * Writes a factory used for processing database object data
 	  * @param classToWrite Class data based on which the factory is created
-	  * @param modelRef     Reference to the read model class
-	  * @param dataRef      Reference to the partial model data class
+	  * @param modelRefs    References to the model classes & traits
 	  * @param dbModelRef   Reference to the database model class
 	  * @param codec        Implicit codec to use when writing the document
 	  * @param setup        Implicit project-specific setup
 	  * @return Reference to the new written factory object. Failure if writing failed.
 	  */
-	def apply(classToWrite: Class, modelRef: Reference, dataRef: Reference, dbModelRef: Reference)
+	def apply(classToWrite: Class, modelRefs: ClassModelReferences, dbModelRef: Reference)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val parentPackage = setup.factoryPackage / classToWrite.packageName
 		val objectName = (classToWrite.name + classNameSuffix).className
 		File(parentPackage,
-			ObjectDeclaration(objectName, extensionsFor(classToWrite, modelRef),
+			ObjectDeclaration(objectName, extensionsFor(classToWrite, modelRefs.stored),
 				properties = propertiesFor(classToWrite, dbModelRef),
-				methods = methodsFor(classToWrite, modelRef, dataRef),
+				methods = methodsFor(classToWrite, modelRefs.stored, modelRefs.data),
 				description = s"Used for reading ${ classToWrite.name.doc } data from the DB",
 				author = classToWrite.author, since = DeclarationDate.versionedToday
 			)

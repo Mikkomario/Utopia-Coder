@@ -29,14 +29,16 @@ object Class
 	  * @param useLongId Whether to use long instead of int in the id property (default = false)
 	  * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
 	  *                           (default = false)
-	  * @return A new class
+	  * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
+	 *                  (default = false)
+	 * @return A new class
 	  */
 	def apply(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
 	          comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	          description: String = "", author: String = "", useLongId: Boolean = false,
-	          writeGenericAccess: Boolean = false): Class =
+	          writeGenericAccess: Boolean = false, isGeneric: Boolean = false): Class =
 		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None,
-			description, author, useLongId, writeGenericAccess)
+			description, author, useLongId, writeGenericAccess, isGeneric)
 	
 	/**
 	  * Creates a new class with automatic table-naming with description support
@@ -53,17 +55,19 @@ object Class
 	  * @param useLongId Whether to use long instead of int in the id property (default = false)
 	  * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
 	  *                           (default = false)
-	  * @return A new class
+	  * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
+	 *                  (default = false)
+	 * @return A new class
 	  */
 	// WET WET
 	def described(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
 	              comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	              description: String = "", author: String = "", descriptionLinkName: Option[Name] = None,
-	              useLongId: Boolean = false, writeGenericAccess: Boolean = false): Class =
+	              useLongId: Boolean = false, writeGenericAccess: Boolean = false, isGeneric: Boolean = false): Class =
 	{
 		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames,
 			Some[Name](descriptionLinkName.getOrElse { name + "id" }), description, author, useLongId,
-			writeGenericAccess)
+			writeGenericAccess, isGeneric)
 	}
 }
 
@@ -85,12 +89,13 @@ object Class
   * @param description A description of this class
   * @param useLongId Whether to use long instead of int in the id property
   * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
+ * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
   */
 // TODO: customTableName should be Option[Name]
 case class Class(name: Name, customTableName: Option[String], idName: Name, properties: Seq[Property],
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
                  descriptionLinkName: Option[Name], description: String, author: String, useLongId: Boolean,
-                 writeGenericAccess: Boolean)
+                 writeGenericAccess: Boolean, isGeneric: Boolean)
 {
 	// ATTRIBUTES   ---------------------------------
 	

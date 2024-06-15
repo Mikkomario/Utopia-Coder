@@ -1,7 +1,7 @@
 package utopia.coder.model.scala.declaration
 
 import utopia.coder.model.scala.code.Code
-import utopia.coder.model.scala.Visibility.Public
+import utopia.coder.model.scala.Visibility.{Protected, Public}
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.{Annotation, Parameter, Visibility}
 import utopia.coder.model.scala.template.ScalaConvertible
@@ -40,6 +40,24 @@ sealed trait PropertyDeclarationType extends ScalaConvertible
 		PropertyDeclaration(this, name, Code.from(line1 +: moreLines).referringTo(references), visibility,
 			explicitOutputType, implicitParams, annotations, description, Empty,
 			isOverridden, isImplicit, isLowMergePriority)
+	
+	/**
+	 * Creates a new abstract property
+	 * @param name Name of the declared property
+	 * @param outputType Data type returned by this function
+	 * @param implicitParams Implicit parameters accepted by this (computed) property (default = empty)
+	 * @param description Documentation for this property (default = empty)
+	 * @param isProtected Whether the visibility of this property should be protected instead of public (default = false)
+	 * @param isOverridden Whether this property overrides a base member (default = false)
+	 * @param isLowMergePriority Whether this declaration should be considered the lower priority
+	 *                           implementation when merging with another version (default = false)
+	 * @return A new abstract property
+	 */
+	def newAbstract(name: String, outputType: ScalaType, implicitParams: Seq[Parameter] = Empty,
+	                description: String = "", isProtected: Boolean = false, isOverridden: Boolean = false,
+	                isLowMergePriority: Boolean = false) =
+		PropertyDeclaration(this, name, Code.empty, if (isProtected) Protected else Public, Some(outputType),
+			implicitParams, Empty, description, Empty, isOverridden, isImplicit = false, isLowMergePriority)
 }
 
 object PropertyDeclarationType

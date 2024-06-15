@@ -33,7 +33,7 @@ object File
   * @author Mikko Hilpinen
   * @since 31.8.2021, v0.1
   */
-case class File(packagePath: Package, declarations: Vector[InstanceDeclaration], fileName: String,
+case class File(packagePath: Package, declarations: Seq[InstanceDeclaration], fileName: String,
                 extraReferences: Set[Reference])
 	extends CodeConvertible with Mergeable[File, File]
 {

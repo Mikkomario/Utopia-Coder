@@ -762,8 +762,8 @@ object ScalaParser
 			// println(s"Main type is: $mainTypeString - Remaining: $remaining")
 			// Checks whether the main type is referencing a type
 			val mainType = refMap.get(mainTypeString) match {
-				case Some(ref) => Right(ref)
-				case None => Left(mainTypeString)
+				case Some(ref) => ref.targetCode
+				case None => CodePiece(mainTypeString)
 			}
 			// Parses generic types if available
 			if (remaining.startsWith("[")) {

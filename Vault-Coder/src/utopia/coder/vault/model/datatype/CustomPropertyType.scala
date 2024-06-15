@@ -61,7 +61,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 						val conversion = if (parts.isEmpty) Left(sqlTypeFrom(model, default)) else Right(parts)
 						val fromValueYieldsTry = model("from_value_can_fail", "yields_try", "try").getBoolean
 						Success(apply(
-							ScalaType(model("type")), conversion, valueDataType,
+							ScalaType.parse(model("type")), conversion, valueDataType,
 							model("from_value"), model("option_from_value"),
 							model("to_value"), model("to_json_value"),
 							model("option_to_value"), model("option_to_json_value"),
@@ -129,7 +129,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 				val toValueInput: CodePiece = model("to_value")
 				val emptyValue = CodePiece.fromValue(model("empty_value", "empty"))
 					.filter { _.nonEmpty }.getOrElse(CodePiece.none)
-				apply(ScalaType(model("type")), sqlTypeFrom(model), model("extract"), model("extract_from_option"),
+				apply(ScalaType.parse(model("type")), sqlTypeFrom(model), model("extract"), model("extract_from_option"),
 					toValueInput.notEmpty
 						.getOrElse { CodePiece("$v", Set(valueConversions)) },
 					emptyValue, ClassPropName.from(model))

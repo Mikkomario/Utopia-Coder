@@ -54,6 +54,7 @@ object VaultPackages
 		val base = utopia / "metropolis"
 		
 		lazy val models = base / "model"
+		lazy val storedModels = models / "stored"
 		lazy val description = models / "stored.description"
 		lazy val combinedDescription = models / "combined.description"
 	}

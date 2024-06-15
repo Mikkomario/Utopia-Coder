@@ -36,6 +36,7 @@ object VaultReferences
 		lazy val hasId = Reference(templateModels, "HasId")
 		lazy val stored = Reference(templateModels, "Stored")
 		lazy val storedModelConvertible = Reference(templateModels, "StoredModelConvertible")
+		lazy val storedFromModelFactory = Reference(templateModels, "StoredFromModelFactory")
 		lazy val fromIdFactory = Reference(templateModels, "FromIdFactory")
 		
 		lazy val indexed = Reference(noSql / "template", "Indexed")
@@ -86,8 +87,9 @@ object VaultReferences
 	{
 		import VaultPackages.Metropolis._
 		
-		lazy val storedModelConvertible = Reference(models / "stored", "StoredModelConvertible")
-		lazy val storedFromModelFactory = Reference(models / "stored", "StoredFromModelFactory")
+		lazy val stored = Reference(storedModels, "Stored")
+		lazy val storedModelConvertible = Reference(storedModels, "StoredModelConvertible")
+		lazy val storedFromModelFactory = Reference(storedModels, "StoredFromModelFactory")
 		lazy val descriptionRole = Reference(description, "DescriptionRole")
 		lazy val linkedDescription = Reference(combinedDescription, "LinkedDescription")
 		lazy val describedWrapper = Reference(combinedDescription, "DescribedWrapper")
