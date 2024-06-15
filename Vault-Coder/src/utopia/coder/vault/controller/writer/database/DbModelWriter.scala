@@ -186,6 +186,33 @@ object DbModelWriter
 		File(storablePackage, modelLike).write()
 	}
 	
+	// XModel trait, which extends XModelLike
+	private def writeModelTrait(classToWrite: Class, storablePackage: Package,
+	                            modelLikeRef: Reference, configRef: Reference)
+	                           (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		val className = (classToWrite.name + modelSuffix).className
+		val classType = ScalaType.basic(className)
+		
+		val modelTrait = TraitDeclaration(
+			name = className,
+			extensions = Single(modelLikeRef(classType)),
+			description = s"Common trait for database interaction models dealing with ${ classToWrite.name.pluralDoc }",
+			author = classToWrite.author,
+			since = DeclarationDate.versionedToday
+		)
+		val companion = ObjectDeclaration(
+			name = className,
+			methods = Set(MethodDeclaration("factory",
+				returnDescription = s"A factory used for constructing ${
+					classToWrite.name } models using the specified configuration")(
+				Parameter("config", configRef, description = "Configuration used in determining database interactions"))(
+				s"${ (classToWrite.name + modelSuffix + factorySuffix).className }(config)"))
+		)
+		
+		File(storablePackage, companion, modelTrait).write()
+	}
+	
 	// Writes XModelFactoryLike used for constructing XModels when generic traits are used
 	private def writeModelFactoryLike(classToWrite: Class, storablePackage: Package, factoryRef: Reference)
 	                                 (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
@@ -211,10 +238,13 @@ object DbModelWriter
 		File(storablePackage, factoryLike).write()
 	}
 	
-	/*
-	private def companionObjectFor(classToWrite: Class)(implicit setup: VaultProjectSetup, naming: NamingRules) = {
-	
-	}*/
+	private def companionObjectOrFactoryTraitFor(classToWrite: Class)
+	                                            (implicit setup: VaultProjectSetup, naming: NamingRules) =
+	{
+		
+		
+		???
+	}
 	
 	// TODO: Utilize above and add support for generic type
 	private def classDeclarationFor(classToWrite: Class, className: String, classType: ScalaType,
