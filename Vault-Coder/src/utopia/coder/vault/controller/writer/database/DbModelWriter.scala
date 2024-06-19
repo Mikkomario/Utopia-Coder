@@ -2,7 +2,7 @@ package utopia.coder.vault.controller.writer.database
 
 import utopia.coder.model.data.{Name, Named, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
-import utopia.coder.model.scala.Visibility.Protected
+import utopia.coder.model.scala.Visibility.{Private, Protected, Public}
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.TypeVariance.Covariance
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
@@ -239,7 +239,8 @@ object DbModelWriter
 	}
 	
 	private def writeModelFactory(classToWrite: Class, storablePackage: Package, modelRefs: ClassModelReferences,
-	                              factoryLikeRef: Reference, dbModelRef: Reference)
+	                              tablesRef: Reference, dbPropsRef: Reference, dbPropsWrapperRef: Reference,
+	                              factoryLikeRef: Reference, dbModelRef: Reference, buildCopy: MethodDeclaration)
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Contains multiple elements:
@@ -257,7 +258,23 @@ object DbModelWriter
 			since = DeclarationDate.versionedToday
 		)
 		
-		// TODO: Write the rest of the classes etc.
+		val (concreteClass, applyParams) = modelClassDeclarationFor(classToWrite, ScalaType.basic(s"_$traitName"),
+			modelRefs, Some(Pair(ScalaType.referenceToType(dbPropsRef), ScalaType.basic(traitName)) -> buildCopy))
+		val concreteFactoryName = s"_$traitName"
+		val concreteFactory = concreteFactoryFor(classToWrite, concreteFactoryName, dbModelRef, applyParams, modelRefs,
+			tablesRef, Some(Pair(dbPropsRef, dbPropsWrapperRef)))
+		
+		val companionObject = ObjectDeclaration(
+			name = traitName,
+			methods = Set(
+				MethodDeclaration("apply", explicitOutputType = Some(ScalaType.basic(traitName)),
+					returnDescription = s"A factory for constructing ${ classToWrite.name } database models")(
+					Pair(Parameter("table", table), Parameter("dbProps", dbPropsRef)))(
+					s"$concreteFactoryName(table, dbProps)")),
+			nested = Set(concreteFactory, concreteClass)
+		)
+		
+		File(storablePackage, companionObject, traitDeclaration).write()
 	}
 	
 	// Writes either the XModel object or the concrete _XFactory(...) class.
@@ -334,9 +351,9 @@ object DbModelWriter
 		}
 		
 		val extensions = customExtensions ++ deprecation.map { _.extensionFor(modelClassType) }
-		val properties = (idProp +: customProps) ++ deprecation.flatMap { _.properties }
+		val properties = (idProp +: customProps) ++ deprecation.view.flatMap { _.properties }
 		val methods = withMethods.toSet ++ customMethods + withId + applyFromData + complete ++
-			deprecation.flatMap { _.methods }
+			deprecation.view.flatMap { _.methods }
 		val description = s"Used for constructing $modelClassType instances and for inserting ${
 			classToWrite.name.pluralDoc } to the database"
 		
@@ -355,6 +372,8 @@ object DbModelWriter
 		else
 			ClassDeclaration(
 				name = factoryName,
+				visibility = Private,
+				constructionParams = constructionParams,
 				extensions = extensions,
 				properties = properties,
 				methods = methods,
@@ -365,7 +384,7 @@ object DbModelWriter
 	}
 	
 	private def modelClassDeclarationFor(classToWrite: Class, reprType: ScalaType, modelRefs: ClassModelReferences,
-	                                     dbPropsAndModelRefsAndBuildCopy: Option[(Pair[Reference], MethodDeclaration)])
+	                                     dbPropsAndModelTypesAndBuildCopy: Option[(Pair[ScalaType], MethodDeclaration)])
 	                                    (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Prepares class data
@@ -385,8 +404,8 @@ object DbModelWriter
 		val withId = withIdMethod(classToWrite, "copy")
 		
 		// Some data differs between trait-based and class based implementations
-		val (className, customConstructionParams, customExtensions, customProps, customMethods) =
-			dbPropsAndModelRefsAndBuildCopy match {
+		val (className, visibility, customConstructionParams, customExtensions, customProps, customMethods) =
+			dbPropsAndModelTypesAndBuildCopy match {
 				// Case: Abstract trait
 				case Some((Pair(dbPropsRef, modelRef), buildCopy)) =>
 					// The concrete implementation requires 2 additional construction parameters
@@ -401,7 +420,8 @@ object DbModelWriter
 							buildCopy.parameters.lists.flatten.map { p => s"${ p.name } = ${ p.name }" } })")
 					
 					// Only needs to extend the predefined XModel trait
-					(s"_$reprType", Pair(table, dbPropsParam), Single(modelRef), Empty, Single(buildCopyImplementation))
+					(s"_$reprType", Private, Pair(table, dbPropsParam), Single[Extension](modelRef),
+						Empty, Single(buildCopyImplementation))
 					
 				// Case: Concrete / simple class
 				case None =>
@@ -414,12 +434,14 @@ object DbModelWriter
 					// Same thing with the value properties => The property names are acquired using the companion object
 					val valueProps = valuePropertiesPropertyFor(classToWrite, reprType.toString)
 					
-					(reprType.toString, Empty, Vector(storable, factory, fromIdFactory), Pair(table, valueProps), Empty)
+					(reprType.toString, Public, Empty, Vector[Extension](storable, factory, fromIdFactory),
+						Pair(table, valueProps), Empty)
 			}
 			
 		val constructionParams = customConstructionParams ++ (idParam +: classApplyParams)
 		val classDeclaration = ClassDeclaration(
 			name = className,
+			visibility = visibility,
 			constructionParams = constructionParams,
 			extensions = customExtensions,
 			properties = customProps,
