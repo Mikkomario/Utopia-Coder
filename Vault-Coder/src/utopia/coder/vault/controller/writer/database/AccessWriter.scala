@@ -51,62 +51,6 @@ object AccessWriter
 	// OTHER    ------------------------------
 	
 	/**
-	  * @param className A class name
-	  * @return Name of the single id access point for that class
-	  */
-	private def singleIdAccessNameFor(className: Name)(implicit naming: NamingRules) =
-		(singleAccessPrefix +: className).className
-	private def uniqueAccessTraitNameFrom(className: Name) = (uniqueAccessPrefix +: className) + accessTraitSuffix
-	/**
-	  * Converts a class name into a ManyXAccess trait name
-	  * @param className Name of the X class
-	  * @param naming Naming rules to apply
-	  * @return A trait name for ManyXAccess traits
-	  */
-	private def manyAccessTraitNameFrom(className: Name)(implicit naming: NamingRules) = {
-		// The "Many" -prefix is ignored if the class name already starts with "Many"
-		if (className.pluralClassName.toLowerCase.startsWith("many"))
-			className + accessTraitSuffix
-		else
-			(manyPrefix +: className) + accessTraitSuffix
-	}
-	
-	private def packageFor(accessPackage: Package, c: Class) = {
-		// Won't include the general package name part twice
-		val pckName = c.packageName
-		val base = accessPackage/pckName
-		c.customAccessSubPackageName.notEmpty match {
-			case Some(custom) =>
-				// Case: "-" defined as a custom package name => Indicates that no sub-packaging should be used
-				if (custom == "-")
-					base
-				else
-					base/custom
-			case None =>
-				val end = {
-					val full = c.name.singularIn(UnderScore).split('_').toVector
-					(full.findIndexWhere { _ ~== pckName } match {
-						case Some(idx) => full.drop(idx + 1)
-						case None => full
-					}).mkString("_")
-				}
-				if (end.isEmpty)
-					base
-				else
-					base / end
-		}
-	}
-	
-	/**
-	  * @param c     A class
-	  * @param setup Project setup (implicit)
-	  * @return Package that contains singular access points for that class
-	  */
-	private def singleAccessPackageFor(c: Class)(implicit setup: VaultProjectSetup) =
-		packageFor(setup.singleAccessPackage, c)
-	private def manyAccessPackageFor(c: Class)(implicit setup: VaultProjectSetup) = packageFor(setup.manyAccessPackage, c)
-	
-	/**
 	  * @param c     A class
 	  * @param setup Project setup (implicit)
 	  * @return Reference to the access point for unique instances of that class based on their id
@@ -920,4 +864,60 @@ object AccessWriter
 			}
 		}
 	}
+	
+	/**
+	 * @param className A class name
+	 * @return Name of the single id access point for that class
+	 */
+	private def singleIdAccessNameFor(className: Name)(implicit naming: NamingRules) =
+		(singleAccessPrefix +: className).className
+	private def uniqueAccessTraitNameFrom(className: Name) = (uniqueAccessPrefix +: className) + accessTraitSuffix
+	/**
+	 * Converts a class name into a ManyXAccess trait name
+	 * @param className Name of the X class
+	 * @param naming Naming rules to apply
+	 * @return A trait name for ManyXAccess traits
+	 */
+	private def manyAccessTraitNameFrom(className: Name)(implicit naming: NamingRules) = {
+		// The "Many" -prefix is ignored if the class name already starts with "Many"
+		if (className.pluralClassName.toLowerCase.startsWith("many"))
+			className + accessTraitSuffix
+		else
+			(manyPrefix +: className) + accessTraitSuffix
+	}
+	
+	private def packageFor(accessPackage: Package, c: Class) = {
+		// Won't include the general package name part twice
+		val pckName = c.packageName
+		val base = accessPackage/pckName
+		c.customAccessSubPackageName.notEmpty match {
+			case Some(custom) =>
+				// Case: "-" defined as a custom package name => Indicates that no sub-packaging should be used
+				if (custom == "-")
+					base
+				else
+					base/custom
+			case None =>
+				val end = {
+					val full = c.name.singularIn(UnderScore).split('_').toVector
+					(full.findIndexWhere { _ ~== pckName } match {
+						case Some(idx) => full.drop(idx + 1)
+						case None => full
+					}).mkString("_")
+				}
+				if (end.isEmpty)
+					base
+				else
+					base / end
+		}
+	}
+	
+	/**
+	 * @param c     A class
+	 * @param setup Project setup (implicit)
+	 * @return Package that contains singular access points for that class
+	 */
+	private def singleAccessPackageFor(c: Class)(implicit setup: VaultProjectSetup) =
+		packageFor(setup.singleAccessPackage, c)
+	private def manyAccessPackageFor(c: Class)(implicit setup: VaultProjectSetup) = packageFor(setup.manyAccessPackage, c)
 }

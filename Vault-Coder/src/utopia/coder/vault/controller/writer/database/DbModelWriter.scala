@@ -15,7 +15,6 @@ import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.util.StringExtensions._
 
-import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
 
 /**
@@ -44,97 +43,57 @@ object DbModelWriter
 	  * Generates the DB model class and the associated companion object
 	  * @param classToWrite The base class
 	  * @param modelRefs    References to various model-related classes and traits
-	  * @param codec        Implicit codec used when writing the file
+	  * @param tablesRef Reference to the Tables object utilized in this project
+	 * @param dbPropsData References to 1) XDbProps trait and 2) XDbPropsWrapper trait,
+	 *                    plus name of the abstract XDbProps property,
+	 *                    in case these are used (i.e. in case writing an abstract trait).
+	 *                    Default = None = Writing a concrete (standard) class.
+	 * @param codec        Implicit codec used when writing the file
 	  * @param setup        Target project -specific setup (implicit)
-	  * @return Reference to the generated class. Failure if writing failed.
+	  * @return Reference to the generated models / factory class / trait. Failure if writing failed.
 	  */
 	def apply(classToWrite: Class, modelRefs: ClassModelReferences,
-	          tablesRef: Reference)
+	          tablesRef: Reference, dbPropsData: Option[(Pair[Reference], String)])
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// TODO: Utilize the new methods instead
+		val storablePackage = setup.dbModelPackage / classToWrite.packageName
 		
-		val parentPackage = setup.dbModelPackage / classToWrite.packageName
-		val className = (classToWrite.name + modelSuffix).className
-		val classType = ScalaType.basic(className)
-		val deprecation = DeprecationStyle.of(classToWrite)
-		
-		val optionalIdType = classToWrite.idType.optional
-		
-		// Contains the following properties:
-		//      1) An id property
-		//      2) Properties for each class property
-		//      3) A table property
-		//      4) Deprecation property (optional)
-		val propertiesBuilder = new VectorBuilder[PropertyDeclaration]()
-		propertiesBuilder += LazyValue("id", Set(vault.dbProp),
-			description = s"Property that acts as the primary ${ classToWrite.name } row index")(
-			s"DbPropertyDeclaration(${classToWrite.idDatabasePropName.quoted}, index)")
-		propertiesBuilder ++= classToWrite.dbProperties
-			.map { prop =>
-				LazyValue(prop.name.prop,
-					description = s"Property that contains ${ classToWrite.name.doc } ${ prop.name.doc }")(
-					s"property(${ prop.modelName.quoted })")
-			}
-		propertiesBuilder += ComputedProperty("table", Set(tablesRef), isOverridden = true)(
-			s"${ tablesRef.target }.${ classToWrite.name.prop }")
-		propertiesBuilder ++= deprecation.iterator.flatMap { _.properties }
-		
-		// Converts each property to the "intermediate" state
-		val applyParametersCode = ("None" +: classToWrite.properties.flatMap { prop =>
-			val propAccessCode = s"data.${prop.name.prop}"
-			prop.dataType.sqlConversions
-				.map { conversion => conversion.midConversion(propAccessCode) }
-		}).mkString(", ")
-		
-		// The generated file contains the model class and the associated companion object
-		File(parentPackage,
-			ObjectDeclaration(className,
-				factoryExtensionsFor(className, modelRefs, deprecation),
-				// Contains an access property for each property, as well as a table -property
-				properties = propertiesBuilder.result(),
-				// Implements .apply(...) and .complete(id, data)
-				methods = Set(
-					MethodDeclaration("apply", isOverridden = true)(Parameter("data", modelRefs.data))(
-						s"apply($applyParametersCode)"),
-					MethodDeclaration("complete", Set(modelRefs.stored), visibility = Protected, isOverridden = true)(
-						Vector(Parameter("id", flow.value), Parameter("data", modelRefs.data)))(
-						s"${ modelRefs.stored.target }(id.get${ if (classToWrite.useLongId) "Long" else "Int" }, data)"),
-					withIdMethod(classToWrite, "apply")
-					// Also includes withX(...) methods for each property
-				) ++ classToWrite.properties.flatMap { withPropertyMethods(_) } ++
-					deprecation.iterator.flatMap { _.methods },
-				description = s"Used for constructing $className instances and for inserting ${
-					classToWrite.name.pluralDoc
-				} to the database", author = classToWrite.author, since = DeclarationDate.versionedToday
-			),
-			ClassDeclaration(className,
-				// Accepts a copy of all properties where each appears in the "intermediate "(db property) state
-				constructionParams = Parameter("id", optionalIdType.toScala, optionalIdType.emptyValue,
-					description = s"${ classToWrite.name.doc } database id") +:
-					classToWrite.dbProperties.map { prop =>
-						val inputType = prop.conversion.intermediate
-						val defaultValue = inputType.emptyValue
-						Parameter(prop.name.prop, inputType.scalaType, defaultValue)
-					}.toVector,
-				// Extends Storable with the factory traits
-				extensions = Vector(storable, modelRefs.factory(classType), fromIdFactory(ScalaType.int, classType)),
-				// Implements the required properties: factory & valueProperties
-				properties = Vector(
-					ComputedProperty("table", isOverridden = true)(s"$className.table"),
-					valuePropertiesPropertyFor(classToWrite, className)
-				),
-				// adds withX(...) -methods for convenience
-				methods = classToWrite.properties.flatMap { withPropertyMethods(_, "copy",
-					"A new copy of this model with the specified ") }.toSet +
-					MethodDeclaration("withId", isOverridden = true)(
-						Parameter("id", classToWrite.idType.toScala))("copy(id = Some(id))"),
-				description = s"Used for interacting with ${ classToWrite.name.plural } in the database",
-				author = classToWrite.author, since = DeclarationDate.versionedToday, isCaseClass = true)
-		).write()
+		// The implementation differs greatly between abstract traits and concrete classes
+		dbPropsData match {
+			// Case: Writing an abstract trait => Writes multiple traits
+			case Some((Pair(dbPropsRef, dbPropsWrapperRef), dbPropsName)) =>
+				// Writes XModelLike
+				writeModelLike(classToWrite, storablePackage, modelRefs, dbPropsRef)
+					.flatMap { case (modelLikeRef, buildCopy) =>
+						// Writes XModel
+						writeModelTrait(classToWrite, storablePackage, modelLikeRef, dbPropsRef)
+							.flatMap { dbModelTraitRef =>
+								// Writes XModelFactoryLike
+								writeModelFactoryLike(classToWrite, storablePackage, modelRefs.factory)
+									.flatMap { factoryLikeRef =>
+										// Writes XModelFactory
+										// TODO: Consider which reference(s) to return
+										writeModelFactory(classToWrite, storablePackage, modelRefs, tablesRef,
+											dbPropsRef, dbPropsWrapperRef, factoryLikeRef, dbModelTraitRef,
+											dbPropsName, buildCopy)
+									}
+							}
+					}
+			// Case: Writing a concrete class
+			//       => Writes the XModel case class and its companion object, which functions as a XModelFactory
+			case None =>
+				val className = (classToWrite.name + modelSuffix).className
+				val classType = ScalaType.basic(className)
+				val (classDeclaration, applyParams) = modelClassDeclarationFor(classToWrite, classType, modelRefs)
+				val objectDeclaration = concreteFactoryFor(classToWrite, className, classType, applyParams,
+					modelRefs, tablesRef)
+				
+				File(storablePackage, objectDeclaration, classDeclaration).write()
+		}
 	}
 	
 	// Writes XModelLike trait used with generic traits
+	// Returns a reference + buildCopy function
 	private def writeModelLike(classToWrite: Class, storablePackage: Package,
 	                           modelRefs: ClassModelReferences, dbPropsRef: Reference)
 	                          (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
@@ -240,7 +199,8 @@ object DbModelWriter
 	
 	private def writeModelFactory(classToWrite: Class, storablePackage: Package, modelRefs: ClassModelReferences,
 	                              tablesRef: Reference, dbPropsRef: Reference, dbPropsWrapperRef: Reference,
-	                              factoryLikeRef: Reference, dbModelRef: Reference, buildCopy: MethodDeclaration)
+	                              factoryLikeRef: Reference, dbModelRef: Reference, dbPropsName: String,
+	                              buildCopy: MethodDeclaration)
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Contains multiple elements:
@@ -262,7 +222,7 @@ object DbModelWriter
 			modelRefs, Some(Pair(ScalaType.referenceToType(dbPropsRef), ScalaType.basic(traitName)) -> buildCopy))
 		val concreteFactoryName = s"_$traitName"
 		val concreteFactory = concreteFactoryFor(classToWrite, concreteFactoryName, dbModelRef, applyParams, modelRefs,
-			tablesRef, Some(Pair(dbPropsRef, dbPropsWrapperRef)))
+			tablesRef, Some(Pair(dbPropsRef, dbPropsWrapperRef) -> dbPropsName))
 		
 		val companionObject = ObjectDeclaration(
 			name = traitName,
@@ -283,7 +243,7 @@ object DbModelWriter
 	private def concreteFactoryFor(classToWrite: Class, factoryName: String, modelClassType: ScalaType,
 	                               modelApplyParams: Parameters,
 	                               modelRefs: ClassModelReferences, tablesRef: Reference,
-	                               dbPropsAndWrapperRef: Option[Pair[Reference]])
+	                               dbPropsData: Option[(Pair[Reference], String)] = None)
 	                              (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Prepares the object data
@@ -311,13 +271,13 @@ object DbModelWriter
 		val withMethods = classToWrite.properties.flatMap { withPropertyMethods(_) }
 		
 		// Certain properties differ between concrete classes and abstract traits
-		val (constructionParams, customExtensions, customProps, customMethods) = dbPropsAndWrapperRef match {
+		val (constructionParams, customExtensions, customProps, customMethods) = dbPropsData match {
 			// Case: Extension if a generic trait => Needs to accept the missing properties as parameters
 			//                                       and to implement a custom apply function
-			case Some(Pair(dbPropsRef, dbPropsWrapperRef)) =>
+			case Some((Pair(dbPropsRef, dbPropsWrapperRef), dbPropsName)) =>
 				val params = Pair(
 					Parameter("table", table, description = "Table targeted by these models"),
-					Parameter("dbProps", dbPropsRef,
+					Parameter(dbPropsName, dbPropsRef,
 						description = "Properties which specify how the database interactions are performed")
 				)
 				// Extends the XModelFactory trait (which contains this concrete implementation)
@@ -327,7 +287,7 @@ object DbModelWriter
 				val applyMethod = MethodDeclaration("apply", explicitOutputType = Some(modelClassType),
 					returnDescription = s"Constructs a new ${
 						classToWrite.name } database model with the specified properties")(modelApplyParams)(
-					s"$modelClassType(table, dbProps, ${ modelApplyParams.lists.flatten.map { _.name }.mkString(", ") })")
+					s"$modelClassType(table, $dbPropsName, ${ modelApplyParams.lists.flatten.map { _.name }.mkString(", ") })")
 				
 				(params, Pair[Extension](factory, dbPropsWrapperRef), Empty, Single(applyMethod))
 				
@@ -384,7 +344,7 @@ object DbModelWriter
 	}
 	
 	private def modelClassDeclarationFor(classToWrite: Class, reprType: ScalaType, modelRefs: ClassModelReferences,
-	                                     dbPropsAndModelTypesAndBuildCopy: Option[(Pair[ScalaType], MethodDeclaration)])
+	                                     dbPropsAndModelTypesAndBuildCopy: Option[(Pair[ScalaType], MethodDeclaration)] = None)
 	                                    (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Prepares class data

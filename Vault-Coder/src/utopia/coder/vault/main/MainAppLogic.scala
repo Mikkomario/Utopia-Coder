@@ -284,37 +284,46 @@ object MainAppLogic extends CoderAppLogic
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
 		ModelWriter(classToWrite).flatMap { modelRefs =>
-			DbModelWriter(classToWrite, modelRefs, tablesRef)
-				.flatMap { dbModelRef =>
-					DbFactoryWriter(classToWrite, modelRefs, dbModelRef).flatMap { dbFactoryRef =>
-						// Adds description-specific references if applicable
-						(descriptionLinkObjects match {
-							// Case: At least one class uses descriptions
-							case Some((linkModels, _, linkedDescriptionFactories)) =>
-								classToWrite.descriptionLinkClass match {
-									case Some(descriptionLinkClass) =>
-										DescribedModelWriter(classToWrite, modelRefs.stored).flatMap { describedRef =>
-											DbDescriptionAccessWriter(descriptionLinkClass,
-												classToWrite.name, linkModels, linkedDescriptionFactories)
-												.map { case (singleAccessRef, manyAccessRef) =>
-													Some(describedRef, singleAccessRef, manyAccessRef)
+			val dbPropsRefs = {
+				if (classToWrite.isGeneric)
+					DbConfigWriter(classToWrite).map { Some(_) }
+				else
+					Success(None)
+			}
+			dbPropsRefs.flatMap { dbPropsRefs =>
+				DbModelWriter(classToWrite, modelRefs, tablesRef, dbPropsRefs)
+					.flatMap { dbModelRef =>
+						DbFactoryWriter(classToWrite, modelRefs, dbModelRef).flatMap { dbFactoryRef =>
+							// Adds description-specific references if applicable
+							(descriptionLinkObjects match {
+								// Case: At least one class uses descriptions
+								case Some((linkModels, _, linkedDescriptionFactories)) =>
+									classToWrite.descriptionLinkClass match {
+										case Some(descriptionLinkClass) =>
+											DescribedModelWriter(classToWrite, modelRefs.stored)
+												.flatMap { describedRef =>
+													DbDescriptionAccessWriter(descriptionLinkClass,
+														classToWrite.name, linkModels, linkedDescriptionFactories)
+														.map { case (singleAccessRef, manyAccessRef) =>
+															Some(describedRef, singleAccessRef, manyAccessRef)
+														}
 												}
-										}
-									case None => Success(None)
-								}
-							// Case: No classes use descriptions => automatically succeeds
-							case None => Success(None)
-						}).flatMap { descriptionReferences =>
-							// Finally writes the access points
-							AccessWriter(classToWrite, modelRefs.stored, dbFactoryRef, dbModelRef,
-								descriptionReferences)
-								.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
-									classToWrite -> ClassReferences(modelRefs,
-										dbFactoryRef, dbModelRef, genericUniqueAccessRef, genericManyAccessRef)
-								}
+										case None => Success(None)
+									}
+								// Case: No classes use descriptions => automatically succeeds
+								case None => Success(None)
+							}).flatMap { descriptionReferences =>
+								// Finally writes the access points
+								AccessWriter(classToWrite, modelRefs.stored, dbFactoryRef, dbModelRef,
+									descriptionReferences)
+									.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
+										classToWrite -> ClassReferences(modelRefs,
+											dbFactoryRef, dbModelRef, genericUniqueAccessRef, genericManyAccessRef)
+									}
+							}
 						}
 					}
-				}
+			}
 		}
 	}
 	
