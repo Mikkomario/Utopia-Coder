@@ -115,4 +115,11 @@ trait SqlTypeConversion
 		SqlTypeConversion(origin, intermediate,
 			target.copy(defaultValue = defaultValue, columnNameSuffix = columnNameSuffix,
 				indexByDefault = indexByDefault))(midConversion)
+	
+	/**
+	 * @param suffix Suffix to add at the end of the column name generated in this conversion
+	 * @return Copy of this conversion with the specified suffix-addition included
+	 */
+	def withAdditionalColumnNameSuffix(suffix: String) =
+		modifyTarget(columnNameSuffix = s"${ target.columnNameSuffix }$suffix")
 }

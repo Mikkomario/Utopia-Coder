@@ -209,6 +209,9 @@ Each property object should contain following properties:
       - `m / min / minute / minutes` - Stores as minutes (int)
       - `s / second / seconds` - Stores as seconds (int)
       - `ms` - Stores as milliseconds (bigint, default)
+  - `"Velocity[X]"` - Results in LinearVelocity type (default name: `"velocity"`)
+    - `X` works similarly as with Duration above, determining how the velocity is stored in the database. 
+      - E.g. Specifying seconds (which is the default) causes the velocity to be stored in distance per second.
   - `"creation" / "created"` - Results in **Instant** / Timestamp type and is used as the row creation time 
     (default name: `"created"`)
     - Enables creation time -based indexing (if indexed)
