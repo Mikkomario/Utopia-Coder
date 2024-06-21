@@ -37,7 +37,7 @@ object Class
 	          comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	          description: String = "", author: String = "", useLongId: Boolean = false,
 	          writeGenericAccess: Boolean = false, isGeneric: Boolean = false): Class =
-		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None,
+		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None, Empty,
 			description, author, useLongId, writeGenericAccess, isGeneric)
 	
 	/**
@@ -66,7 +66,7 @@ object Class
 	              useLongId: Boolean = false, writeGenericAccess: Boolean = false, isGeneric: Boolean = false): Class =
 	{
 		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames,
-			Some[Name](descriptionLinkName.getOrElse { name + "id" }), description, author, useLongId,
+			Some[Name](descriptionLinkName.getOrElse { name + "id" }), Empty, description, author, useLongId,
 			writeGenericAccess, isGeneric)
 	}
 }
@@ -94,8 +94,8 @@ object Class
 // TODO: customTableName should be Option[Name]
 case class Class(name: Name, customTableName: Option[String], idName: Name, properties: Seq[Property],
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
-                 descriptionLinkName: Option[Name], description: String, author: String, useLongId: Boolean,
-                 writeGenericAccess: Boolean, isGeneric: Boolean)
+                 descriptionLinkName: Option[Name], extensions: Seq[Class], description: String, author: String,
+                 useLongId: Boolean, writeGenericAccess: Boolean, isGeneric: Boolean)
 {
 	// ATTRIBUTES   ---------------------------------
 	
@@ -214,4 +214,10 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 	  */
 	def idDatabasePropName(implicit naming: NamingRules) =
 		naming(DbModelPropName).convert(idName.column, naming(ColumnName))
+	
+	/**
+	 * @param newExtensions New extensions to assign to this class
+	 * @return Copy of this class with the specified extensions added
+	 */
+	def extending(newExtensions: IterableOnce[Class]) = copy(extensions = extensions ++ newExtensions)
 }

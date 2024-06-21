@@ -28,6 +28,7 @@ import utopia.coder.model.scala.code.CodePiece
 import utopia.flow.collection.immutable.Empty
 
 import java.nio.file.Path
+import scala.annotation.tailrec
 import scala.util.{Failure, Success, Try}
 
 /**
@@ -94,6 +95,11 @@ object ClassReader
 			
 			// Expects the classes property to contain an object where keys are package names and values are
 			// either references to other files or arrays containing class objects
+			// Each entry in 'classData' contains 4 values:
+			//      1) Read class
+			//      2) Unfinished combination data (0-n)
+			//      3) Class instances (0-n)
+			//      4) Class parent names (0-n)
 			val classData = root("classes").getModel.properties.flatMap { packageAtt =>
 				packageAtt.value.castTo(VectorType, StringType) match {
 					// Case: Class object array input => Parses the objects
@@ -118,19 +124,21 @@ object ClassReader
 										error.printStackTrace()
 										println(s"Failed to parse the json file referred as package ${
 											packageAtt.name}, pointing to file ${referencedPath.absolute}")
-										Vector.empty
+										Empty
 								}
 							// Case: File not found => Prints a warning
 							case None =>
 								println(s"Warning: $subPath for package ${
 									packageAtt.name} is not a valid reference from ${path.parent.absolute}")
-								Vector.empty
+								Empty
 						}
 				}
 			}
-			val classes = classData.map { _._1 }
+			// Compiles the full class hierarchy
+			val classes = compileClassHierarchy(classData.map { case (c, _, _, parentNames) => c -> parentNames })
+			
 			// Processes the proposed combinations
-			val combinations = classData.flatMap { case (parentClass, combos, _) =>
+			val combinations = classData.flatMap { case (parentClass, combos, _, _) =>
 				combos.flatMap { combo =>
 					// Finds the child class (child name match)
 					classes.find { c => c.name.variants.exists { _ ~== combo.childName } }.map { childClass =>
@@ -212,6 +220,53 @@ object ClassReader
 				Mutability.forIsMutable(root("mutable_props", "mutable").getBoolean),
 				!root("models_without_vault").getBoolean, root("prefix_columns").getBoolean)
 		}
+	}
+	
+	private def compileClassHierarchy(classesToResolve: Seq[(Class, Seq[String])])
+	                                 (implicit naming: NamingRules): Seq[Class] =
+	{
+		// Checks which classes have references that need to be resolved
+		val (needResolving, availableParents) = classesToResolve.divideWith { case (classToResolve, parentNames) =>
+			if (parentNames.isEmpty)
+				Right(classToResolve.name.className -> classToResolve)
+			else
+				Left(classToResolve -> parentNames)
+		}
+		// Case: No class references exist => No resolving required
+		if (needResolving.isEmpty)
+			classesToResolve.map { _._1 }
+		// Case: Class references need resolving => Resolves missing references
+		else
+			compileClassHierarchy(needResolving, availableParents.toMap)
+	}
+	
+	@tailrec
+	private def compileClassHierarchy(unresolvedClasses: Iterable[(Class, Seq[String])],
+	                                  availableParents: Map[String, Class])
+	                                 (implicit naming: NamingRules): Seq[Class] =
+	{
+		// Attempts to resolve all the unresolved cases by matching with available parent classes
+		val (remainsUnresolved, resolved) = unresolvedClasses.divideWith { case (classToResolve, parentNames) =>
+			parentNames.findForAll(availableParents.get) match {
+				case Some(parents) => Right(classToResolve.extending(parents))
+				case None => Left(classToResolve -> parentNames)
+			}
+		}
+		
+		// Case: All resolved => Returns
+		if (remainsUnresolved.isEmpty)
+			resolved ++ availableParents.valuesIterator
+		// Case: Resolve failed => Logs a warning and returns without resolving the classes
+		else if (resolved.isEmpty) {
+			println(s"Failed to resolve ${ remainsUnresolved.size } class extension references:")
+			remainsUnresolved.foreach { case (classToResolve, parentNames) =>
+				println(s"\t- ${ classToResolve.name.className } extends ${ parentNames.mkString(" with ") }")
+			}
+			availableParents.valuesIterator.toVector ++ unresolvedClasses.view.map { _._1 }
+		}
+		// Case: Some classes remain unresolved => Performs another iteration
+		else
+			compileClassHierarchy(remainsUnresolved, availableParents ++ resolved.map { c => c.name.className -> c })
 	}
 	
 	private def enumsFrom(root: Model, enumPackage: Package, author: String)(implicit namingRules: NamingRules) = {
@@ -342,21 +397,26 @@ object ClassReader
 		}
 		
 		val readClass = new Class(name, tableName.map { _.table }, idName.getOrElse(Class.defaultIdName),
-			properties, packageName, classModel("access_package", "sub_package", "access").getString, comboIndexColumnNames,
-			descriptionLinkColumnName, classModel("doc").getString, classModel("author").stringOr(defaultAuthor),
+			properties, packageName, classModel("access_package", "sub_package", "access").getString,
+			comboIndexColumnNames, descriptionLinkColumnName,
+			// Doesn't add extensions at this point. These are inserted later.
+			extensions = Empty,
+			description = classModel("doc").getString,
+			author = classModel("author").stringOr(defaultAuthor),
 			useLongId = classModel("use_long_id").getBoolean,
 			// Writes generic access point if this class has combinations, or if explicitly specified
 			writeGenericAccess = classModel("has_combos", "generic_access", "tree_inheritance")
 				.booleanOr(comboInfo.nonEmpty),
 			isGeneric = classModel("is_generic", "generic", "is_trait", "trait").getBoolean)
 		
-		// Also parses class instances if they are present
+		// Parses class instances if they are present
 		val instances = classModel("instance").model match {
 			case Some(instanceModel) => Vector(instanceFrom(instanceModel, readClass))
 			case None => classModel("instances").getVector.flatMap { _.model }.map { instanceFrom(_, readClass) }
 		}
 		
-		(readClass, comboInfo, instances)
+		// Includes referred parent class names in the return value
+		(readClass, comboInfo, instances, classModel("extends", "parent", "parents").getVector.flatMap { _.string })
 	}
 	
 	private def propertyFrom(propModel: Model, enumerations: Iterable[Enum], className: Name,
