@@ -99,7 +99,7 @@ object AccessWriter
 		
 		writeSingleAccesses(classToWrite, modelRef, descriptionReferences, modelProperty, factoryProperty,
 			deprecationMethods.map { _.first }, rootViewExtension)
-			.flatMap { case (_, uniqueAccessLikeRef) =>
+			.flatMap { uniqueAccessLikeRef =>
 				writeManyAccesses(classToWrite, modelRef, descriptionReferences, modelProperty, factoryProperty,
 					deprecationMethods.map { _.second })
 					.map { uniqueAccessLikeRef -> _ }
@@ -118,7 +118,7 @@ object AccessWriter
 	  * @param codec Implicit codec to use
 	  * @param setup Implicit project setup to use
 	  * @param naming Implicit naming rules to use
-	  * @return Reference to the many combo items root access point
+	  * @return Success or a failure
 	  */
 	def writeComboAccessPoints(combo: CombinationData, genericUniqueAccessRef: Reference,
 	                           genericManyAccessRef: Reference, modelRef: Reference,
@@ -129,12 +129,14 @@ object AccessWriter
 		writeManyComboAccesses(combo, genericManyAccessRef, modelRef, factoryRef, childDbModelRef)
 			.flatMap { manyRootRef =>
 				writeSingleComboAccesses(combo, genericUniqueAccessRef, modelRef, factoryRef,
-					parentDbModelRef, childDbModelRef).map { _ -> manyRootRef }
+					parentDbModelRef, childDbModelRef)
+					// Doesn't return any references
+					.map { _ => () }
 			}
 	}
 	
 	// Writes all single item access points
-	// Returns Try[(SingleRootAccessRef, UniqueAccessLikeRef)]
+	// Returns Try[Option[UniqueAccessLikeRef]]
 	private def writeSingleAccesses(classToWrite: Class, modelRef: Reference,
 	                                descriptionReferences: Option[(Reference, Reference, Reference)],
 	                                modelProperty: PropertyDeclaration, factoryProperty: PropertyDeclaration,
@@ -142,16 +144,23 @@ object AccessWriter
 	                               (implicit naming: NamingRules, codec: Codec, setup: VaultProjectSetup) =
 	{
 		val singleAccessPackage = singleAccessPackageFor(classToWrite)
+		// Writes UniqueXAccess trait, plus possibly UniqueXAccessLike
 		writeUniqueAccess(classToWrite, modelRef, singleAccessPackage, modelProperty, factoryProperty, deprecationMethod)
 			.flatMap { case (genericUniqueTraitRef, uniqueAccessRef) =>
-				writeSingleIdAccess(classToWrite, modelRef, uniqueAccessRef, descriptionReferences, singleAccessPackage)
-					.flatMap { singleIdAccessRef =>
-						writeSingleRootAccess(classToWrite.name, classToWrite.idType, modelRef,
-							singleRowModelAccess, uniqueAccessRef, singleIdAccessRef, singleAccessPackage,
-							Pair(modelProperty, factoryProperty), rootViewExtension, classToWrite.author,
-							isDeprecatable = classToWrite.isDeprecatable)
-							.map { _ -> genericUniqueTraitRef }
-					}
+				// For generic traits, stops after writing the abstract traits
+				if (classToWrite.isGeneric)
+					Success(genericUniqueTraitRef)
+				// For concrete classes, writes SingleXAccess and DbX (the root access)
+				else
+					writeSingleIdAccess(classToWrite, modelRef, uniqueAccessRef, descriptionReferences,
+						singleAccessPackage)
+						.flatMap { singleIdAccessRef =>
+							writeSingleRootAccess(classToWrite.name, classToWrite.idType, modelRef,
+								singleRowModelAccess, uniqueAccessRef, singleIdAccessRef, singleAccessPackage,
+								Pair(modelProperty, factoryProperty), rootViewExtension, classToWrite.author,
+								isDeprecatable = classToWrite.isDeprecatable)
+								.map { _ => genericUniqueTraitRef }
+						}
 			}
 	}
 	
@@ -202,7 +211,8 @@ object AccessWriter
 					(combo.childName +: pName).prop
 				}
 		}
-		File(singleAccessPackage,
+		
+		val traitWriteResult = File(singleAccessPackage,
 			accessCompanionObject(uniqueAccessType, subViewName),
 			TraitDeclaration(uniqueAccessName,
 				extensions = uniqueTraitParents,
@@ -211,47 +221,53 @@ object AccessWriter
 				description = s"A common trait for access points that return distinct ${ combo.name.pluralDoc }",
 				author = combo.author, since = DeclarationDate.versionedToday
 			)
-		).write().flatMap { uniqueRef =>
-			// Writes the single id access -class
-			val idType = combo.parentClass.idType
-			val (idAccessParentRef, idAccessParentProps) = {
-				// TODO: WET WET (from writeSingleIdAccess)
-				if (combo.parentClass.useLongId) {
-					val idValueCode = idType.toValueCode("id")
-					Extension(singleIdModelAccess(combinedModelRef)) -> Vector(
-						ComputedProperty("idValue", idValueCode.references, isOverridden = true)(idValueCode.text))
-				}
-				else
-					Extension(singleIntIdModelAccess(combinedModelRef)) -> Empty
-			}
-			File(singleAccessPackage,
-				ClassDeclaration(singleIdAccessNameFor(combo.name),
-					constructionParams = Single(Parameter("id", idType.toScala)),
-					extensions = Pair(uniqueRef, idAccessParentRef),
-					properties = idAccessParentProps,
-					description = s"An access point to individual ${ combo.name.pluralDoc }, based on their ${
-						combo.parentName.doc } id",
-					author = combo.author, since = DeclarationDate.versionedToday, isCaseClass = true
-				)
-			).write().flatMap { singleIdAccessRef =>
-				// Writes the root access object
-				val rootParent: Extension = {
-					if (combo.isDeprecatable)
-						nonDeprecatedView(combinedModelRef)
+		).write()
+		
+		// For non-generic classes, writes the concrete access points, also
+		if (combo.parentClass.isGeneric)
+			traitWriteResult
+		else
+			traitWriteResult.flatMap { uniqueRef =>
+				// Writes the single id access -class
+				val idType = combo.parentClass.idType
+				val (idAccessParentRef, idAccessParentProps) = {
+					// TODO: WET WET (from writeSingleIdAccess)
+					if (combo.parentClass.useLongId) {
+						val idValueCode = idType.toValueCode("id")
+						Extension(singleIdModelAccess(combinedModelRef)) -> Vector(
+							ComputedProperty("idValue", idValueCode.references, isOverridden = true)(idValueCode.text))
+					}
 					else
-						unconditionalView
+						Extension(singleIntIdModelAccess(combinedModelRef)) -> Empty
 				}
-				writeSingleRootAccess(combo.name, idType, combinedModelRef,
-					if (combo.combinationType.isOneToMany) singleModelAccess else singleRowModelAccess,
-					uniqueRef, singleIdAccessRef, singleAccessPackage,
-					Vector(factoryProp,
-						ComputedProperty("model", Set(parentDbModelRef), visibility = Protected,
-							description = s"A database model (factory) used for interacting with linked ${
-								combo.parentName.pluralDoc }")(parentDbModelRef.target),
-						childModelProp),
-					rootParent, combo.author, isDeprecatable = deprecationParent.isDefined)
+				File(singleAccessPackage,
+					ClassDeclaration(singleIdAccessNameFor(combo.name),
+						constructionParams = Single(Parameter("id", idType.toScala)),
+						extensions = Pair(uniqueRef, idAccessParentRef),
+						properties = idAccessParentProps,
+						description = s"An access point to individual ${ combo.name.pluralDoc }, based on their ${
+							combo.parentName.doc } id",
+						author = combo.author, since = DeclarationDate.versionedToday, isCaseClass = true
+					)
+				).write().flatMap { singleIdAccessRef =>
+					// Writes the root access object
+					val rootParent: Extension = {
+						if (combo.isDeprecatable)
+							nonDeprecatedView(combinedModelRef)
+						else
+							unconditionalView
+					}
+					writeSingleRootAccess(combo.name, idType, combinedModelRef,
+						if (combo.combinationType.isOneToMany) singleModelAccess else singleRowModelAccess,
+						uniqueRef, singleIdAccessRef, singleAccessPackage,
+						Vector(factoryProp,
+							ComputedProperty("model", Set(parentDbModelRef), visibility = Protected,
+								description = s"A database model (factory) used for interacting with linked ${
+									combo.parentName.pluralDoc }")(parentDbModelRef.target),
+							childModelProp),
+						rootParent, combo.author, isDeprecatable = deprecationParent.isDefined)
+				}
 			}
-		}
 	}
 	
 	// Returns the more generic reference and then less generic reference
@@ -275,7 +291,7 @@ object AccessWriter
 		
 		// Writes the more generic trait version (-Like) first, if one is requested
 		val parentRef = {
-			if (classToWrite.writeGenericAccess) {
+			if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
 				val item = GenericType.covariant("A")
 				val itemType = item.toScalaType
 				val repr = GenericType.covariant("Repr")
@@ -437,7 +453,7 @@ object AccessWriter
 	}
 	
 	// Writes all access points which access multiple items at a time
-	// Returns Try[ManyAccessLikeRef]
+	// Returns Try[Option[ManyAccessLikeRef]]
 	private def writeManyAccesses(classToWrite: Class, modelRef: Reference,
 	                              descriptionReferences: Option[(Reference, Reference, Reference)],
 	                              modelProperty: PropertyDeclaration, factoryProperty: PropertyDeclaration,
@@ -445,13 +461,18 @@ object AccessWriter
 	                             (implicit naming: NamingRules, codec: Codec, setup: VaultProjectSetup) =
 	{
 		val manyAccessPackage = manyAccessPackageFor(classToWrite)
+		// Writes ManyXAccess and possibly ManyXAccessLike
 		writeManyAccessTrait(classToWrite, modelRef, descriptionReferences, manyAccessPackage, modelProperty,
 			factoryProperty, deprecationMethod)
 			.flatMap { case (genericManyAccessTraitRef, manyAccessTraitRef) =>
-				writeManyRootAccess(classToWrite.name, modelRef, manyAccessTraitRef, descriptionReferences,
-					manyAccessPackage, classToWrite.author, classToWrite.isDeprecatable)
-					// Returns only the most generic trait, since that's the only one being used later
-					.map { _ => genericManyAccessTraitRef }
+				// If the class is a generic trait, won't generate the concrete root access point
+				if (classToWrite.isGeneric)
+					Success(genericManyAccessTraitRef)
+				else
+					writeManyRootAccess(classToWrite.name, modelRef, manyAccessTraitRef, descriptionReferences,
+						manyAccessPackage, classToWrite.author, classToWrite.isDeprecatable)
+						// Returns only the most generic trait, since that's the only one being used later
+						.map { _ => genericManyAccessTraitRef }
 			}
 	}
 	
@@ -473,7 +494,8 @@ object AccessWriter
 			visibility = Protected,
 			description = s"Model (factory) used for interacting the ${
 				combo.childClass.name.pluralDoc } associated with this ${ combo.name.doc }")(childDbModelRef.target)
-		File(packageName,
+		
+		val traitWriteResult = File(packageName,
 			// Writes a private subAccess trait for filter(...) implementation
 			accessCompanionObject(traitType, "SubAccess"),
 			// Writes the common trait for all many combined access points
@@ -491,11 +513,17 @@ object AccessWriter
 				description = s"A common trait for access points that return multiple ${ combo.name.pluralDoc } at a time",
 				author = combo.author
 			)
-		).write().flatMap { traitRef =>
-			// Next writes the root access point
-			writeManyRootAccess(combo.name, modelRef, traitRef, None, packageName, combo.author,
-				isDeprecatable = combo.isDeprecatable)
-		}
+		).write()
+		
+		// For non-generic classes, writes the root access as well
+		if (combo.parentClass.isGeneric)
+			traitWriteResult
+		else
+			traitWriteResult.flatMap { traitRef =>
+				// Next writes the root access point
+				writeManyRootAccess(combo.name, modelRef, traitRef, None, packageName, combo.author,
+					isDeprecatable = combo.isDeprecatable)
+			}
 	}
 	
 	// Writes a trait common for the many model access points
@@ -524,7 +552,7 @@ object AccessWriter
 		
 		// Writes the more generic trait version (-Like) first, if one is requested
 		val parentRef = {
-			if (classToWrite.writeGenericAccess) {
+			if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
 				val item = GenericType.covariant("A")
 				val repr = GenericType.covariant("Repr")
 				
