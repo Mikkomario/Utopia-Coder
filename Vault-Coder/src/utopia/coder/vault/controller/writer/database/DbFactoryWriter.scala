@@ -45,7 +45,9 @@ object DbFactoryWriter
 	  * @param dbModelRef   Reference to the database model class
 	  * @param codec        Implicit codec to use when writing the document
 	  * @param setup        Implicit project-specific setup
-	  * @return Reference to the new written factory object. Failure if writing failed.
+	  * @return Reference to the new written factory object.
+	 *         Followed by a reference to the generated XDbFactoryLike trait, if applicable.
+	 *         Failure if writing failed.
 	  */
 	def apply(classToWrite: Class, modelRefs: ClassModelReferences, dbModelRef: Reference,
 	          dbPropsRef: Option[Reference] = None)
@@ -132,7 +134,7 @@ object DbFactoryWriter
 						nested = Set(concreteFactoryImplementation)
 					)
 					
-					File(factoryPackage, companionObject, traitDeclaration).write()
+					File(factoryPackage, companionObject, traitDeclaration).write().map { _ -> Some(factoryLikeRef) }
 				}
 			
 			// Case: Concrete factory => Just implements the XDbFactory object
@@ -144,7 +146,7 @@ object DbFactoryWriter
 						description = s"Used for reading ${ classToWrite.name.doc } data from the DB",
 						author = classToWrite.author, since = DeclarationDate.versionedToday
 					)
-				).write()
+				).write().map { _ -> None }
 		}
 	}
 	

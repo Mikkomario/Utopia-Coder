@@ -20,7 +20,7 @@ import scala.io.Codec
  * @author Mikko Hilpinen
  * @since 14.06.2024, v1.11
  */
-object DbConfigWriter
+object DbPropsWriter
 {
 	// ATTRIBUTES   -----------------------
 	

@@ -12,7 +12,7 @@ import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDecla
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.controller.writer.database.AccessWriter
-import utopia.coder.vault.model.data.{Class, ClassModelReferences, DbProperty, Property, VaultProjectSetup}
+import utopia.coder.vault.model.data.{Class, ClassModelReferences, DbProperty, GenericClassModelReferences, Property, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
@@ -69,33 +69,35 @@ object ModelWriter
 				// Will contain: 1) XDataLike, 2) XLike and 3) name of the buildCopy function used
 				val traitWriteResult = {
 					if (classToWrite.isGeneric)
-						writeHasProps(classToWrite, dataPackage)
-							.flatMap { hasPropsRef =>
+						writeHasProps(classToWrite, dataPackage).flatMap { hasPropsRef =>
 								writeDataLikeTrait(classToWrite, dataPackage, hasPropsRef, factoryRef)
-							}
-							.flatMap { case (dataLikeRef, buildCopyName) =>
-								writeStoredLike(classToWrite, storePackage, dataLikeRef, factoryWrapperRef)
-									.map { storedLikeRef => Some((dataLikeRef, storedLikeRef, buildCopyName)) }
-							}
+									.flatMap { case (dataLikeRef, buildCopyName) =>
+										writeStoredLike(classToWrite, storePackage, dataLikeRef, factoryWrapperRef)
+											.map { storedLikeRef =>
+												Some(GenericClassModelReferences(
+													hasPropsRef, dataLikeRef, storedLikeRef) -> buildCopyName)
+											}
+									}
+						}
 					else
 						Success(None)
 				}
 				
 				traitWriteResult.flatMap { traitData =>
-					val (dataLikeRef, storedLikeRef, buildCopyName) = traitData match {
-						case Some((dataLikeRef, storedLikeRef, buildCopyName)) =>
-							(Some(dataLikeRef), Some(storedLikeRef), buildCopyName)
-						case None => (None, None, "")
+					val (genericRefs, buildCopyName) = traitData match {
+						case Some((genericRefs, buildCopyName)) => (Some(genericRefs), buildCopyName)
+						case None => (None, "")
 					}
 					// Writes the data class & stored class
-					writeDataClass(classToWrite, dataPackage, factoryRef, dataLikeRef, buildCopyName).flatMap { dataRef =>
-						writeStored(classToWrite, storePackage, factoryWrapperRef, dataRef, storedLikeRef, buildCopyName)
-							.map { storedRef =>
-								// Returns references to generated classes
-								ClassModelReferences(dataRef, storedRef, factoryRef, factoryWrapperRef,
-									traitData.map { case (dataLike, stored, _) => Pair(dataLike, stored) })
-							}
-					}
+					writeDataClass(classToWrite, dataPackage, factoryRef, genericRefs.map { _.dataLike }, buildCopyName)
+						.flatMap { dataRef =>
+							writeStored(classToWrite, storePackage, factoryWrapperRef, dataRef,
+								genericRefs.map { _.storedLike }, buildCopyName)
+								.map { storedRef =>
+									// Returns references to generated classes
+									ClassModelReferences(dataRef, storedRef, factoryRef, factoryWrapperRef, genericRefs)
+								}
+						}
 				}
 			}
 		}

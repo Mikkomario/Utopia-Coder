@@ -9,7 +9,7 @@ import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, Sca
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
-import utopia.coder.vault.model.data.{Class, ClassModelReferences, DbProperty, Property, VaultProjectSetup}
+import utopia.coder.vault.model.data.{Class, ClassModelReferences, DbProperty, GenericDbModelRefs, Property, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
@@ -50,7 +50,9 @@ object DbModelWriter
 	 *                    Default = None = Writing a concrete (standard) class.
 	 * @param codec        Implicit codec used when writing the file
 	  * @param setup        Target project -specific setup (implicit)
-	  * @return Reference to the generated models / factory class / trait. Failure if writing failed.
+	  * @return Success or failure containing either:
+	 *              Right) Reference to the generated XModel class, or
+	 *              Left) References to the various traits generated for generic classes
 	  */
 	def apply(classToWrite: Class, modelRefs: ClassModelReferences,
 	          tablesRef: Reference, dbPropsData: Option[(Pair[Reference], String)])
@@ -72,10 +74,13 @@ object DbModelWriter
 								writeModelFactoryLike(classToWrite, storablePackage, modelRefs.factory)
 									.flatMap { factoryLikeRef =>
 										// Writes XModelFactory
-										// TODO: Consider which reference(s) to return (probably XFactory, as is here)
 										writeModelFactory(classToWrite, storablePackage, modelRefs, tablesRef,
 											dbPropsRef, dbPropsWrapperRef, factoryLikeRef, dbModelTraitRef,
 											dbPropsName, buildCopy)
+											.map { factoryRef =>
+												Left(GenericDbModelRefs(modelLikeRef, factoryLikeRef, dbModelTraitRef,
+													factoryRef))
+											}
 									}
 							}
 					}
@@ -88,7 +93,7 @@ object DbModelWriter
 				val objectDeclaration = concreteFactoryFor(classToWrite, className, classType, applyParams,
 					modelRefs, tablesRef)
 				
-				File(storablePackage, objectDeclaration, classDeclaration).write()
+				File(storablePackage, objectDeclaration, classDeclaration).write().map { Right(_) }
 		}
 	}
 	

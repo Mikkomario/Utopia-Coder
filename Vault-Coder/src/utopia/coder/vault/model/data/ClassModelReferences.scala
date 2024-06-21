@@ -1,7 +1,6 @@
 package utopia.coder.vault.model.data
 
 import utopia.coder.model.scala.datatype.Reference
-import utopia.flow.collection.immutable.Pair
 
 /**
  * Contains references generated for class models & generic traits,
@@ -10,10 +9,9 @@ import utopia.flow.collection.immutable.Pair
  * @param stored Reference to the X class or trait
  * @param factory Reference to the XFactory trait
  * @param factoryWrapper Reference to the XFactoryWrapper trait
- * @param dataAndStoredLike References to 1) XDataLike trait and 2) StoredXLike trait.
- *                             None if no generic traits were written.
+ * @param generic References specific to generic classes. None if this is not a generic class.
  * @author Mikko Hilpinen
  * @since 14.06.2024, v1.11
  */
 case class ClassModelReferences(data: Reference, stored: Reference, factory: Reference, factoryWrapper: Reference,
-                                dataAndStoredLike: Option[Pair[Reference]] = None)
+                                generic: Option[GenericClassModelReferences])

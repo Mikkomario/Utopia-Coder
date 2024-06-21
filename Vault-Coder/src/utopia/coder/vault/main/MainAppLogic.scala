@@ -15,7 +15,7 @@ import utopia.coder.vault.controller.reader
 import utopia.coder.vault.controller.writer.database._
 import utopia.coder.vault.controller.writer.documentation.DocumentationWriter
 import utopia.coder.vault.controller.writer.model.{CombinedModelWriter, DescribedModelWriter, EnumerationWriter, ModelWriter}
-import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, ProjectData, VaultProjectSetup}
+import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, GenericClassReferences, ProjectData, VaultProjectSetup}
 import utopia.coder.vault.model.enumeration.Mutability
 import utopia.coder.vault.util.Common
 import utopia.flow.collection.immutable.{Empty, Pair}
@@ -108,7 +108,7 @@ object MainAppLogic extends CoderAppLogic
 									a.modelCanReferToDB && b.modelCanReferToDB, a.prefixColumnNames && b.prefixColumnNames)
 							}
 						}
-					filterAndWrite(groupedData, targetType, filter.value, outputPath.value, mergeRoots.value.headOption,
+					filterAndWriteProjects(groupedData, targetType, filter.value, outputPath.value, mergeRoots.value.headOption,
 						mergeRoots.value.lift(1), args)
 				case Failure(error) =>
 					error.printStackTrace()
@@ -120,7 +120,7 @@ object MainAppLogic extends CoderAppLogic
 				println(s"Warning: Expect file type is .json. Specified file is of type .${ inputPath.value.fileType }")
 			
 			reader.ClassReader(inputPath.value) match {
-				case Success(data) => filterAndWrite(Some(data), targetType, filter.value, outputPath.value,
+				case Success(data) => filterAndWriteProjects(Some(data), targetType, filter.value, outputPath.value,
 					mergeRoots.value.headOption, mergeRoots.value.lift(1), args)
 				case Failure(error) =>
 					error.printStackTrace()
@@ -133,7 +133,7 @@ object MainAppLogic extends CoderAppLogic
 	
 	// OTHER    -------------------
 	
-	private def filterAndWrite(data: Iterable[ProjectData], targetType: => Int, filter: => Option[Filter],
+	private def filterAndWriteProjects(data: Iterable[ProjectData], targetType: => Int, filter: => Option[Filter],
 	                           outputPath: => Path, mainMergeRoot: => Option[Path],
 	                           alternativeMergeRoot: => Option[Path], arguments: CommandArguments): Boolean =
 	{
@@ -227,7 +227,7 @@ object MainAppLogic extends CoderAppLogic
 						mergePaths, directory/mergeFileName, data.version, data.defaultMutability,
 						data.modelCanReferToDB, data.prefixColumnNames)
 					
-					write(data)
+					writeProjectFiles(data)
 				}
 			}
 		} match {
@@ -241,7 +241,7 @@ object MainAppLogic extends CoderAppLogic
 		}
 	}
 	
-	private def write(data: ProjectData)(implicit setup: VaultProjectSetup, naming: NamingRules): Try[Unit] =
+	private def writeProjectFiles(data: ProjectData)(implicit setup: VaultProjectSetup, naming: NamingRules): Try[Unit] =
 	{
 		def path(fileType: String, parts: String*) = {
 			val fileNameBase = (setup.dbModuleName.inContext(FileName) ++ parts).fileName
@@ -270,7 +270,8 @@ object MainAppLogic extends CoderAppLogic
 			.flatMap { tablesRef =>
 				DescriptionLinkInterfaceWriter(data.classes, tablesRef).flatMap { descriptionLinkObjects =>
 					// Next writes all required documents for each class
-					data.classes.tryMap { write(_, tablesRef, descriptionLinkObjects) }.flatMap { classRefs =>
+					// TODO: Provide references for inheritance (generate in correct order)
+					data.classes.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.flatMap { classRefs =>
 						// Finally writes the combined models
 						val classRefsMap = classRefs.toMap
 						data.combinations.tryForeach { writeCombo(_, classRefsMap) }
@@ -279,49 +280,96 @@ object MainAppLogic extends CoderAppLogic
 			}
 	}
 	
-	private def write(classToWrite: Class, tablesRef: Reference,
+	// TODO: Utilize this above. Pass the classReferenceMap to writeClass
+	private def writeClassesInOrder(classesToWrite: Seq[Class], classReferenceMap: Map[Class, ClassReferences],
+	                                tablesRef: Reference,
+	                                descriptionLinkObjects: Option[(Reference, Reference, Reference)])
+	                               (implicit setup: VaultProjectSetup, naming: NamingRules): Try[Map[Class, ClassReferences]] =
+	{
+		// Checks which classes may be written immediately
+		val (readyClasses, pendingClasses) = classesToWrite
+			.divideBy { _.extensions.forall(classReferenceMap.contains) }.toTuple
+		
+		// Case: All remaining classes may be written => Writes and returns
+		if (pendingClasses.isEmpty)
+			readyClasses.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.map { classReferenceMap ++ _ }
+		// Case: No class may be written => Logs a warning and writes without proper references
+		else if (readyClasses.isEmpty) {
+			println(s"Warning: ${ pendingClasses.size } classes can't resolve their inheritances:")
+			pendingClasses.foreach { c => println(s"\t- ${ c.name.className } extends ${
+				c.extensions.map { _.name.className }.mkString(" with ") }") }
+			
+			pendingClasses.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.map { classReferenceMap ++ _ }
+		}
+		// Case: Some may be written while some can't
+		//       => Writes the immediately available classes and uses recursion to write the rest
+		else
+			readyClasses.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.flatMap { newRefs =>
+				writeClassesInOrder(pendingClasses, classReferenceMap ++ newRefs, tablesRef, descriptionLinkObjects)
+			}
+	}
+	
+	private def writeClass(classToWrite: Class, tablesRef: Reference,
 	          descriptionLinkObjects: Option[(Reference, Reference, Reference)])
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
 		ModelWriter(classToWrite).flatMap { modelRefs =>
 			val dbPropsRefs = {
 				if (classToWrite.isGeneric)
-					DbConfigWriter(classToWrite).map { Some(_) }
+					DbPropsWriter(classToWrite).map { Some(_) }
 				else
 					Success(None)
 			}
 			dbPropsRefs.flatMap { dbPropsRefs =>
 				DbModelWriter(classToWrite, modelRefs, tablesRef, dbPropsRefs)
-					.flatMap { dbModelRef =>
-						DbFactoryWriter(classToWrite, modelRefs, dbModelRef).flatMap { dbFactoryRef =>
-							// Adds description-specific references if applicable
-							(descriptionLinkObjects match {
-								// Case: At least one class uses descriptions
-								case Some((linkModels, _, linkedDescriptionFactories)) =>
-									classToWrite.descriptionLinkClass match {
-										case Some(descriptionLinkClass) =>
-											DescribedModelWriter(classToWrite, modelRefs.stored)
-												.flatMap { describedRef =>
-													DbDescriptionAccessWriter(descriptionLinkClass,
-														classToWrite.name, linkModels, linkedDescriptionFactories)
-														.map { case (singleAccessRef, manyAccessRef) =>
-															Some(describedRef, singleAccessRef, manyAccessRef)
-														}
-												}
-										case None => Success(None)
-									}
-								// Case: No classes use descriptions => automatically succeeds
-								case None => Success(None)
-							}).flatMap { descriptionReferences =>
-								// Finally writes the access points
-								AccessWriter(classToWrite, modelRefs.stored, dbFactoryRef, dbModelRef,
-									descriptionReferences)
-									.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
-										classToWrite -> ClassReferences(modelRefs,
-											dbFactoryRef, dbModelRef, genericUniqueAccessRef, genericManyAccessRef)
-									}
-							}
+					.flatMap { dbModelRefs =>
+						val dbPropsRef = dbPropsRefs match {
+							case None =>
+								dbModelRefs.rightOrMap { _.model }
+							case Some((refs, _)) => refs.first
 						}
+						DbFactoryWriter(classToWrite, modelRefs, dbPropsRef)
+							.flatMap { case (dbFactoryRef, dbFactoryLikeRef) =>
+								// Adds description-specific references if applicable
+								(descriptionLinkObjects match {
+									// Case: At least one class uses descriptions
+									case Some((linkModels, _, linkedDescriptionFactories)) =>
+										classToWrite.descriptionLinkClass match {
+											case Some(descriptionLinkClass) =>
+												DescribedModelWriter(classToWrite, modelRefs.stored)
+													.flatMap { describedRef =>
+														DbDescriptionAccessWriter(descriptionLinkClass,
+															classToWrite.name, linkModels, linkedDescriptionFactories)
+															.map { case (singleAccessRef, manyAccessRef) =>
+																Some(describedRef, singleAccessRef, manyAccessRef)
+															}
+													}
+											case None => Success(None)
+										}
+									// Case: No classes use descriptions => automatically succeeds
+									case None => Success(None)
+								}).flatMap { descriptionReferences =>
+									// Finally writes the access points
+									val modelFactoryRef = dbModelRefs.rightOrMap { _.factory }
+									AccessWriter(classToWrite, modelRefs.stored, dbFactoryRef, modelFactoryRef,
+										descriptionReferences)
+										.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
+											val genericReferences = modelRefs.generic.flatMap { modelRefs =>
+												dbPropsRefs.flatMap { case (dbPropsRefs, _) =>
+													dbModelRefs.leftOption.flatMap { dbModelRefs =>
+														dbFactoryLikeRef.map { factoryLikeRef =>
+															GenericClassReferences(modelRefs, dbPropsRefs.first,
+																dbPropsRefs.second, dbModelRefs, factoryLikeRef)
+														}
+													}
+												}
+											}
+											val classRefs = ClassReferences(modelRefs, dbFactoryRef, dbPropsRef,
+												genericUniqueAccessRef, genericManyAccessRef, genericReferences)
+											classToWrite -> classRefs
+										}
+								}
+							}
 					}
 			}
 		}
