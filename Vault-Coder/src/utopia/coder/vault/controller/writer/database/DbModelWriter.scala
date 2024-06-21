@@ -72,7 +72,7 @@ object DbModelWriter
 								writeModelFactoryLike(classToWrite, storablePackage, modelRefs.factory)
 									.flatMap { factoryLikeRef =>
 										// Writes XModelFactory
-										// TODO: Consider which reference(s) to return
+										// TODO: Consider which reference(s) to return (probably XFactory, as is here)
 										writeModelFactory(classToWrite, storablePackage, modelRefs, tablesRef,
 											dbPropsRef, dbPropsWrapperRef, factoryLikeRef, dbModelTraitRef,
 											dbPropsName, buildCopy)
@@ -130,7 +130,7 @@ object DbModelWriter
 		val modelLike = TraitDeclaration(
 			name = (classToWrite.name + modelSuffix + likeSuffix).className,
 			genericTypes = Single(repr),
-			extensions = Vector(storable, hasId, factory, fromIdFactory),
+			extensions = Vector(storable, hasId, factory, fromIdFactory, hasIdProperty),
 			properties = optionalProps ++ Pair(dbPropsProp, valueProps),
 			methods = withMethods.toSet ++ Set(withId, buildCopy),
 			description = s"Common trait for database models used for interacting with ${
@@ -302,7 +302,9 @@ object DbModelWriter
 					s"${ tablesRef.target }.${ classToWrite.name.prop }")
 				val dbPropImplementations = classToWrite.dbProperties
 					.map { prop =>
-						LazyValue(prop.name.prop, isOverridden = true)(s"property(${ prop.modelName.quoted })")
+						LazyValue(prop.name.prop,
+							description = s"Database property used for interacting with ${ prop.name.pluralDoc }")(
+							s"property(${ prop.modelName.quoted })")
 					}
 					.toVector
 				
@@ -385,7 +387,7 @@ object DbModelWriter
 					
 				// Case: Concrete / simple class
 				case None =>
-					// Implements 1) Storable, 2) XFactory[Self] and 3) FromIdFactory[Id, Self]
+					// Implements 1) Storable, 2) XFactory[Self] and 3) FromIdFactory[Id, Self], 4) HasIdProperty
 					val factory = modelRefs.factory(reprType)
 					val fromIdFactory = vault.fromIdFactory(classToWrite.idType.toScala, reprType)
 					
@@ -394,7 +396,8 @@ object DbModelWriter
 					// Same thing with the value properties => The property names are acquired using the companion object
 					val valueProps = valuePropertiesPropertyFor(classToWrite, reprType.toString)
 					
-					(reprType.toString, Public, Empty, Vector[Extension](storable, factory, fromIdFactory),
+					(reprType.toString, Public, Empty,
+						Vector[Extension](storable, factory, fromIdFactory, hasIdProperty),
 						Pair(table, valueProps), Empty)
 			}
 			

@@ -305,7 +305,6 @@ object ModelWriter
 					.getOrElse(CodePiece.empty).withinParenthesis
 				).withinParenthesis
 		val schema = LazyValue("schema", modelDeclarationCode.references,
-			visibility = if (classToWrite.isGeneric) Public else Private,
 			isOverridden = !fromModelMayFail, isLowMergePriority = true)(modelDeclarationCode.text)
 		
 		val fromModel = fromModelFor(classToWrite, dataClassName).copy(isLowMergePriority = true)

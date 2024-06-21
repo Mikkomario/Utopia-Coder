@@ -74,7 +74,7 @@ object CombinedFactoryWriter
 		}
 		
 		File(setup.factoryPackage/data.packageName,
-			ObjectDeclaration((data.name + DbFactoryWriter.classNameSuffix).className,
+			ObjectDeclaration((data.name + DbFactoryWriter.factorySuffix).className,
 				Single(data.combinationType.extensionWith(references)) ++
 					creation.map { _._1 } ++ deprecation.map { _._1 },
 				properties = Vector(

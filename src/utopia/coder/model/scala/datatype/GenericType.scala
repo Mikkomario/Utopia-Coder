@@ -9,6 +9,7 @@ import utopia.flow.collection.immutable.Empty
 
 object GenericType
 {
+	// TODO: Add description parameters here
 	/**
 	  * Creates a covariant (+) generic type
 	  * @param name Name of this type

@@ -76,15 +76,17 @@ object ClassMethodFactory
 		// Case: No try-based or potentially failing reads are used => implements a simpler fromValidatedModel
 		else {
 			val modelName = param.name
+			lazy val dbPropsAccessor = dbPropsAccessorFor(targetClass)
 			val dataCreation = targetClass.properties
-				.map { prop => propFromValidModelCode(prop, modelName, isFromJson) }
+				.map { prop => propFromValidModelCode(prop, modelName, dbPropsAccessor, isFromJson) }
 				.reduceLeft { _.append(_, ", ") }
 			val code = wrapAssignments(dataCreation)
 			MethodDeclaration(methodName, code.references, visibility = Protected, isOverridden = true)(param)(code.text)
 		}
 	}
 	
-	private def tryApplyCode(classToWrite: Class, validatedModelCode: CodePiece, isFromJson: Boolean)
+	private def tryApplyCode(classToWrite: Class, validatedModelCode: CodePiece,
+	                         isFromJson: Boolean)
 	                        (wrapAssignments: CodePiece => CodePiece)
 	                        (implicit naming: NamingRules) =
 	{
@@ -98,8 +100,9 @@ object ClassMethodFactory
 		builder += validatedModelCode + validateMapMethod + " { valid => "
 		builder.indent()
 		
-		declareTryProps(builder, tryProperties.dropRight(1), "flatMap", isFromJson)
-		declareTryProps(builder, tryProperties.lastOption, "map", isFromJson)
+		lazy val dbPropsAccessor = dbPropsAccessorFor(classToWrite)
+		declareTryProps(builder, tryProperties.dropRight(1), "flatMap", dbPropsAccessor, isFromJson)
+		declareTryProps(builder, tryProperties.lastOption, "map", dbPropsAccessor, isFromJson)
 		val innerIndentCount = tryProperties.size + 1
 		
 		// Writes the instance creation now that the "try-properties" properties have been declared
@@ -110,7 +113,7 @@ object ClassMethodFactory
 				CodePiece(prop.name.prop)
 			// Case: Normal property / value => reads the value from the model
 			else
-				propFromValidModelCode(prop, isFromJson = isFromJson)
+				propFromValidModelCode(prop, dbPropAccessor = dbPropsAccessor, isFromJson = isFromJson)
 		}.reduceLeft { _.append(_, ", ") }
 		builder += wrapAssignments(assignments)
 		
@@ -123,22 +126,27 @@ object ClassMethodFactory
 	
 	// NB: Indents for each declared property
 	private def declareTryProps(builder: CodeBuilder, tryProps: Iterable[Property], mapMethod: String,
-	                            isFromJson: Boolean)
+	                            dbPropAccessor: => String, isFromJson: Boolean)
 	                           (implicit naming: NamingRules) =
 		tryProps.foreach { prop =>
-			val fromValueCode = propFromValidModelCode(prop, isFromJson = isFromJson)
+			val fromValueCode = propFromValidModelCode(prop, dbPropAccessor = dbPropAccessor, isFromJson = isFromJson)
 			builder += fromValueCode + s".$mapMethod { ${prop.name.prop} => "
 			builder.indent()
 		}
 	
-	private def propFromValidModelCode(prop: Property, modelName: String = "valid", isFromJson: Boolean)
+	private def propFromValidModelCode(prop: Property, modelName: String = "valid", dbPropAccessor: => String,
+	                                   isFromJson: Boolean)
 	                                  (implicit naming: NamingRules) =
 	{
 		// Uses different property names based on whether parsing from json or from a database model
 		if (isFromJson)
 			prop.dataType.fromJsonValueCode(s"$modelName(${prop.jsonPropName.quoted})")
-		// NB: Not very clean code. Assumes access to a database model factory named "model".
-		else
-			prop.dataType.fromValueCode(prop.dbProperties.map { prop => s"$modelName(this.model.${prop.name.prop}.name)" })
+		else {
+			val dbProps = dbPropAccessor
+			prop.dataType.fromValueCode(prop.dbProperties.map { prop => s"$modelName($dbProps.${prop.name.prop}.name)" })
+		}
 	}
+	
+	// Not the most elegant implementation, but for now it works (utilized in XDbFactory)
+	private def dbPropsAccessorFor(classToWrite: Class) = if (classToWrite.isGeneric) "dbProps" else "this.model"
 }

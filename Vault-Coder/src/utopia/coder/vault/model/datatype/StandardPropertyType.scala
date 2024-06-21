@@ -1386,7 +1386,8 @@ object StandardPropertyType
 			CodePiece(s"$instanceCode.over(Duration(1, TimeUnit.${ unit.toString }))", Set(duration, timeUnit))
 		
 		override protected def fromDelegateCode(delegateCode: String): CodePiece =
-			CodePiece(s"LinearVelocity($delegateCode)(TimeUnit.${ unit.toString })", Set(timeUnit))
+			CodePiece(s"LinearVelocity($delegateCode)(TimeUnit.${ unit.toString })",
+				Set(paradigm.linearVelocity, timeUnit))
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
