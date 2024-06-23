@@ -2,11 +2,12 @@ package utopia.coder.vault.model.data
 
 import utopia.coder.model.data.{Name, Named, NamingRules}
 import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.coder.vault.model.datatype.StandardPropertyType.ClassReference
 import utopia.coder.vault.model.datatype.{PropertyType, SingleColumnPropertyType}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.vault.model.enumeration.Mutability
-import utopia.flow.collection.immutable.Empty
+import utopia.flow.collection.immutable.{Empty, Single}
 
 object Property
 {
@@ -23,7 +24,7 @@ object Property
 	                 dbPropertyOverrides: DbPropertyOverrides = DbPropertyOverrides.empty,
 	                 customMutability: Option[Mutability] = None, withAccessName: String = "",
 	                 inAccessName: String = "", description: String = ""): Property =
-		apply(name, dataType, customDefaultValue, Vector(dbPropertyOverrides), customMutability, withAccessName,
+		apply(name, dataType, customDefaultValue, Vector(dbPropertyOverrides), customMutability, Empty, withAccessName,
 			inAccessName, description)
 }
 
@@ -44,8 +45,8 @@ object Property
   */
 case class Property(name: Name, dataType: PropertyType, customDefaultValue: CodePiece = CodePiece.empty,
                     dbPropertyOverrides: Seq[DbPropertyOverrides] = Empty,
-                    customMutability: Option[Mutability] = None, withAccessName: String = "",
-                    inAccessName: String = "", description: String = "")
+                    customMutability: Option[Mutability] = None, parents: Seq[Property] = Empty,
+                    withAccessName: String = "", inAccessName: String = "", description: String = "")
 	extends Named
 {
 	// ATTRIBUTES   ------------------------
@@ -138,6 +139,30 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 	}
 	
 	/**
+	 * @return Whether this property extends another property in a parent class
+	 */
+	def isExtension = parents.nonEmpty
+	/**
+	 * @return Whether this property extends another property in a parent class, renamed
+	 */
+	def isRenamedExtension = parents.exists { _.name != name }
+	/**
+	 * @return Whether this property extends another property in a parent class without renaming it
+	 */
+	def isDirectExtension = parents.exists { _.name == name }
+	
+	/**
+	 * @return Names of this property defined in the parent classes
+	 */
+	def alternativeNames = parents.view.map { _.name }.toSet - name
+	
+	/**
+	 * @return If this property extends a parent property, renaming it,
+	 *         returns the parent property name as well as the name of this (overridden / implementing) property
+	 */
+	def rename = parents.view.map { _.name }.find { _ != name }.map { _ -> name }
+	
+	/**
 	  * @return A concrete (ie. non-optional) version of this property, if possible.
 	  *         This if already a concrete property.
 	  *         Please note that custom default values may be erased during this conversion.
@@ -148,6 +173,11 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 		else
 			copy(dataType = dataType.concrete, customDefaultValue = CodePiece.empty)
 	}
+	
+	/**
+	 * @return A property which inherits this one
+	 */
+	def newChild = copy(parents = Single(this))
 	
 	/**
 	  * @param naming Implicit naming rules
@@ -164,4 +194,50 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 	  * @return Code that converts this property (properly named) into a value.
 	  */
 	def toJsonValueCode(implicit naming: NamingRules): CodePiece = dataType.toJsonValueCode(name.prop)
+	
+	
+	// OTHER    -----------------------
+	
+	/**
+	 * Makes this property extend the specified parent properties
+	 * @param parents Parents to extend from highest to lowest priority
+	 * @return Copy of this property with the specified extensions added
+	 */
+	def extending(parents: Seq[Property]) = {
+		parents.headOption match {
+			// Case: Lists parents => Replaces all empty values with those defined in parents, if available
+			case Some(primaryParent) =>
+				// If the singular name form matches the parent property name,
+				// applies pluralization from the parent instead
+				val newName = {
+					if (name.isEmpty || (name.singularIn(primaryParent.name.style) ~== primaryParent.name.singular))
+						primaryParent.name
+					else
+						name
+				}
+				val orderedImplementations = this +: parents
+				copy(
+					name = newName,
+					dataType = primaryParent.dataType,
+					customDefaultValue = orderedImplementations.view.map { _.customDefaultValue }
+						.find { _.nonEmpty }.getOrElse(customDefaultValue),
+					dbPropertyOverrides = orderedImplementations.view.reverse.map { _.dbPropertyOverrides }
+						.reduceLeftOption { (parentOverrides, childOverrides) =>
+							parentOverrides.zipPad(childOverrides, DbPropertyOverrides.empty)
+								.map { case (p, c) => p + c }
+						}
+						.getOrElse(Empty),
+					customMutability = orderedImplementations.view.flatMap { _.customMutability }.headOption,
+					parents = parents ++ parents,
+					withAccessName = orderedImplementations.view.map { _.withAccessName }
+						.find { _.nonEmpty }.getOrElse(withAccessName),
+					inAccessName = orderedImplementations.view.map { _.inAccessName }
+						.find { _.nonEmpty }.getOrElse(inAccessName),
+					description = orderedImplementations.view.map { _.description }
+						.find { _.nonEmpty }.getOrElse(description)
+				)
+			// Case: No parents listed => No change
+			case None => this
+		}
+	}
 }

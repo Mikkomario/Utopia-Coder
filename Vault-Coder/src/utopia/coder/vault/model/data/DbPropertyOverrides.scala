@@ -2,6 +2,7 @@ package utopia.coder.vault.model.data
 
 import utopia.coder.model.data.Name
 import utopia.flow.util.UncertainBoolean
+import utopia.flow.util.StringExtensions._
 
 object DbPropertyOverrides
 {
@@ -24,3 +25,17 @@ object DbPropertyOverrides
   */
 case class DbPropertyOverrides(name: Option[Name] = None, columnName: String = "", default: String = "",
                                lengthRule: String = "", indexing: UncertainBoolean = UncertainBoolean)
+{
+	/**
+	 * Combines this set of overrides with another.
+	 * The values defined in 'other' take priority.
+	 * @param other Another set of database property overrides.
+	 * @return Combination of this overrides, preferring 'other' in cases where both overrides define a value.
+	 */
+	def +(other: DbPropertyOverrides) = copy(
+		name = other.name.orElse(name),
+		columnName = other.columnName.nonEmptyOrElse(columnName),
+		default = other.default.nonEmptyOrElse(default),
+		lengthRule = other.lengthRule.nonEmptyOrElse(lengthRule),
+		indexing = other.indexing.orElse(indexing))
+}

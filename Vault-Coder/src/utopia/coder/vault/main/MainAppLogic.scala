@@ -269,18 +269,15 @@ object MainAppLogic extends CoderAppLogic
 			.flatMap { _ => TablesWriter(data.classes) }
 			.flatMap { tablesRef =>
 				DescriptionLinkInterfaceWriter(data.classes, tablesRef).flatMap { descriptionLinkObjects =>
-					// Next writes all required documents for each class
-					// TODO: Provide references for inheritance (generate in correct order)
-					data.classes.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.flatMap { classRefs =>
+					// Next writes all required documents for each class in order
+					writeClassesInOrder(data.classes, Map(), tablesRef, descriptionLinkObjects).flatMap { classRefs =>
 						// Finally writes the combined models
-						val classRefsMap = classRefs.toMap
-						data.combinations.tryForeach { writeCombo(_, classRefsMap) }
+						data.combinations.tryForeach { writeCombo(_, classRefs) }
 					}
 				}
 			}
 	}
 	
-	// TODO: Utilize this above. Pass the classReferenceMap to writeClass
 	private def writeClassesInOrder(classesToWrite: Seq[Class], classReferenceMap: Map[Class, ClassReferences],
 	                                tablesRef: Reference,
 	                                descriptionLinkObjects: Option[(Reference, Reference, Reference)])
@@ -288,32 +285,36 @@ object MainAppLogic extends CoderAppLogic
 	{
 		// Checks which classes may be written immediately
 		val (readyClasses, pendingClasses) = classesToWrite
-			.divideBy { _.extensions.forall(classReferenceMap.contains) }.toTuple
+			.divideBy { _.parents.forall(classReferenceMap.contains) }.toTuple
+		
+		def write(classToWrite: Class) =
+			writeClass(classToWrite, tablesRef, descriptionLinkObjects, classReferenceMap)
 		
 		// Case: All remaining classes may be written => Writes and returns
 		if (pendingClasses.isEmpty)
-			readyClasses.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.map { classReferenceMap ++ _ }
+			readyClasses.tryMap(write).map { classReferenceMap ++ _ }
 		// Case: No class may be written => Logs a warning and writes without proper references
 		else if (readyClasses.isEmpty) {
 			println(s"Warning: ${ pendingClasses.size } classes can't resolve their inheritances:")
 			pendingClasses.foreach { c => println(s"\t- ${ c.name.className } extends ${
-				c.extensions.map { _.name.className }.mkString(" with ") }") }
+				c.parents.map { _.name.className }.mkString(" with ") }") }
 			
-			pendingClasses.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.map { classReferenceMap ++ _ }
+			pendingClasses.tryMap(write).map { classReferenceMap ++ _ }
 		}
 		// Case: Some may be written while some can't
 		//       => Writes the immediately available classes and uses recursion to write the rest
 		else
-			readyClasses.tryMap { writeClass(_, tablesRef, descriptionLinkObjects) }.flatMap { newRefs =>
+			readyClasses.tryMap(write).flatMap { newRefs =>
 				writeClassesInOrder(pendingClasses, classReferenceMap ++ newRefs, tablesRef, descriptionLinkObjects)
 			}
 	}
 	
 	private def writeClass(classToWrite: Class, tablesRef: Reference,
-	          descriptionLinkObjects: Option[(Reference, Reference, Reference)])
+	                       descriptionLinkObjects: Option[(Reference, Reference, Reference)],
+	                       classReferences: Map[Class, ClassReferences])
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
-		ModelWriter(classToWrite).flatMap { modelRefs =>
+		ModelWriter(classToWrite, classReferences).flatMap { modelRefs =>
 			val dbPropsRefs = {
 				if (classToWrite.isGeneric)
 					DbPropsWriter(classToWrite).map { Some(_) }

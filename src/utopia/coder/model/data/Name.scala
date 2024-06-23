@@ -5,6 +5,7 @@ import utopia.coder.model.enumeration.NamingConvention.{CamelCase, Text}
 import utopia.coder.model.enumeration.{NameContext, NamingConvention}
 import utopia.flow.generic.factory.FromValueFactory
 import utopia.flow.generic.model.immutable.Value
+import utopia.flow.operator.MaybeEmpty
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.operator.equality.ApproxEquals
 import utopia.flow.operator.ordering.SelfComparable
@@ -116,7 +117,7 @@ object Name extends FromValueFactory[Name]
   * @since 4.9.2021, v0.1
   */
 case class Name(singular: String, plural: String, style: NamingConvention)
-	extends SelfComparable[Name] with ApproxEquals[Name]
+	extends SelfComparable[Name] with ApproxEquals[Name] with MaybeEmpty[Name]
 {
 	// COMPUTED ------------------------------
 	
@@ -209,6 +210,8 @@ case class Name(singular: String, plural: String, style: NamingConvention)
 	def toString(implicit context: NameContext, naming: NamingRules) = contextualSingular
 	
 	override def self = this
+	
+	override def isEmpty: Boolean = singular.isEmpty
 	
 	override def compareTo(o: Name) = singular.compareTo(o.singular)
 	

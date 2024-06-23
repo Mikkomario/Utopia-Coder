@@ -7,6 +7,7 @@ import utopia.coder.vault.model.enumeration.IntSize.Default
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, CreationTime, Deprecation, EnumValue, Expiration, UpdateTime}
 import utopia.coder.model.enumeration.NameContext.{ColumnName, DbModelPropName}
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair}
 
 object Class
@@ -94,7 +95,7 @@ object Class
 // TODO: customTableName should be Option[Name]
 case class Class(name: Name, customTableName: Option[String], idName: Name, properties: Seq[Property],
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
-                 descriptionLinkName: Option[Name], extensions: Seq[Class], description: String, author: String,
+                 descriptionLinkName: Option[Name], parents: Seq[Class], description: String, author: String,
                  useLongId: Boolean, writeGenericAccess: Boolean, isGeneric: Boolean)
 {
 	// ATTRIBUTES   ---------------------------------
@@ -194,7 +195,6 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 		case Deprecation => true
 		case _ => false
 	} }
-	
 	/**
 	  * @return Property in this class which contains instance expiration time. None if no such property is present.
 	  */
@@ -202,6 +202,11 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 		case Expiration => true
 		case _ => false
 	} }
+	
+	/**
+	 * @return Whether this class extends another class
+	 */
+	def isExtension = parents.nonEmpty
 	
 	/**
 	  * @param naming Implicit naming rules
@@ -219,5 +224,50 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 	 * @param newExtensions New extensions to assign to this class
 	 * @return Copy of this class with the specified extensions added
 	 */
-	def extending(newExtensions: IterableOnce[Class]) = copy(extensions = extensions ++ newExtensions)
+	def extending(newExtensions: Seq[Class], propertyReferences: Map[Property, Seq[String]]) = {
+		if (newExtensions.isEmpty)
+			this
+		else {
+			// Adds referred extensions to defined properties and adds missing properties
+			val resolvedPropertyReferences = propertyReferences.map { case (child, parentRefs) =>
+				// Finds the referred properties. Logs a warning if all were not found.
+				val (missingReferences, parentProps) = parentRefs.divideWith { ref =>
+					newExtensions.findMap { parent => parent.properties.find { _.name ~== ref } }.toRight(ref)
+				}
+				if (missingReferences.nonEmpty)
+					println(s"Warning: ${ missingReferences.size } references from ${
+						child.name } of $name (${ missingReferences.mkString(", ") }) could not be resolved")
+						
+				child -> parentProps
+			}
+			val overriddenParentProperties = resolvedPropertyReferences.valuesIterator.flatten.toSet
+			val (requiredPropsToAdd, optionalPropsToAdd) = newExtensions
+				.flatMap { _.properties }.filterNot(overriddenParentProperties.contains).distinctBy { _.name.singular }
+				.divideBy { _.defaultValue.nonEmpty }.toTuple
+			val mergedProperties = properties
+				.map { prop =>
+					resolvedPropertyReferences.get(prop) match {
+						case Some(parents) => prop.extending(parents)
+						case None => prop
+					}
+				}
+			// Inserts the additional properties to different locations based on whether they have default values or not
+			val lastRequiredPropertyIndex = mergedProperties.lastIndexWhere { _.defaultValue.isEmpty }
+			val newProperties = requiredPropsToAdd ++ mergedProperties.take(lastRequiredPropertyIndex + 1) ++
+				optionalPropsToAdd ++ mergedProperties.drop(lastRequiredPropertyIndex + 1)
+			
+			// Combines class information, replacing empty values with defined values from parents
+			val orderedImplementations = this +: newExtensions
+			copy(
+				idName = orderedImplementations.view.map { _.idName }.find { _.nonEmpty }.getOrElse(idName),
+				properties = newProperties,
+				comboIndexColumnNames = orderedImplementations.flatMap { _.comboIndexColumnNames },
+				descriptionLinkName = orderedImplementations.view.flatMap { _.descriptionLinkName }.headOption,
+				parents = parents ++ newExtensions,
+				description = orderedImplementations.view.map { _.description }
+					.find { _.nonEmpty }.getOrElse(description),
+				useLongId = orderedImplementations.exists { _.useLongId }
+			)
+		}
+	}
 }
