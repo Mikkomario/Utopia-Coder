@@ -9,8 +9,8 @@ import scala.language.implicitConversions
 object Extension
 {
 	// Implicitly converts scala types and references to extensions
-	implicit def referenceToExtension(ref: Reference): Extension = apply(ref)
-	implicit def typeToExtension(ref: ScalaType): Extension = apply(ref)
+	implicit def fromReference(ref: Reference): Extension = apply(ref)
+	implicit def fromType(ref: ScalaType): Extension = apply(ref)
 }
 
 /**

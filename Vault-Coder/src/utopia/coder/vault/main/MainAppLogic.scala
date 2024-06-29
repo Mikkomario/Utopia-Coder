@@ -288,7 +288,8 @@ object MainAppLogic extends CoderAppLogic
 			.divideBy { _.parents.forall(classReferenceMap.contains) }.toTuple
 		
 		def write(classToWrite: Class) =
-			writeClass(classToWrite, tablesRef, descriptionLinkObjects, classReferenceMap)
+			writeClass(classToWrite, tablesRef, descriptionLinkObjects,
+				classToWrite.parents.flatMap(classReferenceMap.get))
 		
 		// Case: All remaining classes may be written => Writes and returns
 		if (pendingClasses.isEmpty)
@@ -311,10 +312,10 @@ object MainAppLogic extends CoderAppLogic
 	
 	private def writeClass(classToWrite: Class, tablesRef: Reference,
 	                       descriptionLinkObjects: Option[(Reference, Reference, Reference)],
-	                       classReferences: Map[Class, ClassReferences])
+	                       parentClassReferences: Seq[ClassReferences])
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
-		ModelWriter(classToWrite, classReferences).flatMap { modelRefs =>
+		ModelWriter(classToWrite, parentClassReferences).flatMap { modelRefs =>
 			val dbPropsRefs = {
 				if (classToWrite.isGeneric)
 					DbPropsWriter(classToWrite).map { Some(_) }

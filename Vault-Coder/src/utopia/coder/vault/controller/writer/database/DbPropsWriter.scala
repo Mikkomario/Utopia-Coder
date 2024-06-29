@@ -20,6 +20,7 @@ import scala.io.Codec
  * @author Mikko Hilpinen
  * @since 14.06.2024, v1.11
  */
+// TODO: Implement support for class inheritance
 object DbPropsWriter
 {
 	// ATTRIBUTES   -----------------------
