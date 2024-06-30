@@ -318,7 +318,7 @@ object MainAppLogic extends CoderAppLogic
 		ModelWriter(classToWrite, parentClassReferences).flatMap { modelRefs =>
 			val dbPropsRefs = {
 				if (classToWrite.isGeneric)
-					DbPropsWriter(classToWrite).map { Some(_) }
+					DbPropsWriter(classToWrite, parentClassReferences).map { Some(_) }
 				else
 					Success(None)
 			}

@@ -2,13 +2,13 @@ package utopia.coder.vault.controller.writer.database
 
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
-import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
-import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, TraitDeclaration}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
-import utopia.coder.vault.model.data.Class
-import utopia.coder.vault.model.data.VaultProjectSetup
+import utopia.coder.model.scala.declaration._
+import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
+import utopia.coder.vault.model.data.{Class, ClassReferences, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences._
+import utopia.flow.collection.CollectionExtensions.RichIterable
 import utopia.flow.collection.immutable.{Pair, Single}
 import utopia.flow.util.StringExtensions._
 
@@ -20,7 +20,6 @@ import scala.io.Codec
  * @author Mikko Hilpinen
  * @since 14.06.2024, v1.11
  */
-// TODO: Implement support for class inheritance
 object DbPropsWriter
 {
 	// ATTRIBUTES   -----------------------
@@ -44,35 +43,46 @@ object DbPropsWriter
 	 *         name of the property used for defining the wrapped XDbProps.
 	 *         Failure if file-writing failed.
 	 */
-	def apply(classToWrite: Class)
+	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences])
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val configPackage = setup.databasePackage/"config"/classToWrite.packageName
-		writeDbPropsTrait(classToWrite, configPackage).flatMap { dbProps =>
+		writeDbPropsTrait(classToWrite, configPackage, parentClassReferences).flatMap { dbProps =>
 			writeDbPropsWrapperTrait(classToWrite, configPackage, dbProps)
 				.map { case (wrapper, wrappedName) => Pair(dbProps, wrapper) -> wrappedName }
 		}
 	}
 	
 	// Writes XDbProps trait and companion object
-	private def writeDbPropsTrait(classToWrite: Class, configPackage: Package)
+	private def writeDbPropsTrait(classToWrite: Class, configPackage: Package,
+	                              parentClassReferences: Seq[ClassReferences])
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// The trait defines declarations for all the database properties
+		// The trait defines declarations for all the database properties (except those defined in parent traits)
 		val traitName = (classToWrite.name + dbPropsSuffix).className
 		val traitType = ScalaType.basic(traitName)
 		
-		val props = classToWrite.dbProperties
-			.map { prop =>
-				ComputedProperty.newAbstract(prop.name.prop, vault.dbProp,
-					description = s"Declaration which defines how ${ prop.name } shall be interacted with in the database")
+		val abstractProps = classToWrite.properties.filterNot { _.isDirectExtension }
+			.flatMap { prop =>
+				prop.dbProperties.map { prop =>
+					ComputedProperty.newAbstract(prop.name.prop, vault.dbProp,
+						description = s"Declaration which defines how ${
+							prop.name } shall be interacted with in the database")
+				}
 			}
 			.toVector
+		// When extending parent traits, implements the renamed property declarations
+		// NB: Doesn't work for multi-part properties
+		val renameImplementations = classToWrite.properties.filter { _.dbProperties.hasSize(1) }.flatMap { prop =>
+			prop.rename.map { case (original, implementation) =>
+				ComputedProperty(original.prop, isOverridden = true)(implementation.prop)
+			}
+		}
 		
 		val dbPropsTrait = TraitDeclaration(
 			name = traitName,
-			// extensions = Single(vault.hasIdProperty),
-			properties = props,
+			extensions = parentClassReferences.flatMap { _.generic.map { _.dbProps } },
+			properties = abstractProps ++ renameImplementations,
 			author = classToWrite.author,
 			description = s"Common trait for classes which provide access to ${ classToWrite.name } database properties",
 			since = DeclarationDate.versionedToday
@@ -92,12 +102,13 @@ object DbPropsWriter
 		}
 		// val idProp = LazyValue("id", Set(vault.dbProp), isOverridden = true)("DbPropertyDeclaration(idPropName, index)")
 		
-		val defaultIdPropName = classToWrite.idDatabasePropName.quoted
-		val constructionParams = Pair(
-			Parameter("table", vault.table, description = "Table operated using this configuration"),
-			Parameter("idPropName", ScalaType.string, classToWrite.idDatabasePropName.quoted,
+		// val defaultIdPropName = classToWrite.idDatabasePropName.quoted
+		/*
+		Parameter("idPropName", ScalaType.string, classToWrite.idDatabasePropName.quoted,
 				description = s"Name of the database property which represents this class' primary row id (default = \"$defaultIdPropName\")")
-		) ++ propNames.map { _._2 }
+		 */
+		val constructionParams = Parameter("table", vault.table,
+			description = "Table operated using this configuration") +: propNames.map { _._2 }
 		
 		val concreteClassName = s"_$traitName"
 		val concreteImplementation = ClassDeclaration(
@@ -120,6 +131,7 @@ object DbPropsWriter
 	}
 	
 	// Writes XDbPropsWrapper trait
+	// TODO: It is probably possible to extend YDbPropsWrapper from class parents. But is that necessary?
 	private def writeDbPropsWrapperTrait(classToWrite: Class, configPackage: Package, dbPropsRef: Reference)
 	                                    (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
