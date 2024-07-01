@@ -323,7 +323,7 @@ object MainAppLogic extends CoderAppLogic
 					Success(None)
 			}
 			dbPropsRefs.flatMap { dbPropsRefs =>
-				DbModelWriter(classToWrite, modelRefs, tablesRef, dbPropsRefs)
+				DbModelWriter(classToWrite, parentClassReferences, modelRefs, tablesRef, dbPropsRefs)
 					.flatMap { dbModelRefs =>
 						val dbPropsRef = dbPropsRefs match {
 							case None =>

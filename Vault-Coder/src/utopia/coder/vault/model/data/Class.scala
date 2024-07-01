@@ -9,6 +9,7 @@ import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, C
 import utopia.coder.model.enumeration.NameContext.{ColumnName, DbModelPropName}
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair}
+import utopia.flow.operator.Identity
 
 object Class
 {
@@ -219,6 +220,18 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 	  */
 	def idDatabasePropName(implicit naming: NamingRules) =
 		naming(DbModelPropName).convert(idName.column, naming(ColumnName))
+	
+	/**
+	 * @param naming Implicit naming rules
+	 * @return A map which contains mapping from parent property names to property names in this class.
+	 *         Contains a default value (identity) for all inputs.
+	 */
+	def propertyRenames(implicit naming: NamingRules) =
+		properties.view.flatMap { _.rename.map { case (inParent, locally) => inParent.prop -> locally.prop } }
+			.toMap.withDefault(Identity)
+	
+	
+	// OTHER    ------------------------
 	
 	/**
 	 * @param newExtensions New extensions to assign to this class

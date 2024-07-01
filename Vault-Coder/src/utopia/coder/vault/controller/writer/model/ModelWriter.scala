@@ -372,7 +372,7 @@ object ModelWriter
 		}
 		
 		val schemaCode = modelDeclaration.targetCode +
-			(collectionFor(classToWrite.properties.size) +
+			(CodePiece.collection(classToWrite.properties.size) +
 				classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
 					.getOrElse(CodePiece.empty).withinParenthesis
 				).withinParenthesis
@@ -740,7 +740,7 @@ object ModelWriter
 		if (propWrites.isEmpty)
 			parentToModels.getOrElse { CodePiece("Model.empty", Set(model)) }
 		else {
-			val collection = collectionFor(propWrites.size)
+			val collection = CodePiece.collection(propWrites.size)
 			val propsToModel = CodePiece("Model", Set(model)) +
 				(collection + propWrites.reduceLeft { _.append(_, ", ") }.withinParenthesis).withinParenthesis
 			
@@ -772,7 +772,7 @@ object ModelWriter
 		// Writes only the necessary code parts (i.e. omits duplicate default parameters)
 		var paramsCode = CodePiece(name.quoted).append(prop.dataType.valueDataType.targetCode, ", ")
 		if (altNames.nonEmpty || default.isDefined)
-			paramsCode = paramsCode.append(collectionFor(altNames.size), ", ") +
+			paramsCode = paramsCode.append(CodePiece.collection(altNames.size), ", ") +
 				s"(${ altNames.map { _.quoted }.mkString(", ") })"
 		default.foreach { default => paramsCode = paramsCode.append(default, ", ") }
 		if (prop.dataType.isOptional || !prop.dataType.supportsDefaultJsonValues)
@@ -783,11 +783,4 @@ object ModelWriter
 	
 	private def withMethodNameFor(prop: Property)(implicit naming: NamingRules): String = withMethodNameFor(prop.name)
 	private def withMethodNameFor(propName: Name)(implicit naming: NamingRules) = (withPrefix + propName).function
-	
-	private def collectionFor(numberOfEntries: Int) = numberOfEntries match {
-		case 0 => empty.targetCode
-		case 1 => single.targetCode
-		case 2 => pair.targetCode
-		case _ => CodePiece("Vector")
-	}
 }

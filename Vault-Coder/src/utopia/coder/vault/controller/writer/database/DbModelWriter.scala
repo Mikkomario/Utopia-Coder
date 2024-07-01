@@ -3,13 +3,15 @@ package utopia.coder.vault.controller.writer.database
 import utopia.coder.model.data.{Name, Named, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.{Private, Protected, Public}
+import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.TypeVariance.Covariance
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
-import utopia.coder.vault.model.data.{Class, ClassModelReferences, DbProperty, GenericDbModelRefs, Property, VaultProjectSetup}
+import utopia.flow.collection.CollectionExtensions._
+import utopia.coder.vault.model.data.{Class, ClassModelReferences, ClassReferences, DbProperty, GenericDbModelRefs, Property, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
@@ -42,7 +44,8 @@ object DbModelWriter
 	/**
 	  * Generates the DB model class and the associated companion object
 	  * @param classToWrite The base class
-	  * @param modelRefs    References to various model-related classes and traits
+	  * @param parentClassReferences References generated for classes which this class inherits
+	 * @param modelRefs    References to various model-related classes and traits
 	  * @param tablesRef Reference to the Tables object utilized in this project
 	 * @param dbPropsData References to 1) XDbProps trait and 2) XDbPropsWrapper trait,
 	 *                    plus name of the abstract XDbProps property,
@@ -54,7 +57,7 @@ object DbModelWriter
 	 *              Right) Reference to the generated XModel class, or
 	 *              Left) References to the various traits generated for generic classes
 	  */
-	def apply(classToWrite: Class, modelRefs: ClassModelReferences,
+	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences], modelRefs: ClassModelReferences,
 	          tablesRef: Reference, dbPropsData: Option[(Pair[Reference], String)])
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
@@ -65,7 +68,7 @@ object DbModelWriter
 			// Case: Writing an abstract trait => Writes multiple traits
 			case Some((Pair(dbPropsRef, dbPropsWrapperRef), dbPropsName)) =>
 				// Writes XModelLike
-				writeModelLike(classToWrite, storablePackage, modelRefs, dbPropsRef)
+				writeModelLike(classToWrite, storablePackage, parentClassReferences, modelRefs, dbPropsRef)
 					.flatMap { case (modelLikeRef, buildCopy) =>
 						// Writes XModel
 						writeModelTrait(classToWrite, storablePackage, modelLikeRef, dbPropsRef)
@@ -74,9 +77,9 @@ object DbModelWriter
 								writeModelFactoryLike(classToWrite, storablePackage, modelRefs.factory)
 									.flatMap { factoryLikeRef =>
 										// Writes XModelFactory
-										writeModelFactory(classToWrite, storablePackage, modelRefs, tablesRef,
-											dbPropsRef, dbPropsWrapperRef, factoryLikeRef, dbModelTraitRef,
-											dbPropsName, buildCopy)
+										writeModelFactory(classToWrite, storablePackage, parentClassReferences,
+											modelRefs, tablesRef, dbPropsRef, dbPropsWrapperRef, factoryLikeRef,
+											dbModelTraitRef, dbPropsName, buildCopy)
 											.map { factoryRef =>
 												Left(GenericDbModelRefs(modelLikeRef, factoryLikeRef, dbModelTraitRef,
 													factoryRef))
@@ -89,7 +92,8 @@ object DbModelWriter
 			case None =>
 				val className = (classToWrite.name + modelSuffix).className
 				val classType = ScalaType.basic(className)
-				val (classDeclaration, applyParams) = modelClassDeclarationFor(classToWrite, classType, modelRefs)
+				val (classDeclaration, applyParams) = modelClassDeclarationFor(classToWrite, classType,
+					parentClassReferences, modelRefs)
 				val objectDeclaration = concreteFactoryFor(classToWrite, className, classType, applyParams,
 					modelRefs, tablesRef)
 				
@@ -100,44 +104,80 @@ object DbModelWriter
 	// Writes XModelLike trait used with generic traits
 	// Returns a reference + buildCopy function
 	private def writeModelLike(classToWrite: Class, storablePackage: Package,
+	                           parentClassReferences: Seq[ClassReferences],
 	                           modelRefs: ClassModelReferences, dbPropsRef: Reference)
 	                          (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
+		// Utilizes a generic type +Repr when creating copies of self
 		val repr = GenericType.covariant("Repr")
 		val reprType = repr.toScalaType
 		
-		val hasId = vault.hasId(classToWrite.idType.optional.toScala)
+		// Some extensions are different when inheriting other YModelLike[Repr] traits
 		val factory = modelRefs.factory(reprType)
-		val fromIdFactory = vault.fromIdFactory(classToWrite.idType.toScala, reprType)
+		val customExtensions: Seq[Extension] = parentClassReferences
+			.flatMap[Extension] { _.generic.map { _.dbModel.modelLike(reprType) } }
+			.notEmpty match
+		{
+			case Some(parentExtensions) => parentExtensions
+			// Case: Highest level trait => Extends Storable, HasId[...], FromIdFactory[..., Repr] and HasIdProperty
+			case None =>
+				val hasId = vault.hasId(classToWrite.idType.optional.toScala)
+				val fromIdFactory = vault.fromIdFactory(classToWrite.idType.toScala, reprType)
+				Vector(storable, hasId, fromIdFactory, hasIdProperty)
+		}
 		
+		// Contains a dbProps -property for accessing property names
 		val dbPropsProp = ComputedProperty.newAbstract("dbProps", dbPropsRef,
-			description = "Access to the database properties which are utilized in this model")
-		val optionalProps = classToWrite.dbProperties
+			description = "Access to the database properties which are utilized in this model",
+			isOverridden = classToWrite.isExtension)
+		// Defines the properties passed to the constructor
+		// When extending a parent YModelLike[Repr],
+		// skips redefining the same properties and adds rename implementations, where applicable
+		val optionalProps = classToWrite.properties.view.filterNot { _.isDirectExtension }.flatMap { _.dbProperties }
 			.map { prop => ComputedProperty.newAbstract(prop.name.prop, prop.conversion.intermediate.scalaType) }
 			.toVector
-		val valueProps = valuePropertiesPropertyFor(classToWrite, "dbProps")
-		
-		val buildCopyName = (copyPrefix +: classToWrite.name).function
-		val buildCopyParams = classToWrite.dbProperties
-			.map { prop =>
-				val propType = prop.conversion.intermediate
-				Parameter(prop.name.prop, propType.scalaType, propType.emptyValue,
-					description = s"${ prop.name } to assign to the new model (default = currently assigned value)")
+		val propRenameImplementations = classToWrite.properties.flatMap { prop =>
+			prop.rename.map { case (original, implementation) =>
+				ComputedProperty(original.prop, isOverridden = true)(implementation.prop)
 			}
-			.toVector
+		}
+		val valueProps = valuePropertiesPropertyFor(classToWrite,
+			parentClassReferences.flatMap { _.generic.map { _.dbModel.modelLike } }.map { _.targetCode }, "dbProps")
+		
+		// Defines a method for creating copies of this instance, modifying some properties
+		val buildCopyName = (copyPrefix +: classToWrite.name).function
 		val buildCopy = MethodDeclaration.newAbstract(buildCopyName, reprType,
 			returnDescription = s"Copy of this model with the specified ${ classToWrite.name } properties",
-			isProtected = true)(buildCopyParams)
-		val withMethods = classToWrite.properties.flatMap { withPropertyMethods(_, buildCopyName,
-			"A new copy of this model with the specified ") }
-		val withId = withIdMethod(classToWrite, buildCopyName)
+			isProtected = true)(buildCopyParamsFor(classToWrite))
+		// When extending another ModelLike, implements their buildCopy
+		val parentBuildCopyImplementations = classToWrite.parents.map { parent =>
+			val params = buildCopyParamsFor(parent)
+			val renames = classToWrite.propertyRenames
+			MethodDeclaration((copyPrefix +: parent.name).function, isOverridden = true)(params)(
+				s"$buildCopyName(${ params.map { param => s"${ renames(param.name) } = ${ param.name }" } })")
+		}
+		
+		// Generates withX for all class properties, except for those already defined in parents
+		val withMethods = classToWrite.properties.view.filterNot { _.isDirectExtension }
+			.flatMap { withPropertyMethods(_, buildCopyName, "A new copy of this model with the specified ") }.toSet
+		val withRenameImplementations = classToWrite.properties.flatMap { prop =>
+			prop.rename.map { case (original, implementation) =>
+				val paramName = original.prop
+				MethodDeclaration((withPrefix +: original).function, isOverridden = true)(
+					Parameter(paramName, prop.dataType.concrete.toScala))(
+					s"${ (withPrefix +: implementation).function }($paramName)")
+			}
+		}
+		// Implements withId(...), except when one has already been defined in a parent
+		val withId = if (classToWrite.isExtension) None else Some(withIdMethod(classToWrite, buildCopyName))
 		
 		val modelLike = TraitDeclaration(
 			name = (classToWrite.name + modelSuffix + likeSuffix).className,
 			genericTypes = Single(repr),
-			extensions = Vector(storable, hasId, factory, fromIdFactory, hasIdProperty),
-			properties = optionalProps ++ Pair(dbPropsProp, valueProps),
-			methods = withMethods.toSet ++ Set(withId, buildCopy),
+			extensions = customExtensions :+ factory,
+			properties = optionalProps ++ Pair(dbPropsProp, valueProps) ++ propRenameImplementations,
+			methods = (withMethods + buildCopy) ++ parentBuildCopyImplementations ++
+				withRenameImplementations ++ withId,
 			description = s"Common trait for database models used for interacting with ${
 				classToWrite.name } data in the database",
 			author = classToWrite.author,
@@ -148,6 +188,7 @@ object DbModelWriter
 		File(storablePackage, modelLike).write().map { _ -> buildCopy }
 	}
 	
+	// TODO: Continue adding support for inheritance here downwards
 	// XModel trait, which extends XModelLike
 	private def writeModelTrait(classToWrite: Class, storablePackage: Package,
 	                            modelLikeRef: Reference, dbPropsRef: Reference)
@@ -202,7 +243,8 @@ object DbModelWriter
 		File(storablePackage, factoryLike).write()
 	}
 	
-	private def writeModelFactory(classToWrite: Class, storablePackage: Package, modelRefs: ClassModelReferences,
+	private def writeModelFactory(classToWrite: Class, storablePackage: Package,
+	                              parentClassReferences: Seq[ClassReferences], modelRefs: ClassModelReferences,
 	                              tablesRef: Reference, dbPropsRef: Reference, dbPropsWrapperRef: Reference,
 	                              factoryLikeRef: Reference, dbModelRef: Reference, dbPropsName: String,
 	                              buildCopy: MethodDeclaration)
@@ -224,7 +266,8 @@ object DbModelWriter
 		)
 		
 		val (concreteClass, applyParams) = modelClassDeclarationFor(classToWrite, ScalaType.basic(s"_$traitName"),
-			modelRefs, Some(Pair(ScalaType.referenceToType(dbPropsRef), ScalaType.basic(traitName)) -> buildCopy))
+			parentClassReferences, modelRefs,
+			Some(Pair(ScalaType.referenceToType(dbPropsRef), ScalaType.basic(traitName)) -> buildCopy))
 		val concreteFactoryName = s"_$traitName"
 		val concreteFactory = concreteFactoryFor(classToWrite, concreteFactoryName, dbModelRef, applyParams, modelRefs,
 			tablesRef, Some(Pair(dbPropsRef, dbPropsWrapperRef) -> dbPropsName))
@@ -350,7 +393,8 @@ object DbModelWriter
 			)
 	}
 	
-	private def modelClassDeclarationFor(classToWrite: Class, reprType: ScalaType, modelRefs: ClassModelReferences,
+	private def modelClassDeclarationFor(classToWrite: Class, reprType: ScalaType,
+	                                     parentClassReferences: Seq[ClassReferences], modelRefs: ClassModelReferences,
 	                                     dbPropsAndModelTypesAndBuildCopy: Option[(Pair[ScalaType], MethodDeclaration)] = None)
 	                                    (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
@@ -399,7 +443,8 @@ object DbModelWriter
 					// Defines table by referring to the companion object
 					val table = ComputedProperty("table", isOverridden = true)(s"$reprType.table")
 					// Same thing with the value properties => The property names are acquired using the companion object
-					val valueProps = valuePropertiesPropertyFor(classToWrite, reprType.toString)
+					val valueProps = valuePropertiesPropertyFor(classToWrite,
+						parentClassReferences.map { _.dbModel.targetCode }, reprType.toString)
 					
 					(reprType.toString, Public, Empty,
 						Vector[Extension](storable, factory, fromIdFactory, hasIdProperty),
@@ -438,22 +483,44 @@ object DbModelWriter
 		}
 	}
 	
-	private def valuePropertiesPropertyFor(classToWrite: Class, dbPropsName: String)
+	private def valuePropertiesPropertyFor(classToWrite: Class, parentReferences: Seq[CodePiece], dbPropsName: String)
 	                                      (implicit naming: NamingRules) =
 	{
-		val quotedId = classToWrite.idDatabasePropName.quoted
-		if (classToWrite.properties.isEmpty)
-			ComputedProperty("valueProperties", Set(flow.valueConversions), isOverridden = true)(
-				s"Vector($quotedId -> id)"
-			)
-		else {
-			val propsPart = classToWrite.dbProperties
-				.map { prop => prop.toValueCode.withPrefix(s"$dbPropsName.${ prop.name.prop }.name -> ") }
-				.reduceLeft { _.append(_, ", ") }
-			ComputedProperty("valueProperties", propsPart.references + flow.valueConversions, isOverridden = true)(
-				s"Vector($dbPropsName.id.name -> id, $propsPart)"
-			)
+		// Utilizes 'valueProperties' defined in parent traits when inheriting
+		val parentValuePropsCode = parentReferences.map { _.mapText { parent => s"$parent.valueProperties" } }
+			.reduceLeft { _.append(_, " ++ ") }
+		// The other properties are defined here manually
+		val remainingProperties = classToWrite.properties.filterNot { _.isExtension }
+		
+		def quotedId = s"$dbPropsName.id.name"
+		// The implementation is different when inheriting parents
+		val implementation = {
+			// Case: No more properties left to define
+			if (remainingProperties.isEmpty) {
+				// Case: Topmost trait => Only defines the id property
+				if (parentValuePropsCode.isEmpty)
+					CodePiece(s"Single($quotedId -> id)", Set(flow.valueConversions, flow.single))
+				// Case: Inheriting another trait => Only refers to the parent(s)
+				else parentValuePropsCode
+			}
+			// Case: Properties must be defined manually
+			else {
+				val propsPart = remainingProperties.view.flatMap { _.dbProperties }
+					.map { prop => prop.toValueCode.withPrefix(s"$dbPropsName.${ prop.name.prop }.name -> ") }
+					.reduceLeft { _.append(_, ", ") }
+				
+				// Case: No inheritance applied => Wraps the properties in a collection and includes the id property
+				if (parentValuePropsCode.isEmpty)
+					CodePiece.collection(remainingProperties.size + 1) +
+						(s"$quotedId -> id" +: propsPart).withinParenthesis
+				// Case: Inheritance applied => Appends these properties to those defined in parents
+				else
+					parentValuePropsCode
+						.append(CodePiece.collection(remainingProperties.size) + propsPart.withinParenthesis, " ++ ")
+			}
 		}
+		
+		ComputedProperty("valueProperties", implementation.references, isOverridden = true)(implementation.text)
 	}
 	
 	private def withIdMethod(classToWrite: Class, assignFunctionName: String) =
@@ -507,6 +574,15 @@ object DbModelWriter
 			Parameter(paramName, parameterType, description = paramDescription))(
 			s"$calledMethodName($constructionParamsCode)")
 	}
+	
+	private def buildCopyParamsFor(classToWrite: Class)(implicit naming: NamingRules) =
+		classToWrite.dbProperties
+			.map { prop =>
+				val propType = prop.conversion.intermediate
+				Parameter(prop.name.prop, propType.scalaType, propType.emptyValue,
+					description = s"${ prop.name } to assign to the new model (default = currently assigned value)")
+			}
+			.toVector
 	
 	private def withMethodNameFor(prop: Named)(implicit naming: NamingRules): String = withMethodNameFor(prop.name)
 	private def withMethodNameFor(name: Name)(implicit naming: NamingRules) = (withPrefix + name).prop

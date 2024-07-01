@@ -7,6 +7,7 @@ import utopia.flow.operator.combine.Combinable.SelfCombinable
 import utopia.flow.operator.MaybeEmpty
 import utopia.flow.util.StringExtensions._
 import utopia.coder.model.scala.datatype.Reference
+import Reference._
 import utopia.coder.model.scala.template.Referencing
 
 import scala.language.implicitConversions
@@ -41,6 +42,19 @@ object CodePiece extends FromValueFactory[CodePiece]
 	
 	
 	// OTHER    ------------------------
+	
+	/**
+	 * Generates a code piece to represent a collection that holds n values.
+	 * The type of collection used depends on the number of items.
+	 * @param numberOfEntries Number of items that will be stored within the collection.
+	 * @return Code which refers to a collection of suitable type
+	 */
+	def collection(numberOfEntries: Int) = numberOfEntries match {
+		case 0 => flow.empty.targetCode
+		case 1 => flow.single.targetCode
+		case 2 => flow.pair.targetCode
+		case _ => CodePiece("Vector")
+	}
 	
 	/**
 	  * Converts a value into a code piece. The value may be either a model with properties 'code' and
