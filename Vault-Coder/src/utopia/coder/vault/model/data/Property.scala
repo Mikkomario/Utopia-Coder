@@ -8,6 +8,7 @@ import utopia.coder.vault.model.datatype.{PropertyType, SingleColumnPropertyType
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.vault.model.enumeration.Mutability
 import utopia.flow.collection.immutable.{Empty, Single}
+import utopia.flow.collection.mutable.iterator.OptionsIterator
 
 object Property
 {
@@ -151,6 +152,11 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 	 */
 	def isDirectExtension = parents.exists { _.name == name }
 	
+	/**
+	 * @return Name of this property, as defined in the highest level parent (if extension is used).
+	 *         If this property extends no other property, returns the name of this property.
+	 */
+	def originalName = OptionsIterator.iterate(Some(this)) { _.parents.headOption }.last.name
 	/**
 	 * @return Names of this property defined in the parent classes
 	 */

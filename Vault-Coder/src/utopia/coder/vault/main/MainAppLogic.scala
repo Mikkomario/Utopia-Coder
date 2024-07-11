@@ -330,7 +330,7 @@ object MainAppLogic extends CoderAppLogic
 								dbModelRefs.rightOrMap { _.model }
 							case Some((refs, _)) => refs.first
 						}
-						DbFactoryWriter(classToWrite, modelRefs, dbPropsRef)
+						DbFactoryWriter(classToWrite, parentClassReferences, modelRefs, dbPropsRef)
 							.flatMap { case (dbFactoryRef, dbFactoryLikeRef) =>
 								// Adds description-specific references if applicable
 								(descriptionLinkObjects match {
@@ -353,8 +353,8 @@ object MainAppLogic extends CoderAppLogic
 								}).flatMap { descriptionReferences =>
 									// Finally writes the access points
 									val modelFactoryRef = dbModelRefs.rightOrMap { _.factory }
-									AccessWriter(classToWrite, modelRefs.stored, dbFactoryRef, modelFactoryRef,
-										descriptionReferences)
+									AccessWriter(classToWrite, parentClassReferences, modelRefs.stored, dbFactoryRef,
+										modelFactoryRef, descriptionReferences)
 										.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
 											val genericReferences = modelRefs.generic.flatMap { modelRefs =>
 												dbPropsRefs.flatMap { case (dbPropsRefs, _) =>

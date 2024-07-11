@@ -23,6 +23,8 @@ object Code
 	
 	implicit def lineToCode(line: CodeLine): Code = if (line.isEmpty) empty else apply(Single(line))
 	implicit def stringToCode(codeLine: String): Code = if (codeLine.isEmpty) empty else apply(Single(CodeLine(codeLine)))
+	implicit def pieceToCode(codePiece: CodePiece): Code =
+		if (codePiece.isEmpty) empty else apply(Single(CodeLine(codePiece.text)), codePiece.references)
 	
 	
 	// OTHER    ----------------------------------

@@ -43,6 +43,33 @@ object MethodDeclaration
 			isLowMergePriority)
 	
 	/**
+	 * Creates a new method declaration
+	 * @param name Method name
+	 * @param code Code within this method's implementation
+	 * @param visibility Method visibility (default = public)
+	 * @param genericTypes Generic types to use within this method (default = empty)
+	 * @param explicitOutputType Data type returned by this method, when explicitly defined (optional)
+	 * @param annotations Annotations that apply to this method (default = empty)
+	 * @param description Description of this method (default = empty)
+	 * @param returnDescription Description of the return value of this method (default = empty)
+	 * @param headerComments Lines of comments to insert before the declaration (default = empty)
+	 * @param isOverridden Whether this method overrides a base member (default = false)
+	 * @param isImplicit Whether this is an implicit function (default = false)
+	 * @param isLowMergePriority Whether this method should be overwritten with an existing code when merging
+	 *                           (default = true)
+	 * @param params Method parameters (0-n)
+	 * @return A new method
+	 */
+	def usingCode(name: String, code: Code, visibility: Visibility = Public, genericTypes: Seq[GenericType] = Empty,
+	              explicitOutputType: Option[ScalaType] = None,
+	              annotations: Seq[Annotation] = Empty, description: String = "", returnDescription: String = "",
+	              headerComments: Seq[String] = Empty, isOverridden: Boolean = false, isImplicit: Boolean = false,
+	              isLowMergePriority: Boolean = false)
+	             (params: Parameters = Parameters.empty) =
+		apply(visibility, name, genericTypes, params, code, explicitOutputType, annotations, description,
+			returnDescription, headerComments, isOverridden, isImplicit, isLowMergePriority)
+	
+	/**
 	  * Creates a new abstract method declaration
 	  * @param name Method name
 	  * @param outputType Return type of this method

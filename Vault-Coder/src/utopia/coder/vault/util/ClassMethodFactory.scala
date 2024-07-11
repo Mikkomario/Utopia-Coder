@@ -5,7 +5,7 @@ import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{Class, Property}
 import utopia.coder.model.scala.Visibility.{Protected, Public}
 import utopia.coder.model.scala.Parameter
-import utopia.coder.model.scala.code.{CodeBuilder, CodePiece}
+import utopia.coder.model.scala.code.{Code, CodeBuilder, CodePiece}
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.model.scala.declaration.MethodDeclaration
 import Reference.Flow._
@@ -37,21 +37,13 @@ object ClassMethodFactory
 	                   isFromJson: Boolean = false)
 	                  (wrapAssignments: CodePiece => CodePiece)
 	                  (implicit naming: NamingRules) =
-	{
-		// Case: Class contains no properties
-		if (targetClass.properties.isEmpty) {
-			val code = wrapAssignments(CodePiece.empty)
-			MethodDeclaration(methodName, code.references, isOverridden = true)(param)(code.text)
-		}
-		else
-			new MethodDeclaration(Public, methodName, Empty, param,
-				tryApplyCode(targetClass, validatedModelCode, isFromJson)(wrapAssignments), None, Empty,
-				"", "", Empty, isOverridden = true, isImplicit = false,
-				isLowMergePriority = false)
-	}
+		MethodDeclaration.usingCode(methodName,
+			classFromModelCode(targetClass, validatedModelCode, isFromJson)(wrapAssignments),
+			isOverridden = true)(param)
 	
 	/**
-	  * Creates a new method that parses instances from a validated model
+	  * Creates a new method that parses instances from a validated model.
+	 * NB: Doesn't support class inheritance.
 	  * @param targetClass Class being parsed
 	  * @param methodName Name of the method (default = fromValidatedModel)
 	  * @param isFromJson Whether the input model is from json (true) or from a database model (false).
@@ -85,6 +77,28 @@ object ClassMethodFactory
 		}
 	}
 	
+	/**
+	 * Creates a new method code that parses an instance from a model
+	 * @param targetClass Class being parsed
+	 * @param validatedModelCode Code that provides a try containing a validated model based on the input parameter
+	 * @param isFromJson Whether the input model is from json (true) or from a database model (false).
+	 *                   Default = database model.
+	 * @param wrapAssignments A function that accepts assignments that provide enough data for a data instance
+	 *                        creation (e.g. "param1Value, param2Value, param3Value") and produces the code
+	 *                        resulting in the desired output type (like stored model, for example)
+	 * @return A method for parsing class data from models
+	 */
+	def classFromModelCode(targetClass: Class, validatedModelCode: CodePiece, isFromJson: Boolean = false)
+	                      (wrapAssignments: CodePiece => CodePiece)
+	                      (implicit naming: NamingRules): Code =
+	{
+		// Case: Class contains no properties
+		if (targetClass.properties.isEmpty)
+			wrapAssignments(CodePiece.empty)
+		else
+			tryApplyCode(targetClass, validatedModelCode, isFromJson)(wrapAssignments)
+	}
+	
 	private def tryApplyCode(classToWrite: Class, validatedModelCode: CodePiece,
 	                         isFromJson: Boolean)
 	                        (wrapAssignments: CodePiece => CodePiece)
@@ -108,9 +122,9 @@ object ClassMethodFactory
 		// Writes the instance creation now that the "try-properties" properties have been declared
 		// Imports the db properties, if needed
 		val assignments = classToWrite.properties.map { prop =>
-			// Case: Try-based property / value => already defined
-			if (prop.dataType.yieldsTryFromValue)
-				CodePiece(prop.name.prop)
+			// Case: Try-based property / value or an inherited and parsed db property => already defined
+			if (prop.dataType.yieldsTryFromValue || (!isFromJson && prop.isExtension))
+				CodePiece(prop.originalName.prop)
 			// Case: Normal property / value => reads the value from the model
 			else
 				propFromValidModelCode(prop, dbPropAccessor = dbPropsAccessor, isFromJson = isFromJson)
