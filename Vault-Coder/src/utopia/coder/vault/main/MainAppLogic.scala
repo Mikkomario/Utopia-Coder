@@ -13,7 +13,7 @@ import utopia.flow.util.logging.Logger
 import utopia.flow.view.immutable.caching.Lazy
 import utopia.coder.vault.controller.reader
 import utopia.coder.vault.controller.writer.database._
-import utopia.coder.vault.controller.writer.documentation.DocumentationWriter
+import utopia.coder.vault.controller.writer.documentation.{DocumentationWriter, TableDescriptionsWriter}
 import utopia.coder.vault.controller.writer.model.{CombinedModelWriter, DescribedModelWriter, EnumerationWriter, ModelWriter}
 import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, GenericClassReferences, ProjectData, VaultProjectSetup}
 import utopia.coder.vault.model.enumeration.Mutability
@@ -265,6 +265,8 @@ object MainAppLogic extends CoderAppLogic
 				path("json", "length", "rules")) }
 			// Writes project documentation
 			.flatMap { _ => DocumentationWriter(data, path("md")) }
+			// Writes tables json documentation
+			.flatMap { _ => TableDescriptionsWriter(data.classes, path("ndjson", "tables")) }
 			// Writes the tables document, which is referred to later, also
 			.flatMap { _ => TablesWriter(data.classes) }
 			.flatMap { tablesRef =>
