@@ -5,7 +5,7 @@ import utopia.flow.time.Today
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.model.data.{Class, ProjectData}
+import utopia.coder.vault.model.data.{Class, ModuleData}
 import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, EnumValue}
 import utopia.coder.vault.model.enumeration.CombinationType.{Combined, MultiCombined, PossiblyCombined}
 import utopia.coder.model.enumeration.NameContext.Header
@@ -29,12 +29,12 @@ object DocumentationWriter
 	  * @param naming Implicit naming rules
 	  * @return Success or failure
 	  */
-	def apply(data: ProjectData, targetPath: Path)
+	def apply(data: ModuleData, targetPath: Path)
 	         (implicit codec: Codec, naming: NamingRules) =
 	{
 		targetPath.writeUsing { writer =>
 			// Writes the project header
-			writer.println(s"# ${ data.projectName.header }")
+			writer.println(s"# ${ data.moduleName.header }")
 			data.version.foreach { v => writer.println(s"Version: **$v**  ") }
 			writer.println(s"Updated: $Today")
 			
@@ -87,7 +87,7 @@ object DocumentationWriter
 			// Writes enumeration descriptions
 			if (orderedEnums.nonEmpty) {
 				writer.println(s"\n## Enumerations\nBelow are listed all enumerations introduced in ${
-					data.projectName.header }, in alphabetical order  ")
+					data.moduleName.header }, in alphabetical order  ")
 				orderedEnums.foreach { case (name, enum) =>
 					writer.println(s"\n### ${ name.header }")
 					enum.description.notEmpty.foreach { doc => writer.println(doc) }
@@ -110,7 +110,7 @@ object DocumentationWriter
 			
 			// Writes packages and classes
 			writer.println("\n## Packages and Classes")
-			writer.println(s"Below are listed all classes introduced in ${ data.projectName.header }, grouped by package and in alphabetical order.  ")
+			writer.println(s"Below are listed all classes introduced in ${ data.moduleName.header }, grouped by package and in alphabetical order.  ")
 			writer.println(s"There are a total number of ${ orderedClasses.size } packages and ${ orderedClasses.map { _._2.size }.sum } classes")
 			orderedClasses.foreach { case (packageName, classes) =>
 				writer.println(s"\n### ${ packageName.header }")

@@ -11,6 +11,7 @@ import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{Class, DbProperty, VaultProjectSetup}
 import utopia.coder.vault.model.datatype.PropertyType
 import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, EnumValue}
+import utopia.flow.util.Version
 
 import java.io.PrintWriter
 import java.nio.file.Path
@@ -29,14 +30,18 @@ object SqlWriter
 	
 	/**
 	  * Writes the SQL document for the specified classes
-	  * @param dbName Name of the database to use (optional)
-	  * @param classes    Classes to write
+	  * @param projectName Name of the project for which this SQL is written
+	 * @param dbName Name of the database to use (optional)
+	  * @param version Version of this document, if applicable
+	 * @param classes    Classes to write
 	  * @param targetPath Path to which write the sql document
 	  * @param codec      Implicit codec used when writing
-	  * @return Target path. Failure if writing failed.
+	  * @param prefixColumnNames Whether column names should be prefixed with a unique table-specific prefix
+	 * @return Target path. Failure if writing failed.
 	  */
-	def apply(dbName: Option[Name], classes: Seq[Class], targetPath: Path)
-	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
+	def apply(projectName: Name, dbName: Option[Name], version: Option[Version], classes: Seq[Class], targetPath: Path,
+	          prefixColumnNames: Boolean)
+	         (implicit codec: Codec, naming: NamingRules) =
 	{
 		// Doesn't write anything if no classes are included
 		if (classes.nonEmpty) {
@@ -58,8 +63,8 @@ object SqlWriter
 			targetPath.writeUsing { writer =>
 				// Writes the header
 				writer.println("-- ")
-				writer.println(s"-- Database structure for ${setup.dbModuleName.doc} models")
-				setup.version.foreach { v => writer.println(s"-- Version: $v") }
+				writer.println(s"-- Database structure for ${projectName.doc} models")
+				version.foreach { v => writer.println(s"-- Version: $v") }
 				writer.println(s"-- Last generated: ${Today.toString}")
 				writer.println("--")
 				
@@ -73,7 +78,8 @@ object SqlWriter
 				}
 				
 				// Groups the classes by package and writes them
-				writeClasses(writer, initials, classesByTableName.groupBy { _._2.packageName }, references)
+				writeClasses(writer, initials, classesByTableName.groupBy { _._2.packageName }, references,
+					prefixColumnNames)
 			}
 		}
 		else
@@ -85,8 +91,8 @@ object SqlWriter
 	@tailrec
 	private def writeClasses(writer: PrintWriter, initialsMap: Map[String, String],
 	                          classesByPackageAndTableName: Map[String, Map[String, Class]],
-	                          references: Map[String, Set[String]])
-	                        (implicit setup: VaultProjectSetup, naming: NamingRules): Unit =
+	                          references: Map[String, Set[String]], prefixProperties: Boolean)
+	                        (implicit naming: NamingRules): Unit =
 	{
 		// Finds the classes which don't make any references to other remaining classes
 		val remainingTableNames = classesByPackageAndTableName.flatMap { _._2.keys }.toSet
@@ -99,7 +105,7 @@ object SqlWriter
 		if (notReferencingTableNames.isEmpty) {
 			writer.println("\n-- WARNING: Following classes contain a cyclic loop\n")
 			classesByPackageAndTableName.valuesIterator.flatMap { _.valuesIterator }.toVector.sortBy { _.name.singular }
-				.foreach { writeClass(writer, _, initialsMap) }
+				.foreach { writeClass(writer, _, initialsMap, prefixProperties) }
 		}
 		// Case: There are some classes which don't reference remaining classes => writes those
 		else {
@@ -123,8 +129,8 @@ object SqlWriter
 				.bestMatch { _._2._2.isEmpty }.maxBy { _._2._1.size }
 			val packageHeader = Name.interpret(packageName, CamelCase.lower).to(Text.allCapitalized).singular
 			writer.println(s"\n--\t$packageHeader\t${"-" * 10}\n")
-			val allRemainingPackageClasses = writePossibleClasses(writer, initialsMap, writeableClasses, references) ++
-				remainingPackageClasses
+			val allRemainingPackageClasses = writePossibleClasses(writer, initialsMap, writeableClasses, references,
+				prefixProperties) ++ remainingPackageClasses
 			// Prepares the next recursive iteration
 			val remainingClasses = {
 				if (allRemainingPackageClasses.isEmpty)
@@ -133,14 +139,15 @@ object SqlWriter
 					classesByPackageAndTableName + (packageName -> allRemainingPackageClasses)
 			}
 			if (remainingClasses.nonEmpty)
-				writeClasses(writer, initialsMap, remainingClasses, references)
+				writeClasses(writer, initialsMap, remainingClasses, references, prefixProperties)
 		}
 	}
 	
 	@tailrec
 	private def writePossibleClasses(writer: PrintWriter, initialsMap: Map[String, String],
-	                                 classesByTableName: Map[String, Class], references: Map[String, Set[String]])
-	                                (implicit setup: VaultProjectSetup, naming: NamingRules): Map[String, Class] =
+	                                 classesByTableName: Map[String, Class], references: Map[String, Set[String]],
+	                                 prefixProperties: Boolean)
+	                                (implicit naming: NamingRules): Map[String, Class] =
 	{
 		// Finds the classes which don't make any references to other remaining classes
 		val remainingTableNames = classesByTableName.keySet
@@ -154,18 +161,19 @@ object SqlWriter
 		else {
 			// Writes the classes in alphabetical order
 			notReferencingTableNames.toVector.sorted
-				.foreach { table => writeClass(writer, classesByTableName(table), initialsMap) }
+				.foreach { table => writeClass(writer, classesByTableName(table), initialsMap, prefixProperties) }
 			// Continues recursively. Returns the final group of remaining classes.
 			val remainingClassesByTableName = classesByTableName -- notReferencingTableNames
 			if (remainingClassesByTableName.nonEmpty)
-				writePossibleClasses(writer, initialsMap, remainingClassesByTableName, references)
+				writePossibleClasses(writer, initialsMap, remainingClassesByTableName, references, prefixProperties)
 			else
 				remainingClassesByTableName
 		}
 	}
 	
-	private def writeClass(writer: PrintWriter, classToWrite: Class, initialsMap: Map[String, String])
-	                      (implicit setup: VaultProjectSetup, naming: NamingRules): Unit =
+	private def writeClass(writer: PrintWriter, classToWrite: Class, initialsMap: Map[String, String],
+	                       prefixProperties: Boolean)
+	                      (implicit naming: NamingRules): Unit =
 	{
 		implicit val wr: PrintWriter = writer
 		
@@ -177,7 +185,7 @@ object SqlWriter
 				case _ => None
 			})
 		def prefixColumnName(colName: String, referredTableName: => Option[String] = None): String = {
-			if (setup.prefixSqlProperties) {
+			if (prefixProperties) {
 				referredTableName.flatMap(initialsMap.get) match {
 					case Some(refInitials) => s"${classInitials}_${refInitials}_$colName"
 					case None => s"${ classInitials }_$colName"
@@ -242,7 +250,7 @@ object SqlWriter
 						val refInitials = initialsMap(refTableName)
 						val refColumnName = {
 							val base = rawColumnName.column
-							if (setup.prefixSqlProperties)
+							if (prefixProperties)
 								s"${ refInitials }_$base"
 							else
 								base
@@ -254,7 +262,7 @@ object SqlWriter
 						val constraintNameBase = {
 							val nameWithoutId = columnName.replace("_id", "")
 							val base = {
-								if (setup.prefixSqlProperties)
+								if (prefixProperties)
 									nameWithoutId
 								else
 									s"${ classInitials }_${ refInitials }_$nameWithoutId"

@@ -10,13 +10,24 @@ import utopia.coder.model.enumeration.NameContext.{ColumnName, DbModelPropName}
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.flow.operator.Identity
+import utopia.flow.operator.ordering.CombinedOrdering
 
 object Class
 {
+	// ATTRIBUTES   ---------------------
+	
 	/**
 	  * Id / index name to use by default
 	  */
 	val defaultIdName = Name("id", "ids", CamelCase.lower)
+	
+	implicit val ord: Ordering[Class] = CombinedOrdering[Class](
+		Ordering.by { _.packageName },
+		Ordering.by { _.name.singular }
+	)
+	
+	
+	// OTHER    -------------------------
 	
 	/**
 	  * Creates a new class with automatic table-naming

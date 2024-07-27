@@ -1,11 +1,12 @@
 package utopia.coder.controller.app
 
 import utopia.coder.controller.parsing.file.InputFiles
-import utopia.coder.model.data.{Filter, ProjectPaths}
+import utopia.coder.model.data.{Filter, LazyProjectPaths, ProjectPaths}
 import utopia.flow.async.AsyncExtensions._
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.parse.file.FileUtils
 import utopia.flow.parse.file.container.ObjectMapFileContainer
 import utopia.flow.parse.json.{JsonParser, JsonReader}
 import utopia.flow.time.TimeExtensions._
@@ -14,6 +15,7 @@ import utopia.flow.util.console.ConsoleExtensions._
 import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
 import utopia.flow.util.logging.Logger
 import utopia.flow.util.{NotEmpty, Version}
+import utopia.flow.view.immutable.View
 import utopia.flow.view.immutable.caching.Lazy
 
 import java.nio.file.{Path, Paths}
@@ -50,15 +52,13 @@ trait CoderAppLogic extends AppLogic
 	/**
 	  * Runs this application
 	  * @param args Command line arguments specified by the user
-	  * @param inputPath Data input path (either a json file or a directory)
-	  * @param outputPath Output write path
-	  * @param mergeRoots Source code directories for merging
+	  * @param paths Paths to important files. Lazily initialized.
 	  * @param filter A filter to apply
 	  * @param targetGroup Targeted subgroup. None if all groups are targeted.
 	  * @return Whether the parsing process succeeded
 	  */
-	protected def run(args: CommandArguments, inputPath: Lazy[Path], outputPath: Lazy[Path],
-	                  mergeRoots: Lazy[Seq[Path]], filter: Lazy[Option[Filter]], targetGroup: Option[String]): Boolean
+	protected def run(args: CommandArguments, paths: LazyProjectPaths, filter: Lazy[Option[Filter]],
+	                  targetGroup: Option[String]): Boolean
 	
 	
 	// IMPLEMENTED  --------------------------
@@ -72,7 +72,8 @@ trait CoderAppLogic extends AppLogic
 		ArgumentSchema("target", "filter",
 			help = "Search filter applied to written classes and/or enums (case-insensitive)"),
 		ArgumentSchema("type", "group", help = "Specifies the group of items to write, or the type of filtering applied"),
-		ArgumentSchema("merge", help = "Source origin where merge input files are read from (relative to root, if root is specified)"),
+		ArgumentSchema("merge", "src",
+			help = "Source origin where merge input files are read from (relative to root, if root is specified)"),
 		ArgumentSchema.flag("all", "A", help = "Flag for selecting group 'all'"),
 		ArgumentSchema.flag("single", "S", help = "Flag for limiting filter results to exact matches"),
 		ArgumentSchema.flag("merging", "M", help = "Flag for enabling merge mode"),
@@ -85,12 +86,12 @@ trait CoderAppLogic extends AppLogic
 		
 		// Checks if the specified root path is an alias
 		val rootInput = arguments("root").string
-		lazy val project = rootInput.flatMap(projects.get)
+		val project = rootInput.flatMap(projects.get)
 		val root = project match {
 			case Some(p) => Right(p)
 			case None => Left(rootInput.map { s => s: Path })
 		}
-		val rootPath = root.leftOption.flatten
+		val rootPath = root.leftOrMap { p => Some(p.root) }
 		rootPath.filter { _.notExists }.foreach { p =>
 			println(s"Specified root path (${p.toAbsolutePath}) doesn't exist. Please try again.")
 			System.exit(0)
@@ -99,10 +100,18 @@ trait CoderAppLogic extends AppLogic
 			case Some(root) => root/endPath
 			case None => endPath
 		}
+		def paths(pathsStr: String) =
+			pathsStr.split("&").toVector.map { s => path(s.trim) }
+				.filter { p =>
+					val res = p.exists
+					if (!res)
+						println(s"Specified path ${ p.toAbsolutePath } doesn't exist")
+					res
+				}
 		
 		// Determines the input path
 		lazy val modelsPath: Path = project match {
-			case Some(p) => p.modelsDirectory
+			case Some(p) => p.input
 			case None =>
 				arguments("input").string.map(path).getOrElse {
 					rootPath match {
@@ -135,7 +144,7 @@ trait CoderAppLogic extends AppLogic
 		}
 		// Determines the output path
 		lazy val outputPath: Lazy[Path] = Lazy {
-			project.map { _.outputDirectory }
+			project.map { _.output }
 				.orElse { arguments("output").string.map(path) }
 				.getOrElse {
 					rootPath match {
@@ -167,60 +176,40 @@ trait CoderAppLogic extends AppLogic
 		val targetType = if (targetsAllTypes) None else specificallyTargetedType
 		// Determines merge roots
 		val mergeRoots = Lazy {
-			val mainRoot = project.map { _.src }.orElse {
-				arguments("merge").string match {
-					case Some(mergeRoot) =>
-						val mergeRootPath = path(mergeRoot)
-						if (mergeRootPath.exists)
-							Some(mergeRootPath)
-						else {
-							println(s"Specified merge source root path ${ mergeRootPath.toAbsolutePath } doesn't exist")
-							None
-						}
-					case None =>
-						if (arguments("merging").getBoolean) {
-							println("Please specify path to the existing source root directory (src)")
-							println(s"Hint: Path may be absolute or relative to ${
-								rootPath.getOrElse(Paths.get("")).toAbsolutePath }")
-							StdIn.readNonEmptyLine().flatMap { input =>
-								val mergeRoot = path(input)
-								if (mergeRoot.exists)
-									Some(mergeRoot)
-								else {
-									println(s"Specified path ${ mergeRoot.toAbsolutePath } doesn't exist")
-									None
-								}
-							}
-						}
-						else
-							None
-				}
-			}
-			val alternativeMergeRoot: Option[Path] = project.map { _.altSrc }.getOrElse {
-				if (mainRoot.isDefined && supportsAlternativeMergeRoots) {
-					println("If you want, please specify the alternative merge source path for the project")
-					println(s"The path may be absolute or relative to ${
-						rootPath.getOrElse(Paths.get("")).toAbsolutePath }")
-					StdIn.readNonEmptyLine().flatMap { input =>
-						val mergeRoot = path(input)
-						if (mergeRoot.exists)
-							Some(mergeRoot)
-						else {
-							println(s"Specified directory ${ mergeRoot.toAbsolutePath } didn't exist")
-							None
+			arguments("merge").string match {
+				case Some(mergeArg) => paths(mergeArg)
+				case None =>
+					if (arguments("merging").getBoolean) {
+						println("Please specify path to the existing source root directory (src)")
+						println(s"Hint: Path may be absolute or relative to ${
+							rootPath.getOrElse(Paths.get("")).toAbsolutePath }")
+						println("If you want to specify multiple source directories, separate them with '&'")
+						StdIn.readNonEmptyLine() match {
+							case Some(input) => paths(input)
+							case None => Empty
 						}
 					}
-				}
-				else
-					None
+					else
+						Empty
 			}
-			Pair(mainRoot, alternativeMergeRoot).flatten
 		}
 		
 		// Runs the actual application logic
 		// Merge roots may not be given if specifically denied with -N
-		val didSucceed = run(arguments, inputPath, outputPath,
-			if (arguments("nomerge").getBoolean) Lazy.initialized(Empty) else mergeRoots, filter, targetType)
+		val lazySources = if (arguments("nomerge").getBoolean) Lazy.initialized(Empty) else mergeRoots
+		val lazyRootPath = rootPath match {
+			case Some(predefined) => View.fixed(predefined)
+			case None =>
+				Lazy {
+					inputPath.value.commonParentWith(outputPath.value +: lazySources.value)._1.getOrElse {
+						println("Please specify the project root path")
+						println(s"The path may be absolute or relative to ${ FileUtils.workingDirectory.toAbsolutePath }")
+						StdIn.readLine(): Path
+					}
+				}
+		}
+		val lazyPaths = LazyProjectPaths(lazyRootPath, inputPath, outputPath, lazySources)
+		val didSucceed = run(arguments, lazyPaths, filter, targetType)
 		
 		// May store the project settings for future use
 		if (didSucceed && project.isEmpty &&
@@ -241,25 +230,14 @@ trait CoderAppLogic extends AppLogic
 					// The project merge root(s) are required
 					val projectMergeRoots = NotEmpty(mergeRoots.value).orElse {
 						StdIn.readNonEmptyLine(
-							s"Please specify the project source directory (absolute or relative to ${ "".toAbsolutePath })")
-							.map { p => p: Path }
-							.map { mainRoot =>
-								val altSrc = {
-									if (supportsAlternativeMergeRoots &&
-										StdIn.ask("Do you want to specify an alternative source directory?"))
-										StdIn.readNonEmptyLine(
-											s"Please specify the alternative project source director (absolute or relative to ${ "".toAbsolutePath })")
-											.map { p => p: Path }
-									else
-										None
-								}
-								Single(mainRoot) ++ altSrc
-							}
+							s"Please specify the project source directory (absolute or relative to ${
+								FileUtils.workingDirectory.toAbsolutePath })\nIf you want to specify multiple source directories, separate them with '&'.")
+							.map(paths).filter { _.nonEmpty }
 					}
 					projectMergeRoots match {
 						case Some(mergeRoots) =>
-							projects(projectName) = ProjectPaths(modelsPath, outputPath.value, mergeRoots.head,
-								mergeRoots.lift(1))
+							projects(projectName) = ProjectPaths(lazyRootPath.value, modelsPath, outputPath.value,
+								mergeRoots)
 							projects.activeSaveCompletionFuture.waitFor(3.seconds) match {
 								case Success(_) => println(s"Saved the project. You may now refer to it as '$projectName'")
 								case Failure(_) => println("Couldn't save the project.")

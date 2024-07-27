@@ -125,6 +125,11 @@ case class Package(parts: Seq[String]) extends ScalaConvertible with MaybeEmpty[
 	  * @return A sub-package of this package
 	  */
 	def /(more: String) = Package(parts ++ more.split(separatorRegex).filter { _.nonEmpty })
+	/**
+	 * @param subPackage A sub-package
+	 * @return Full package including both of these package paths
+	 */
+	def /(subPackage: Package) = Package(parts ++ subPackage.parts)
 	
 	/**
 	  * @param sourceRoot Source root directory

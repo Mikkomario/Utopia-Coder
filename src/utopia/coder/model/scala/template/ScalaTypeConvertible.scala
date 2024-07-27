@@ -5,7 +5,7 @@ import utopia.coder.model.scala.datatype.ScalaType
 /**
   * A common trait for items which may be converted to Scala data types
   * @author Mikko Hilpinen
-  * @since 17.7.2022, v1.5.1
+  * @since 17.7.2022, Vault Coder v1.5.1
   */
 trait ScalaTypeConvertible
 {

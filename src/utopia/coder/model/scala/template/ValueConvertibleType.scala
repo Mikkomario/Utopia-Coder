@@ -6,7 +6,7 @@ import utopia.coder.model.scala.datatype.ScalaType
 /**
   * A common trait for data types which can be converted to utopia.flow.datastructure.immutable.Value
   * @author Mikko Hilpinen
-  * @since 17.7.2022, v1.5.1
+  * @since 17.7.2022, Vault Coder v1.5.1
   */
 trait ValueConvertibleType
 {

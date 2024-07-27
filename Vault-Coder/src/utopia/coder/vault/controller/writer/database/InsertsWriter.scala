@@ -10,6 +10,7 @@ import utopia.coder.vault.model.data.{Class, Instance, VaultProjectSetup}
 import utopia.coder.model.enumeration.NameContext.DatabaseName
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, Text}
 import utopia.flow.operator.ordering.CombinedOrdering
+import utopia.flow.util.Version
 
 import java.io.PrintWriter
 import java.nio.file.Path
@@ -32,22 +33,24 @@ object InsertsWriter
 	
 	/**
 	  * Writes initial database inserts SQL
-	  * @param dbName Name of the targeted database (optional)
-	  * @param instances Instances to write
+	  * @param projectName Name of the project for which this document is for
+	 * @param dbName Name of the targeted database (optional)
+	  * @param version Version of this document, if applicable
+	 * @param instances Instances to write
 	  * @param targetPath Path to which the data will be written
-	  * @param setup Implicit project setup
 	  * @param naming Implicit naming rules
 	  * @return Success (containing target path) or failure
 	  */
-	def apply(dbName: Option[Name], instances: Iterable[Instance], targetPath: Path)
-	         (implicit setup: VaultProjectSetup, naming: NamingRules) =
+	def apply(projectName: Name, dbName: Option[Name], version: Option[Version], instances: Iterable[Instance],
+	          targetPath: Path)
+	         (implicit naming: NamingRules) =
 	{
 		if (instances.nonEmpty)
 			targetPath.writeUsing { writer =>
 				// Writes the header
 				writer.println("-- ")
-				writer.println(s"-- Initial database inserts for ${setup.dbModuleName}")
-				setup.version.foreach { v => writer.println(s"-- Version: $v") }
+				writer.println(s"-- Initial database inserts for $projectName")
+				version.foreach { v => writer.println(s"-- Version: $v") }
 				writer.println(s"-- Last generated: ${Today.toString}")
 				writer.println("--")
 				

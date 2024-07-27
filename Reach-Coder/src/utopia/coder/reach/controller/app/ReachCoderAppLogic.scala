@@ -1,7 +1,7 @@
 package utopia.coder.reach.controller.app
 
 import utopia.coder.controller.app.CoderAppLogic
-import utopia.coder.model.data.{Filter, NamingRules, ProjectSetup}
+import utopia.coder.model.data.{Filter, LazyProjectPaths, NamingRules, ProjectSetup}
 import utopia.coder.model.enumeration.NameContext.FileName
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.file.FileExtensions._
@@ -12,6 +12,7 @@ import utopia.flow.view.immutable.caching.Lazy
 import utopia.coder.reach.controller.reader.ComponentFactoryReader
 import utopia.coder.reach.controller.writer.ComponentFactoryWriter
 import utopia.coder.reach.util.Common
+import utopia.flow.view.immutable.View
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContext
@@ -33,18 +34,17 @@ object ReachCoderAppLogic extends CoderAppLogic
 	override protected def projectsStoreLocation: Path = "projects.json"
 	override protected def supportsAlternativeMergeRoots: Boolean = false
 	
-	override protected def run(args: CommandArguments, inputPath: Lazy[Path], outputPath: Lazy[Path],
-	                           mergeRoots: Lazy[Seq[Path]], filter: Lazy[Option[Filter]],
+	override protected def run(args: CommandArguments, paths: LazyProjectPaths, filter: Lazy[Option[Filter]],
 	                           targetGroup: Option[String]): Boolean =
 	{
-		val input = inputPath.value
+		val input = paths.input
 		if (input.notExists) {
 			println(s"The specified input path ${input.toAbsolutePath} doesn't exist")
 			false
 		}
 		else {
 			// Creates the output directory
-			outputPath.value.asExistingDirectory.flatMap { output =>
+			paths.output.asExistingDirectory.flatMap { output =>
 				// Moves out the previous build files, if possible
 				(output / "last-build").asExistingDirectory.flatMap { lastBuildDir =>
 					// Deletes the previous backup
@@ -56,7 +56,7 @@ object ReachCoderAppLogic extends CoderAppLogic
 				}.logFailureWithMessage("Failed to move the previous build")
 				
 				// Processes the input file/files
-				val mergeRoot = mergeRoots.map { _.headOption }
+				val mergeRoot = paths.srcView.mapValue { _.headOption }
 				if (input.isDirectory)
 					input.allRegularFileChildrenOfType("json").flatMap { inputPaths =>
 						inputPaths.map { process(_, output, mergeRoot, filter) }.toTryCatch.logToTry.map { _.flatten }
@@ -78,8 +78,8 @@ object ReachCoderAppLogic extends CoderAppLogic
 	
 	// OTHER    ----------------------------
 	
-	private def process(inputPath: Path, outputPath: Path, mergeRoot: Lazy[Option[Path]],
-	                    filter: Lazy[Option[Filter]]) =
+	private def process(inputPath: Path, outputPath: Path, mergeRoot: View[Option[Path]],
+	                    filter: View[Option[Filter]]) =
 	{
 		// Reads the input path
 		ComponentFactoryReader(inputPath).flatMap { projectData =>

@@ -3,7 +3,7 @@ package utopia.coder.model.data
 /**
   * A common trait for items that have singular and plural names
   * @author Mikko Hilpinen
-  * @since 18.7.2022, v1.5.1
+  * @since 18.7.2022, Vault Coder v1.5.1
   */
 trait Named
 {

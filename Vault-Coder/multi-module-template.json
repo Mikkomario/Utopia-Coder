@@ -1,0 +1,130 @@
+{
+  "name": "Project",
+  "version": "v1.0",
+  "author": "Author Name (optional)",
+  "database": "database_name (optional)",
+  "prefix_columns": false,
+  "package": "com.company.project (optional, used as root)",
+  "modules": [
+    {
+      "root": "sub-directory/module-directory (optional, under this project's root)",
+      "input": "data/models (under root)",
+      "output": "data/coder-build (under root)",
+      "src": "src",
+      "src_alt": "sub-module/src (optional, under root)"
+    }
+  ],
+  "naming": {
+    "sql": "underscore",
+    "database_name": "underscore (or from sql)",
+    "table": "underscore (or from sql)",
+    "column": "underscore (or from sql)",
+    "prop": "camelCase",
+    "db_prop": "camelCase (or from prop)",
+    "json": "camelCase",
+    "doc": "text",
+    "header": "Text (or from doc)",
+    "file_name": "kebab",
+    "class": "PascalCase",
+    "enum": "PascalCase (or from class)",
+    "enum_value": "PascalCase (or from enum)"
+  },
+  "types": {
+    "CustomDataTypeName": {
+      "type": "com.company.project.custom.GenericDataType[TypeParamName]",
+      "sql": "INT",
+      "from_value": {
+        "code": "GenericDataType.fromValue($v).getOrElse(GenericDataType.default)",
+        "references": ["com.company.project.custom.GenericDataType"]
+      },
+      "from_value_can_fail": false,
+      "from_json_value": {
+        "code": "GenericDataType.fromValue($v).getOrElse(GenericDataType.default) (optional)",
+        "references": ["com.company.project.custom.GenericDataType"]
+      },
+      "from_json_value_can_fail": false,
+      "option_from_value": {
+        "code": "GenericDataType.fromValue($v)",
+        "references": ["com.company.project.custom.GenericDataType"]
+      },
+      "option_from_json_value": {
+        "code": "GenericDataType.fromValue($v) (optional)",
+        "references": ["com.company.project.custom.GenericDataType"]
+      },
+      "to_value": {
+        "code": "$v.index",
+        "references": ["utopia.flow.generic.casting.ValueConversions._"]
+      },
+      "to_json_value": {
+        "code": "$v.index (optional)",
+        "references": ["utopia.flow.generic.casting.ValueConversions._"]
+      },
+      "option_to_value": {
+        "code": "$v.map { _.index } (optional)",
+        "references": ["utopia.flow.generic.casting.ValueConversions._"]
+      },
+      "option_to_json_value": {
+        "code": "$v.map { _.index } (optional)",
+        "references": ["utopia.flow.generic.casting.ValueConversions._"]
+      },
+      "empty": {
+        "code": "GenericDataType.empty (optional)",
+        "references": ["com.company.project.custom.GenericDataType"]
+      },
+      "default": {
+        "code": "GenericDataType.default (optional)",
+        "references": ["com.company.project.custom.GenericDataType"]
+      },
+      "sql_default": "0 (optional)",
+      "prop_name": "customDataTypeName (default)",
+      "col_suffix": "index (optional)",
+      "index": false
+    },
+    "CustomMultiColumnDataTypeName": {
+      "type": "com.company.project.custom.TypeName",
+      "parts": [
+        {
+          "type": "Option[Int]",
+          "sql": "INT",
+          "extract": "Some($v.part1)",
+          "extract_from_option": "$v.map { _.part1 }",
+          "to_value": {
+            "code": "$v (default)",
+            "references": ["utopia.flow.generic.casting.ValueConversions._"]
+          },
+          "nullable": false,
+          "empty": "None (default)",
+          "sql_default": "0 (optional)",
+          "index": false,
+          "col_suffix": ""
+        }
+      ],
+      "from_value": {
+        "code": "TypeName($v1.getInt, $v2.getString)",
+        "references": ["com.company.project.custom.TypeName"]
+      },
+      "from_value_can_fail": false,
+      "option_from_value": {
+        "code": "$v1.int.flatMap { part1 => $v2.string.map { part2 => TypeName(part1, part2) } }",
+        "references": ["com.company.project.custom.TypeName"]
+      },
+      "to_value": {
+        "code": "$v.part2 + $v.part1",
+        "references": ["utopia.flow.generic.casting.ValueConversions._"]
+      },
+      "option_to_value": {
+        "code": "$v.map { v => v.part2 + v.part1 }",
+        "references": ["utopia.flow.generic.casting.ValueConversions._"]
+      },
+      "empty": {
+        "code": "TypeName.empty (optional)",
+        "references": ["com.company.project.custom.TypeName"]
+      },
+      "default": {
+        "code": "TypeName.default (optional)",
+        "references": ["com.company.project.custom.TypeName"]
+      },
+      "prop_name": "customMultiColumnDataTypeName (default)"
+    }
+  }
+}
