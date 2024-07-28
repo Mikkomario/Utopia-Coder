@@ -524,7 +524,7 @@ object DbModelWriter
 	{
 		// Utilizes 'valueProperties' defined in parent traits when inheriting
 		val parentValuePropsCode = parentReferences.map { _.mapText { parent => s"$parent.valueProperties" } }
-			.reduceLeft { _.append(_, " ++ ") }
+			.reduceLeftOption { _.append(_, " ++ ") }.getOrElse(CodePiece.empty)
 		// The other properties are defined here manually
 		val remainingProperties = classToWrite.properties.filterNot { _.isExtension }
 		

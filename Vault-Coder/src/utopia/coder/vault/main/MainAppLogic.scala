@@ -195,32 +195,27 @@ object MainAppLogic extends CoderAppLogic
 		println()
 		
 		// Writes a single common SQL, table documentation, etc. for each database
-		modules.map { _._1 }.groupBy { _.databaseName }
-			.map { case (databaseName, modules) =>
-				writeCommonFiles(projectName, commonVersion, modules, databaseName, commonOutputPath,
-					prefixColumnNames)(commonNaming)
-			}
-			.findMap { _.failure }
-			.foreach { log(_, "Failed to write some of the commonly shared files") }
+		commonOutputPath.createDirectories() match {
+			case Success(commonOutputPath) =>
+				backup(commonOutputPath)
+				modules.map { _._1 }.groupBy { _.databaseName }
+					.map { case (databaseName, modules) =>
+						println(s"Writing common files for ${ modules.size } modules to $commonOutputPath")
+						writeCommonFiles(projectName, commonVersion, modules, databaseName, commonOutputPath,
+							prefixColumnNames)(commonNaming)
+					}
+					.findMap { _.failure }
+					.foreach { log(_, "Failed to write some of the commonly shared files") }
+			case Failure(error) => log(error, s"Failed to create the output directory $commonOutputPath")
+		}
 		
 		// Handles one module at a time
 		val writeResults = filteredData.filter { _._1.nonEmpty }.map { case (module, paths) =>
 			println(s"Writing class and enumeration data to ${paths.output.toAbsolutePath}...")
 			paths.output.asExistingDirectory.flatMap { directory =>
 				// Moves the previously written files to a backup directory (which is cleared first)
-				val backupDirectory = directory/"last-build"
-				if (backupDirectory.exists)
-					backupDirectory.deleteContents().failure.foreach { e =>
-						println(s"WARNING: failed to clear $backupDirectory before backup. Error message: ${e.getMessage}")
-					}
-				else
-					backupDirectory.createDirectories().failure.foreach { _.printStackTrace() }
-				directory.tryIterateChildren {
-						_.filterNot { _ == backupDirectory }.map { _.moveTo(backupDirectory) }.toVector.toTry }
-					.failure
-					.foreach { e =>
-						println(s"WARNING: Failed to back up some previously built files. Error message: ${e.getMessage}")
-					}
+				if (directory != commonOutputPath)
+					backup(directory)
 				
 				println(s"Writing ${module.classes.size} classes, ${
 					module.enumerations.size} enumerations and ${
@@ -316,7 +311,7 @@ object MainAppLogic extends CoderAppLogic
 	                               (implicit setup: VaultProjectSetup, naming: NamingRules): Try[Map[Class, ClassReferences]] =
 	{
 		// Checks which classes may be written immediately
-		val (readyClasses, pendingClasses) = classesToWrite
+		val (pendingClasses, readyClasses) = classesToWrite
 			.divideBy { _.parents.forall(classReferenceMap.contains) }.toTuple
 		
 		def write(classToWrite: Class) =
@@ -432,6 +427,23 @@ object MainAppLogic extends CoderAppLogic
 									}
 							}
 					}
+			}
+	}
+	
+	private def backup(directory: Path) = {
+		// Moves the previously written files to a backup directory (which is cleared first)
+		val backupDirectory = directory/"last-build"
+		if (backupDirectory.exists)
+			backupDirectory.deleteContents().failure.foreach { e =>
+				println(s"WARNING: failed to clear $backupDirectory before backup. Error message: ${e.getMessage}")
+			}
+		else
+			backupDirectory.createDirectories().failure.foreach { _.printStackTrace() }
+		directory.tryIterateChildren {
+				_.filterNot { _ == backupDirectory }.map { _.moveTo(backupDirectory) }.toVector.toTry }
+			.failure
+			.foreach { e =>
+				println(s"WARNING: Failed to back up some previously built files. Error message: ${e.getMessage}")
 			}
 	}
 }
