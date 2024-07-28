@@ -12,18 +12,21 @@ First, you need to prepare a .json file describing the model structure you want 
 See the required document structure below.  
 
 Once you have created a specification document, run the application using the following command line command: 
-`java -jar Vault-Coder.jar <root> <input> <output> <filter> <group> <merge>`
-- `<root>` (`project`) argument specifies **either** the path (beginning) that is common for both the input and the output
+`java -jar Vault-Coder.jar <root> <input> <output> <filter> <group> <merge> <module>`
+- `<root>` (`project`) argument specifies **either** the path (root) that is common for both `input`, `output` and `merge`
   - This argument is optional
-  - You may also pass a previously stored **project name** here, in which case you may omit `input` and `output` 
+  - You may also pass a previously stored **project name** here, in which case you may omit `input`, `output` and `merge` 
 - `<input>` (`in`) points towards your specification .json file or to a directory that holds such files
   - This argument is optional, but if `<root>` is not specified, this value is requested during application use
   - If `<root>` is specified, this path should be relative to it
   - If `<root>` is specified and this is not specified, uses `<root>` as the input path
+  - Typically, this value points to a directory with multiple versioned json files. 
+    In these cases, the latest version is always read and the others skipped.
 - `<output>` (`out`) argument specifies the path to where the generated code will be stored 
   - If `<root>` is specified, this path should be relative to it
   - If this argument is not specified, it is requested during application use
   - If the target directory doesn't exist, it will be created
+  - Note: It is safest to use a separate directory for this purpose
 - `<filter>` is a filter that is used to reduce the number of classes or enumerations that are written
   - This argument is optional
   - If `<group>` is specified and this value is not, the application allows the user to type a filter during 
@@ -42,8 +45,10 @@ Once you have created a specification document, run the application using the fo
   - You may also specify this value during program use if you pass `-M` as a command line argument
   - Alternatively, you may specifically disable merging by passing `-N` as a command line argument
     - This is only necessary on saved projects
-  - NB: When merging data in projects where the database and the model implementations are separated to different 
-    modules, the application will request another (optional) source directory for the other module
+  - If your project / module contains multiple source directories, include them all, separated with `&`
+- `<module>` Specifies the targeted module in a multimodal project
+  - This argument is optional
+  - If omitted, all project modules will be generated
 - Additionally, if you specify the `-NC` flag, you may prevent any combo classes from being written
 
 The program will inform you if there were any problems during input file processing or during output write operations.
@@ -55,9 +60,9 @@ When writing a new input document, you may start with the
 [input template](https://github.com/Mikkomario/Utopia-Scala/blob/development/Vault-Coder/input-template.json) file.
 
 The input .json file should contain a single object with following properties:
-- **"name" / "project": String (optional)** - Name of this project
+- **"name" / "project": String (optional)** - Name of this project or module
   - If left empty, the name will be based on the specified base package or database package
-  - If your project contains multiple modules, name the Vault-dependent module
+  - If your project is separated to a non-database and database parts, name the Vault-dependent part
 - **"author": String (optional)** - Author of this project's model structure
 - **"base_package" / "package": String (optional)** - Contains the package prefix common to all generated files 
   (e.g. `"utopia.vault.coder"`)
@@ -90,8 +95,46 @@ The input .json file should contain a single object with following properties:
     - Alternatively, you may pass a string as a package property value. In these cases, the string is expected to 
       list either a .json file that contains the class object array, 
       or a directory that contains a versioned set of such files.
-      - E.g. If the read file is `/dir/models-v1.0.json`, a property `"package1": "package-models"` would find 
+      - E.g. If the primary file is `/dir/models-v1.0.json`, a property `"package1": "package-models"` would find 
         the latest version json file from under `/dir/package-models` and expect a json object array as file contents.
+
+### Multimodal Projects
+For more complex projects, you may write a multimodal project file. This is similar to a standard input file, but:
+- Doesn't contain class or enumeration data
+- Contains references to all modules, including their paths relative to the project's `root` path
+- Specifies default values which apply to all model files, unless overridden
+
+Multimodal project files support the following properties:
+- **"name" / "project": String (optional)** - Name of this project
+  - Same rules apply as to other input files
+- **"author": String (optional)** - Author of this project's model structure
+- **"base_package" / "package": String (optional)** - Contains the package prefix common to all generated files
+  (e.g. `"utopia.vault.coder"`)
+  - NB: All packages listed within module files will be appended to this value
+    - E.g. If package here is defined as `com.company` and a submodule's package is `module`, 
+      the class files of that module will be written under com.company.module
+- **"database_name" / "db_name" / "database" / "db": String (optional)** - Name of the target database
+- **"mutable_props" / "mutable": Boolean (optional)** - True if properties should be considered mutable by default
+  - May / will be overridden by module- and property-specific declarations
+  - `false` (i.e. immutable) by default
+- **"prefix_columns": Boolean (optional)** - Whether sql column names should have a table-name -based prefix
+  (default = `false`)
+- **"naming": Object (optional)** - An object where you can specify custom naming schemes for the generated documents
+  - See [Naming Object Structure](#naming-object-structure) for more details
+- **"types" / "data_types": Object (optional)** - Contains a custom data type object for each key.
+  The keys may be used within the property declarations to reference these data types.
+  - See [Data Type Object Structure](#data-type-object-structure) for more details
+
+Besides these, you **must** include the following property:
+- **modules: [Object]** - An array of this project's modules. Each contains the following properties:
+  - **root: Path (optional)** - Path common to all other paths in this module
+    - Relative to this project's `root` path
+  - **input: Path** - Path to the directory or file where module classes will be read
+    - Relative to `root`
+  - **output: Path** - Path to the directory where generated files will be placed
+    - Relative to `root`
+  - **sources: [Path]** - Paths to the source directories within this module
+    - Relative to `root`
 
 ### Enumeration Object Structure
 Enumeration objects should contain the following properties:
@@ -314,7 +357,7 @@ database. In such a situation, you need to apply the following changes when writ
 - **Don't** include the **"index", "length_rule" or "sql_default"** -properties within the main property object
 
 #### Combination Object Structure
-Each combination object should contains following properties:
+Each combination object should contain following properties:
 - **"child" / "children": String** - Name of the linked child class
   - NB: If you use the name `"children"` and don't otherwise specify combination type, 1-n -linking will be used.
     For `"child"` property name, combination type 1- 0-1 will be used instead.
@@ -502,61 +545,66 @@ This application will produce the following documents
 - **S-database-structure.sql** -document that contains create table sql statements
 - **S-length-rules.json** -document that contains all listed column length rules
   - Use `ColumnLengthRules.loadFrom(...)` in **Vault** in your code to apply this file to your project
+- **S-tables.ndjson** -document, which lists all classes / tables in a json format
 - **S.md** - Class & enumeration documentation
 - **S-merge-conflicts-yyyy-mm-dd-hh-mm.txt** -document that lists merge conflicts that occurred (if there were any)
-- project root package
-  - model
-    - combined
-      - **P**
-        - **DescribedX.scala** - A version of the class which includes descriptions 
-        (only for classes with description support)
-    - enumeration
-      - **E.scala** where **E** goes through each introduced enumeration
-    - partial
-      - **P**
-        - **XData.scala** - The data model containing basic model information
-    - stored
-      - **P**
-        - **X.scala** - A stored variant of the class model
-  - database
-    - **STables.scala** - An object containing a reference to all tables listed in the **database_structure.sql** document
-    - factory
-      - **SDescriptionLinkFactory.scala** - An object that contains description link factories for described classes
-      - **P**
-        - **XFactory.scala** - A factory object used for reading models from database
-          - These are also generated for various class combinations
+- src
+  - project root package
     - model
-      - **SDescriptionLinkModel.scala** - An object that contains description link model factories for described classes
-      - **P**
-        - **XModel.scala** - Database interaction model class + the associated companion object used for forming queries etc.
-    - access
-      - single
+      - enumeration
+        - **E.scala** where **E** goes through each introduced enumeration
+      - factory
+        - **XFactory.scala** - Trait defining class-specific with-functions
+        - **XFactoryWrapper.scala** - Trait implementing these with-functions by wrapping another **XFactory**
+      - partial
         - **P**
-          - **X**
-            - **UniqueXAccessLike.scala** - A trait common to distinct single access points that return instances 
-              of **X** or any combinations where **X** acts as the parent class
-              - Only generated for classes that use combinations
-            - **UniqueXAccess.scala** - A trait common to distinct single access points that return instances of **X**
-            - **DbSingleX.scala** - A class that accesses individual instances of **X** based on their id
-              - Also generated for various class combinations
-            - **DbX.scala** - The root access point for individual instances of **X**
-              - Also generated for various class combinations
-        - description
-          - **DbXDescription.scala** - The root access point for individual descriptions targeting instances of **X**
-            - Only generated for classes which support descriptions
-      - many
+          - **XData.scala** - The data model containing basic model information
+      - stored
         - **P**
-          - **X**
-            - **ManyXsAccessLike.scala** - A trait common to access points that return multiple instances 
-              of **X** or its variations (combinations) at a time
-              - Only generated for classes that use combinations
-            - **ManyXsAccess.scala** - A trait common to access points that return multiple instances of **X** at a time
-              - Also generated for various class combinations
-            - **DbXs.scala** - The root access point for multiple instances of **X**
-              - Also generated for various class combinations
-        - description
-          - **DbXDescriptions.scala** - The root access point for accessing multiple **X**-descriptions at once
-            - Only generated for classes which support descriptions
+          - **X.scala** - A stored variant of the class model
+      - combined
+        - **P**
+          - **DescribedX.scala** - A version of the class which includes descriptions
+            (only for classes with description support)
+    - database
+      - **STables.scala** - An object containing a reference to all tables listed in the **database_structure.sql** document
+      - storable
+        - **SDescriptionLinkModel.scala** - An object that contains description link model factories for described classes
+        - **P**
+          - **XModel.scala** - Database interaction model class + the associated companion object used for forming queries etc.
+      - factory
+        - **SDescriptionLinkFactory.scala** - An object that contains description link factories for described classes
+        - **P**
+          - **XFactory.scala** - A factory object used for reading models from database
+            - These are also generated for various class combinations
+      - access
+        - single
+          - **P**
+            - **X**
+              - **UniqueXAccessLike.scala** - A trait common to distinct single access points that return instances 
+                of **X** or any combinations where **X** acts as the parent class
+                - Only generated for classes that use combinations
+              - **UniqueXAccess.scala** - A trait common to distinct single access points that return instances of **X**
+              - **DbSingleX.scala** - A class that accesses individual instances of **X** based on their id
+                - Also generated for various class combinations
+              - **DbX.scala** - The root access point for individual instances of **X**
+                - Also generated for various class combinations
+          - description
+            - **DbXDescription.scala** - The root access point for individual descriptions targeting instances of **X**
+              - Only generated for classes which support descriptions
+        - many
+          - **P**
+            - **X**
+              - **ManyXsAccessLike.scala** - A trait common to access points that return multiple instances 
+                of **X** or its variations (combinations) at a time
+                - Only generated for classes that use combinations
+              - **ManyXsAccess.scala** - A trait common to access points that return multiple instances of **X** at a time
+                - Also generated for various class combinations
+              - **DbXs.scala** - The root access point for multiple instances of **X**
+                - Also generated for various class combinations
+          - description
+            - **DbXDescriptions.scala** - The root access point for accessing multiple **X**-descriptions at once
+              - Only generated for classes which support descriptions
 
 ## Generating Model Templates
 There's an alternative mode available. This mode reads one or more tables from a database and writes 

@@ -10,8 +10,7 @@
       "root": "sub-directory/module-directory (optional, under this project's root)",
       "input": "data/models (under root)",
       "output": "data/coder-build (under root)",
-      "src": "src",
-      "src_alt": "sub-module/src (optional, under root)"
+      "sources": ["src"]
     }
   ],
   "naming": {

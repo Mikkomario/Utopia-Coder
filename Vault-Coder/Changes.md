@@ -11,6 +11,9 @@
 - Database models are now written into `database.storable` package instead of `database.model` package
 - The input file no longer supports classes defined as a single `class` property
 - A package property no longer supports an object as a value
+- Removed support for generating multiple projects at once
+  - It is not certain, however, whether this feature was ever possible to utilize anyway
+  - This is replaced with the new multimodal projects -feature 
 - Generated **UniqueXAccessLike** traits now extend **FilterableView**
 - The child-property in multi-linked combined models is now **Seq** instead of **Vector**
 - The `.values` property in enumerations with exactly two values is now of type **Pair** instead of **Vector**
