@@ -1,0 +1,16 @@
+<component name="ArtifactManager">
+  <artifact name="Reach-Coder">
+    <output-path>$PROJECT_DIR$/out/artifacts/Reach_Coder</output-path>
+    <root id="root">
+      <element id="archive" name="Reach-Coder.jar">
+        <element id="module-output" name="Reach-Coder" />
+        <element id="module-output" name="BunnyMunch" />
+        <element id="module-output" name="Flow" />
+        <element id="module-output" name="Utopia-Coder" />
+      </element>
+      <element id="library" level="application" name="scala-sdk-2.13.12" />
+      <element id="file-copy" path="$PROJECT_DIR$/Reach-Coder/input-template.json" />
+      <element id="file-copy" path="$PROJECT_DIR$/Reach-Coder/README.md" />
+    </root>
+  </artifact>
+</component>

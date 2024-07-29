@@ -1,6 +1,17 @@
 # Utopia Vault Coder
 
-## v1.11 (in development)
+## v1.11 - 28.7.2024
+This update introduces both a number of styling updates (breaking) and multiple new features.  
+Most importantly, feature-wise, projects may now be split into multiple submodules and even package-specific 
+json files. This helps in keeping track of classes in larger projects.
+
+Other important new features include:
+- Generation of various withX(...) access / filter functions
+- Generation of factory traits with various withX(...) functions
+- New data types
+- Property mutabilities, which affect whether setters will be generated to the access points
+- Automated backups of merged files
+
 ### Breaking changes
 - Code-generation now matches **Vault v1.19**
 - Factory objects are now named "...DbFactory" instead of "...Factory"

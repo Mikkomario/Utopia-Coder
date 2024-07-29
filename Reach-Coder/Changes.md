@@ -1,6 +1,7 @@
 # Reach Coder - List of changes
 
-## v1.0.2 (in development)
+## v1.0.2 - 28.7.2024
+A minor update following mostly general **Utopia Coder** changes.
 ### New features
 - Backups are now taken when files are merged together
 ### Other changes
