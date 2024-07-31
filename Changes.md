@@ -3,6 +3,8 @@
 ## v1.1.1 (in development)
 ### Bugfixes
 - Fixed a bug where project sources would not get applied automatically
+- Changed the syntax for including multiple paths from separation with `&` to separation with `:` since 
+  `&` conflicted with Linux terminal syntax
 ### New features
 - New refactoring tools:
   - Added **PackageTarget** for locating packages within project sources

@@ -25,7 +25,8 @@ object UpgradeVault
 {
 	// ATTRIBUTES   --------------------------
 	
-	private lazy val manyAccessPackages = PackageTarget(Package("database.access.many"), recursive = true)
+	private lazy val accessPackages = PackageTarget(Package("database.access.*"), recursive = true)
+	// private lazy val manyAccessPackages = PackageTarget(Package("database.access.many"), recursive = true)
 	
 	
 	// OTHER    ------------------------------
@@ -58,9 +59,9 @@ object UpgradeVault
 		val oldFilterIdentifiers = oldFilterMethodNames.map { FunctionIdentifier(_, vault.condition) }
 		
 		// Finds sub-view implementations and replaces them with new ones
-		val subAccessTargetRegex = Regex("Sub") + (Regex("Access") || "View").withinParenthesis +
-			Regex.escape('(') + Regex("override val parent")
-		val replaceAccessCompanions = ReplaceCode(manyAccessPackages, subAccessTargetRegex) { i =>
+		val subAccessTargetRegex = Regex("Sub") + (Regex("Access") || "View").withinParenthesis + Regex.escape('(') +
+			(Regex("override val parent") || Regex("condition\\: Condition\\) extends")).withinParenthesis
+		val replaceAccessCompanions = ReplaceCode(accessPackages, subAccessTargetRegex) { i =>
 			if (i.isObject) {
 				println(s"Replacing ${ i.name } companion object")
 				AccessWriter.accessCompanionObject(ScalaType.basic(i.name))
@@ -74,8 +75,8 @@ object UpgradeVault
 		val companionsResults = replaceAccessCompanions(sourceRoot)
 		
 		// Also replaces the other filter function implementations
-		val manyAccessRegex = Regex("Many") + Regex.word + "Access"
-		val replaceFilters = ReplaceCode(manyAccessPackages, Regex("trait ") + manyAccessRegex) { i =>
+		val manyAccessRegex = (Regex("Many") || "Unique").withinParenthesis + Regex.word + "Access"
+		val replaceFilters = ReplaceCode(accessPackages, Regex("trait ") + manyAccessRegex) { i =>
 			if (i.isTrait && manyAccessRegex(i.name) && oldFilterIdentifiers.exists(i.contains)) {
 				println(s"Replacing ${ i.name } filter method")
 				i -- oldFilterIdentifiers + AccessWriter.filteringApply(ScalaType.basic(i.name))

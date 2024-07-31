@@ -8,6 +8,7 @@
   - Please note, however, that the nested instances and the apply implementations from previous versions 
     are not removed automatically
 ### Bugfixes
+- When specifying multiple directories, the separator is now `:` instead of `&`, since `&` had issues on Linux
 - Fixed an issue where classes with **Long** ids 
   would be targeted with **Int** ids in their "many" root access -variants
 ### New features

@@ -54,6 +54,7 @@ object UpgradeVaultAppLogic extends CoderAppLogic
 			false
 		}
 		else {
+			MainAppLogic.backup(paths.output)
 			val backupDir = paths.output/"backup"
 			implicit val backup: Backup = new Backup(sources, backupDir)
 			sources.foreach { src =>

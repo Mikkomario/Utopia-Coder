@@ -9,6 +9,7 @@ import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.parse.file.FileUtils
 import utopia.flow.parse.file.container.ObjectMapFileContainer
 import utopia.flow.parse.json.{JsonParser, JsonReader}
+import utopia.flow.parse.string.Regex
 import utopia.flow.time.TimeExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.flow.util.console.ConsoleExtensions._
@@ -100,14 +101,14 @@ trait CoderAppLogic extends AppLogic
 			case Some(root) => root/endPath
 			case None => endPath
 		}
+		val pathSplitterRegex = Regex.escape(':')
 		def paths(pathsStr: String) =
-			pathsStr.split("&").toVector.map { s => path(s.trim) }
-				.filter { p =>
-					val res = p.exists
-					if (!res)
-						println(s"Specified path ${ p.toAbsolutePath } doesn't exist")
-					res
-				}
+			pathSplitterRegex.split(pathsStr).map { s => path(s.trim) }.filter { p =>
+				val res = p.exists
+				if (!res)
+					println(s"Specified path ${ p.toAbsolutePath } doesn't exist")
+				res
+			}
 		
 		// Determines the input path
 		lazy val modelsPath: Path = project match {
@@ -186,7 +187,7 @@ trait CoderAppLogic extends AppLogic
 								println("Please specify path to the existing source root directory (src)")
 								println(s"Hint: Path may be absolute or relative to ${
 									rootPath.getOrElse(Paths.get("")).toAbsolutePath }")
-								println("If you want to specify multiple source directories, separate them with '&'")
+								println("If you want to specify multiple source directories, separate them with ':'")
 								StdIn.readNonEmptyLine() match {
 									case Some(input) => paths(input)
 									case None => Empty
@@ -235,7 +236,7 @@ trait CoderAppLogic extends AppLogic
 					val projectMergeRoots = NotEmpty(mergeRoots.value).orElse {
 						StdIn.readNonEmptyLine(
 							s"Please specify the project source directory (absolute or relative to ${
-								FileUtils.workingDirectory.toAbsolutePath })\nIf you want to specify multiple source directories, separate them with '&'.")
+								FileUtils.workingDirectory.toAbsolutePath })\nIf you want to specify multiple source directories, separate them with ':'.")
 							.map(paths).filter { _.nonEmpty }
 					}
 					projectMergeRoots match {
