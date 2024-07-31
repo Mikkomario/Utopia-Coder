@@ -1,6 +1,32 @@
 # Utopia Coder - list of changes
 
-## v1.1 (in development)
+## v1.1.1 (in development)
+### Bugfixes
+- Fixed a bug where project sources would not get applied automatically
+### New features
+- New refactoring tools:
+  - Added **PackageTarget** for locating packages within project sources
+  - Added **ReplaceCode**, which can be used for modifying specific types of instances throughout the project
+- Added support for 2 new application logics:
+  - **ListProjectAppLogic**, which lists projects that have been registered
+  - **ShowProjectAppLogic**, which shows project paths
+    - This logic may also be used to easily register new projects
+- Added support for function identifiers
+### New methods
+- **File**
+  - Add `.mapInstanceDeclarations(...)`
+- **InstanceDeclaration**
+  - Added `.declarationType: InstanceDeclarationType`, plus `.isClass`, `.isTrait` and `.isObject`
+  - Added a number of functions for adding and removing methods, properties and nested instances
+- **ScalaType**
+  - Added `.withoutGenericTypeParameters`
+### Other changes
+- Command argument hints are no longer displayed for commands with no arguments
+- **Applogic**`.argumentSchema` is now of type **Seq** instead of **Vector**
+- **InstanceDeclaration**`.makeCopy(...)` now has default parameter values
+- **Parameters** now extends **Iterable**
+
+## v1.1 - 28.7.2024
 Adding refactoring support
 ### Breaking changes
 - Modified **CodeAppLogic**'s `run(...)` function's parameters

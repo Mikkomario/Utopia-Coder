@@ -21,6 +21,8 @@ case class TraitDeclaration(name: String, genericTypes: Seq[GenericType] = Empty
                             isSealed: Boolean = false)
 	extends InstanceDeclaration
 {
+	override def declarationType: InstanceDeclarationType = InstanceDeclarationType.TraitD
+	
 	override protected def constructorParams = None
 	
 	override def creationCode = Code.empty

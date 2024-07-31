@@ -117,6 +117,11 @@ case class MethodDeclaration(visibility: Visibility, name: String, genericTypes:
                              isLowMergePriority: Boolean)
 	extends FunctionDeclaration[MethodDeclaration] with Mergeable[MethodDeclaration, MethodDeclaration]
 {
+	// ATTRIBUTES   --------------------------
+	
+	override lazy val identifier = super.identifier
+	
+	
 	// IMPLEMENTED  --------------------------
 	
 	override def keyword = "def"

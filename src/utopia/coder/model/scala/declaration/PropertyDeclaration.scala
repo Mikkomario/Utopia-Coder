@@ -45,6 +45,11 @@ case class PropertyDeclaration(declarationType: PropertyDeclarationType, name: S
                                isLowMergePriority: Boolean = false)
 	extends FunctionDeclaration[PropertyDeclaration] with Mergeable[PropertyDeclaration, PropertyDeclaration]
 {
+	// ATTRIBUTES   ---------------------------------------
+	
+	override lazy val identifier = super.identifier
+	
+	
 	// COMPUTED -------------------------------------------
 	
 	/**

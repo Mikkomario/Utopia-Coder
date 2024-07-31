@@ -4,9 +4,11 @@ import utopia.bunnymunch.jawn.JsonBunny
 import utopia.flow.async.context.ThreadPool
 import utopia.flow.parse.json.JsonParser
 import utopia.flow.time.TimeExtensions._
+import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.logging.{Logger, SysErrLogger}
 import utopia.vault.database.ConnectionPool
 
+import java.nio.file.Path
 import scala.concurrent.ExecutionContext
 
 /**
@@ -21,4 +23,6 @@ object Common
 	implicit val connectionPool: ConnectionPool =
 		new ConnectionPool(20, 4, 10.seconds)
 	implicit val jsonParser: JsonParser = JsonBunny
+	
+	val projectsPath: Path = "projects.json"
 }

@@ -1,9 +1,8 @@
 package utopia.coder.model.scala.declaration
 
-import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.Visibility.Public
+import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.datatype.{Extension, GenericType}
-import utopia.coder.model.scala.declaration.InstanceDeclarationType.ClassD
 import utopia.coder.model.scala.{Annotation, DeclarationDate, Parameters, Visibility}
 import utopia.flow.collection.immutable.Empty
 
@@ -30,6 +29,8 @@ case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Empty
 		else
 			"class"
 	}
+	
+	override def declarationType: InstanceDeclarationType = InstanceDeclarationType.ClassD
 	
 	override protected def constructorParams = Some(constructionParams)
 	

@@ -63,7 +63,7 @@ trait CoderAppLogic extends AppLogic
 	
 	// IMPLEMENTED  --------------------------
 	
-	override def argumentSchema = Vector(
+	override def argumentSchema: Seq[ArgumentSchema] = Vector(
 		ArgumentSchema("project", "root", help = "Common directory path OR the name of an existing project"),
 		ArgumentSchema("input", "in",
 			help = "Path to file or directory where data is read from (relative to root, if root is specified)"),
@@ -179,18 +179,22 @@ trait CoderAppLogic extends AppLogic
 			arguments("merge").string match {
 				case Some(mergeArg) => paths(mergeArg)
 				case None =>
-					if (arguments("merging").getBoolean) {
-						println("Please specify path to the existing source root directory (src)")
-						println(s"Hint: Path may be absolute or relative to ${
-							rootPath.getOrElse(Paths.get("")).toAbsolutePath }")
-						println("If you want to specify multiple source directories, separate them with '&'")
-						StdIn.readNonEmptyLine() match {
-							case Some(input) => paths(input)
-							case None => Empty
-						}
+					project match {
+						case Some(project) => project.sources
+						case None =>
+							if (arguments("merging").getBoolean) {
+								println("Please specify path to the existing source root directory (src)")
+								println(s"Hint: Path may be absolute or relative to ${
+									rootPath.getOrElse(Paths.get("")).toAbsolutePath }")
+								println("If you want to specify multiple source directories, separate them with '&'")
+								StdIn.readNonEmptyLine() match {
+									case Some(input) => paths(input)
+									case None => Empty
+								}
+							}
+							else
+								Empty
 					}
-					else
-						Empty
 			}
 		}
 		

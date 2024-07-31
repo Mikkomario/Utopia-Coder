@@ -166,6 +166,14 @@ case class ScalaType(code: CodePiece, typeParameters: Seq[ScalaType] = Empty, ca
 	}
 	
 	
+	// COMPUTED ------------------------
+	
+	/**
+	 * @return Copy of this type with no generic type parameters specified
+	 */
+	def withoutGenericTypeParameters = if (typeParameters.isEmpty) this else copy(typeParameters = Empty)
+	
+	
 	// OTHER    ------------------------
 	
 	/**

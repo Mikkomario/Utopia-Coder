@@ -13,10 +13,10 @@
         <element id="module-output" name="Vault" />
       </element>
       <element id="library" level="project" name="mariadb-java-client" />
-      <element id="library" level="application" name="scala-sdk-2.13.12" />
       <element id="file-copy" path="$PROJECT_DIR$/Vault-Coder/README.md" />
       <element id="file-copy" path="$PROJECT_DIR$/Vault-Coder/input-template.json" />
       <element id="file-copy" path="$PROJECT_DIR$/Vault-Coder/multi-module-template.json" />
+      <element id="library" level="application" name="scala-sdk-2.13.14" />
     </root>
   </artifact>
 </component>

@@ -10,6 +10,7 @@ import utopia.coder.model.merging.{MergeConflict, Mergeable}
 import utopia.coder.model.scala.{Package, datatype}
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.model.scala.template.CodeConvertible
+import utopia.flow.util.Mutate
 
 import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
@@ -164,6 +165,12 @@ case class File(packagePath: Package, declarations: Seq[InstanceDeclaration], fi
 		}
 		fileToWrite.writeTo(ref.path.withFileName(actualFileName)).map { _ => ref }
 	}
+	
+	/**
+	 * @param f A mapping function applied to individual instance declarations within this file
+	 * @return Copy of this file with mapped declarations
+	 */
+	def mapInstanceDeclarations(f: Mutate[InstanceDeclaration]) = copy(declarations = declarations.map(f))
 	
 	private def importTargetsFrom(references: Set[Reference]) = {
 		// Those of the imports which can be grouped, are grouped

@@ -21,6 +21,8 @@ case class ObjectDeclaration(name: String, extensions: Seq[Extension] = Empty,
                              isCaseObject: Boolean = false)
 	extends InstanceDeclaration
 {
+	override def declarationType: InstanceDeclarationType = InstanceDeclarationType.ObjectD
+	
 	override def keyword = if (isCaseObject) "case object" else "object"
 	
 	override protected def constructorParams = None

@@ -55,7 +55,7 @@ object MainAppLogic extends CoderAppLogic
 	override protected implicit def exc: ExecutionContext = Common.exc
 	override protected implicit def log: Logger = Common.log
 	
-	override protected def projectsStoreLocation: Path = "projects.json"
+	override protected def projectsStoreLocation: Path = Common.projectsPath
 	override protected def supportsAlternativeMergeRoots: Boolean = true
 	
 	// Adds the "no combos" -argument and the "module" argument
@@ -135,6 +135,28 @@ object MainAppLogic extends CoderAppLogic
 	
 	
 	// OTHER    -------------------
+	
+	/**
+	 * Backs up an old directory by moving its contents to a sub-directory instead
+	 * @param directory Directory that will be backed up
+	 * @param subDirectoryName Name of the directory in which the old files from this directory are placed
+	 */
+	def backup(directory: Path, subDirectoryName: String = "last-build") = {
+		// Moves the previously written files to a backup directory (which is cleared first)
+		val backupDirectory = directory/subDirectoryName
+		if (backupDirectory.exists)
+			backupDirectory.deleteContents().failure.foreach { e =>
+				println(s"WARNING: failed to clear $backupDirectory before backup. Error message: ${e.getMessage}")
+			}
+		else
+			backupDirectory.createDirectories().failure.foreach { _.printStackTrace() }
+		directory.tryIterateChildren {
+				_.filterNot { _ == backupDirectory }.map { _.moveTo(backupDirectory) }.toVector.toTry }
+			.failure
+			.foreach { e =>
+				println(s"WARNING: Failed to back up some previously built files. Error message: ${e.getMessage}")
+			}
+	}
 	
 	private def filterAndWriteModule(module: ModuleData, paths: ProjectPaths, targetType: => Int,
 	                                 filter: => Option[Filter], arguments: CommandArguments) =
@@ -427,23 +449,6 @@ object MainAppLogic extends CoderAppLogic
 									}
 							}
 					}
-			}
-	}
-	
-	private def backup(directory: Path) = {
-		// Moves the previously written files to a backup directory (which is cleared first)
-		val backupDirectory = directory/"last-build"
-		if (backupDirectory.exists)
-			backupDirectory.deleteContents().failure.foreach { e =>
-				println(s"WARNING: failed to clear $backupDirectory before backup. Error message: ${e.getMessage}")
-			}
-		else
-			backupDirectory.createDirectories().failure.foreach { _.printStackTrace() }
-		directory.tryIterateChildren {
-				_.filterNot { _ == backupDirectory }.map { _.moveTo(backupDirectory) }.toVector.toTry }
-			.failure
-			.foreach { e =>
-				println(s"WARNING: Failed to back up some previously built files. Error message: ${e.getMessage}")
 			}
 	}
 }

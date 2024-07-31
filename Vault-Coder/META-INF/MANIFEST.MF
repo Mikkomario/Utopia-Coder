@@ -1,5 +1,5 @@
 Manifest-Version: 1.0
 Main-Class: utopia.coder.vault.main.VaultCoderApp
-Class-Path: mariadb-java-client-1.5.9.jar scala-library-2.13.12.jar scal
- a-reflect-2.13.12.jar
+Class-Path: mariadb-java-client-1.5.9.jar scala-library-2.13.14.jar scal
+ a-reflect-2.13.14.jar
 

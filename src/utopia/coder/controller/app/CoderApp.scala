@@ -37,7 +37,7 @@ trait CoderApp
 		// Writes hints and warnings
 		if (arguments.unrecognized.nonEmpty)
 			println(s"Warning! Following arguments were not recognized: ${ arguments.unrecognized.mkString(", ") }")
-		if (arguments.values.isEmpty) {
+		if (arguments.values.isEmpty && arguments.schema.nonEmpty) {
 			println("Hint: This program supports following command line arguments:")
 			arguments.schema.arguments.foreach { arg => println(s"- $arg") }
 			println()

@@ -72,6 +72,16 @@ object ClassReader
 	def moduleFrom(path: Path, project: ProjectData = ProjectData.default)(implicit log: Logger): Try[ModuleData] =
 		JsonBunny(path).flatMap { _.tryModel.map { root => moduleFrom(path, root, project) } }
 	
+	/**
+	 * Reads the referenced modules from a project file path
+	 * @param path Path to a project json file
+	 * @param projectRootPath Path to the project root directory
+	 * @param log Implicit logging implementation
+	 * @return Paths of each of the targeted project's modules
+	 */
+	def moduleReferencesFrom(path: Path, projectRootPath: Path)(implicit log: Logger): Try[Vector[ProjectPaths]] =
+		JsonBunny(path).flatMap { _.tryModel.map { moduleReferencesFrom(_, projectRootPath) } }
+	
 	private def projectFrom(root: Model, rootPath: Path)(implicit log: Logger) = {
 		// Reads basic project information
 		implicit val namingRules: NamingRules = NamingRules(root("naming").getModel).value
@@ -89,18 +99,21 @@ object ClassReader
 		val customTypes = customTypesFrom(root)
 		
 		// Reads module paths
-		val modules = root("modules").getVector.flatMap { v =>
+		val modules = moduleReferencesFrom(root, rootPath)
+		
+		ProjectData(projectName, modules, root("version").string.map { Version(_) }, rootPackage, databaseName,
+			namingRules, Mutability.forIsMutable(root("mutable_props", "mutable").getBoolean), customTypes,
+			author, root("prefix_columns").getBoolean)
+	}
+	
+	private def moduleReferencesFrom(root: Model, rootPath: Path)(implicit log: Logger) =
+		root("modules").getVector.flatMap { v =>
 			val parsed = v.castTo(ModelType, StringType) match {
 				case Left(modelVal) => modelVal.tryModel.flatMap(ProjectPaths.apply).logToOption
 				case Right(stringVal) => Some(ProjectPaths(stringVal.getString))
 			}
 			parsed.map { _.under(rootPath) }
 		}
-		
-		ProjectData(projectName, modules, root("version").string.map { Version(_) }, rootPackage, databaseName,
-			namingRules, Mutability.forIsMutable(root("mutable_props", "mutable").getBoolean), customTypes,
-			author, root("prefix_columns").getBoolean)
-	}
 	
 	private def moduleFrom(path: Path, root: Model, project: ProjectData)(implicit log: Logger): ModuleData = {
 		implicit val namingRules: NamingRules = NamingRules.from(root("naming").getModel, project.namingRules)

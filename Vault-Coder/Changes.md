@@ -1,5 +1,25 @@
 # Utopia Vault Coder
 
+# v1.12 (in development)
+### Breaking changes
+- In "many" root access objects, an id-targeting subclass is no longer generated, 
+  except for classes that have descriptions. Instead, the access point either extends **AccessManyByIntIds**, 
+  if it uses **Int** ids, or defines a simple `.apply(Iterable[Long])` implementation (in case it uses **Long** ids)
+  - Please note, however, that the nested instances and the apply implementations from previous versions 
+    are not removed automatically
+### Bugfixes
+- Fixed an issue where classes with **Long** ids 
+  would be targeted with **Int** ids in their "many" root access -variants
+### New features
+- Added 3 new commands / alternative modes:
+  - `list`: Lists all projects that have been registered
+  - `show <project>`: Shows paths that are relevant to a project
+  - `upgrade <...>`: Performs automated refactoring, facilitating the transitioning between Vault versions
+    - At this time, only upgrade to Vault v1.20 (changes in **FilteringView**) is supported 
+### Other changes
+- This version utilizes and supports Vault v1.20
+- Generated access trait companion objects now extend **ViewFactory**
+
 ## v1.11 - 28.7.2024
 This update introduces both a number of styling updates (breaking) and multiple new features.  
 Most importantly, feature-wise, projects may now be split into multiple submodules and even package-specific 

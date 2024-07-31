@@ -17,7 +17,7 @@ trait AppLogic
 	/**
 	  * @return Schema for the command arguments to parse
 	  */
-	def argumentSchema: Vector[ArgumentSchema]
+	def argumentSchema: Seq[ArgumentSchema]
 	
 	/**
 	  * Runs this logic

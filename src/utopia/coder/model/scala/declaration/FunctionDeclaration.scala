@@ -1,15 +1,13 @@
 package utopia.coder.model.scala.declaration
 
-import utopia.flow.collection.immutable.Pair
-import utopia.flow.operator.equality.EqualsExtensions._
-import utopia.flow.util.StringExtensions._
-import utopia.coder.model.scala.code.CodeBuilder
 import utopia.coder.model.merging.{MergeConflict, Mergeable}
-import utopia.coder.model.scala.code.Code
+import utopia.coder.model.scala.code.{Code, CodeBuilder}
 import utopia.coder.model.scala.datatype.{GenericType, ScalaType}
 import utopia.coder.model.scala.doc.ScalaDocKeyword.Return
 import utopia.coder.model.scala.doc.ScalaDocPart
 import utopia.coder.model.scala.{Annotation, Parameters, Visibility}
+import utopia.flow.collection.immutable.{Empty, Pair}
+import utopia.flow.util.StringExtensions._
 
 import scala.collection.immutable.VectorBuilder
 
@@ -87,6 +85,17 @@ trait FunctionDeclaration[+Repr]
 	// COMPUTED ------------------------------
 	
 	/**
+	 * @return Identifier of this function, consisting of its name and basic parameter types
+	 */
+	def identifier = {
+		val paramTypes = params match {
+			case Some(params) => params.view.map { _.dataType.withoutGenericTypeParameters }.toSeq
+			case None => Empty
+		}
+		FunctionIdentifier(name, paramTypes)
+	}
+	
+	/**
 	  * @return Whether this function is abstract (doesn't specify a body)
 	  */
 	def isAbstract = bodyCode.isEmpty
@@ -94,8 +103,7 @@ trait FunctionDeclaration[+Repr]
 	
 	// IMPLEMENTED  --------------------------
 	
-	override def documentation =
-	{
+	override def documentation = {
 		val desc = description
 		val returnDesc = returnDescription
 		val resultBuilder = new VectorBuilder[ScalaDocPart]()
@@ -108,8 +116,7 @@ trait FunctionDeclaration[+Repr]
 		resultBuilder.result()
 	}
 	
-	override def toCode =
-	{
+	override def toCode = {
 		val builder = new CodeBuilder()
 		// Adds the documentation first
 		builder ++= scalaDoc
@@ -142,10 +149,9 @@ trait FunctionDeclaration[+Repr]
 		builder.result()
 	}
 	
-	override def matches(other: FunctionDeclaration[_]): Boolean = name == other.name && (params ~== other.params)
+	override def matches(other: FunctionDeclaration[_]): Boolean = identifier == other.identifier
 	
-	override def mergeWith(other: FunctionDeclaration[_]) =
-	{
+	override def mergeWith(other: FunctionDeclaration[_]) = {
 		val (priority, lowPriority) = {
 			if (isLowMergePriority) {
 				if (other.isLowMergePriority) this -> other else other -> this

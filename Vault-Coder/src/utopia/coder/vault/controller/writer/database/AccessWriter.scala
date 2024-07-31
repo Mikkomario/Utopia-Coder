@@ -38,7 +38,6 @@ object AccessWriter
 	
 	private val accessTraitSuffix = data.Name("Access", "Access", CamelCase.capitalized)
 	private val genericAccessSuffix = data.Name("Like", "Like", CamelCase.capitalized)
-	private val subViewSuffix = data.Name("SubView", "SubView", CamelCase.capitalized)
 	private val uniqueAccessPrefix = data.Name("Unique", "Unique", CamelCase.capitalized)
 	
 	private val newPrefix = data.Name("new", "new", CamelCase.lower)
@@ -131,13 +130,45 @@ object AccessWriter
 	{
 		// Writes many & single accesses
 		writeManyComboAccesses(combo, genericManyAccessRef, modelRef, factoryRef, childDbModelRef)
-			.flatMap { manyRootRef =>
+			.flatMap { _ =>
 				writeSingleComboAccesses(combo, genericUniqueAccessRef, modelRef, factoryRef,
 					parentDbModelRef, childDbModelRef)
 					// Doesn't return any references
 					.map { _ => () }
 			}
 	}
+	
+	/**
+	 * Generates a companion object for an access trait
+	 * @param accessTraitType Type of the access trait for which this object is added
+	 * @return Declaration of the companion object
+	 */
+	def accessCompanionObject(accessTraitType: ScalaType) = {
+		val subViewName = s"_$accessTraitType"
+		ObjectDeclaration(
+			name = accessTraitType.toString,
+			extensions = Single(viewFactory(accessTraitType)),
+			methods = Set(
+				MethodDeclaration("apply", explicitOutputType = Some(accessTraitType),
+					returnDescription = "An access point that applies the specified filter condition (only)",
+					isOverridden = true)(
+					Parameter("condition", condition, description = "Condition to apply to all requests"))(
+					s"new $subViewName(condition)")
+			),
+			nested = Set(subViewDeclaration(accessTraitType, subViewName))
+		)
+	}
+	
+	/**
+	 * Generates the apply method used in access point filtering / construction.
+	 * Typically these are placed in the semi-concrete access traits.
+	 * @param traitType Type of the access trait returned by this method
+	 * @return Method for constructing new access points
+	 */
+	// Assumes that the companion object contains an apply method
+	def filteringApply(traitType: ScalaType) =
+		MethodDeclaration("apply", explicitOutputType = Some(traitType), isOverridden = true)(
+			Parameter("condition", condition))(s"$traitType(condition)")
 	
 	// Writes all single item access points
 	// Returns Try[Option[UniqueAccessLikeRef]] (i.e. reference to the generic single access trait, if generated)
@@ -179,7 +210,6 @@ object AccessWriter
 		// Writes the unique access trait
 		val uniqueAccessName = uniqueAccessTraitNameFrom(combo.name).className
 		val uniqueAccessType = ScalaType.basic(uniqueAccessName)
-		val subViewName = s"_$uniqueAccessName"
 		val deprecationParent = deprecationReferenceFor(combo.parentClass).map[Extension] { _(uniqueAccessType) }
 		val uniqueTraitParents: Seq[Extension] = {
 			val base: Extension = genericUniqueAccessTraitRef(combinedModelRef, uniqueAccessType)
@@ -219,11 +249,11 @@ object AccessWriter
 		}
 		
 		val traitWriteResult = File(singleAccessPackage,
-			accessCompanionObject(uniqueAccessType, subViewName),
+			accessCompanionObject(uniqueAccessType),
 			TraitDeclaration(uniqueAccessName,
 				extensions = uniqueTraitParents,
 				properties = Vector(self, factoryProp, childModelProp) ++ childGetters,
-				methods = childSetters + filterMethod(uniqueAccessType),
+				methods = childSetters + filteringApply(uniqueAccessType),
 				description = s"A common trait for access points that return distinct ${ combo.name.pluralDoc }",
 				author = combo.author, since = DeclarationDate.versionedToday
 			)
@@ -346,7 +376,6 @@ object AccessWriter
 		parentRef.flatMap { parentRef =>
 			val traitNameString = uniqueAccessTraitName.className
 			val traitType = ScalaType.basic(traitNameString)
-			val subViewName = s"_$traitNameString"
 			
 			// The parent types depend from 4 factors:
 			//      1) Whether generic type is used,
@@ -382,11 +411,11 @@ object AccessWriter
 			}
 			val baseProperties = Vector(self, factoryProperty)
 			val properties = if (parentRef.isDefined) baseProperties else baseProperties ++ highestTraitProperties
-			val filterM = filterMethod(traitType)
+			val filterM = filteringApply(traitType)
 			val methods = if (parentRef.isDefined) Set(filterM) else highestTraitMethods + filterM
 			
 			File(singleAccessPackage,
-				accessCompanionObject(traitType, subViewName),
+				accessCompanionObject(traitType),
 				TraitDeclaration(traitNameString,
 					extensions = parents, properties = properties, methods = methods,
 					description = s"A common trait for access points that return individual and distinct ${
@@ -504,7 +533,7 @@ object AccessWriter
 					Success(genericManyAccessTraitRef)
 				else
 					writeManyRootAccess(classToWrite.name, modelRef, manyAccessTraitRef, descriptionReferences,
-						manyAccessPackage, classToWrite.author, classToWrite.isDeprecatable)
+						manyAccessPackage, classToWrite.author, classToWrite.isDeprecatable, classToWrite.useLongId)
 						// Returns only the most generic trait, since that's the only one being used later
 						.map { _ => genericManyAccessTraitRef }
 			}
@@ -531,7 +560,7 @@ object AccessWriter
 		
 		val traitWriteResult = File(packageName,
 			// Writes a private subAccess trait for filter(...) implementation
-			accessCompanionObject(traitType, "SubAccess"),
+			accessCompanionObject(traitType),
 			// Writes the common trait for all many combined access points
 			TraitDeclaration(traitName,
 				extensions = extensions,
@@ -543,7 +572,7 @@ object AccessWriter
 					pullMany = true) { n => (combo.childName + n).props },
 				methods = propertySettersFor(combo.childClass,
 					childModelProp.name) { n => (combo.childName +: n).props } +
-					filterMethod(traitType),
+					filteringApply(traitType),
 				description = s"A common trait for access points that return multiple ${ combo.name.pluralDoc } at a time",
 				author = combo.author
 			)
@@ -556,7 +585,7 @@ object AccessWriter
 			traitWriteResult.flatMap { traitRef =>
 				// Next writes the root access point
 				writeManyRootAccess(combo.name, modelRef, traitRef, None, packageName, combo.author,
-					isDeprecatable = combo.isDeprecatable)
+					isDeprecatable = combo.isDeprecatable, useLongIds = combo.parentClass.useLongId)
 			}
 	}
 	
@@ -632,7 +661,6 @@ object AccessWriter
 		parentRef.flatMap { parentRef =>
 			val traitName = traitNameBase.pluralClassName
 			val traitType = ScalaType.basic(traitName)
-			val subViewName = ((manyPrefix +: classToWrite.name) + subViewSuffix).pluralClassName
 			
 			// Trait parent type depends on whether descriptions are used or not
 			val (accessParent, inheritanceProperties, inheritanceMethods) = descriptionReferences match {
@@ -698,7 +726,7 @@ object AccessWriter
 			
 			File(manyAccessPackage,
 				// The companion object contains a sub-view implementation
-				accessCompanionObject(traitType, subViewName),
+				accessCompanionObject(traitType),
 				TraitDeclaration(traitName,
 					extensions = parents,
 					// Contains computed properties to access class properties
@@ -706,7 +734,7 @@ object AccessWriter
 						(if (parentRef.isDefined) Vector(self) else self +: highestTraitProperties),
 					// Contains setters for property values (plural)
 					methods = (if (parentRef.isDefined) Set[MethodDeclaration]() else highestTraitMethods) ++
-						inheritanceMethods + filterMethod(traitType),
+						inheritanceMethods + filteringApply(traitType),
 					description = s"A common trait for access points which target multiple ${
 						classToWrite.name.pluralDoc } at a time",
 					author = classToWrite.author, since = DeclarationDate.versionedToday
@@ -719,7 +747,8 @@ object AccessWriter
 	
 	private def writeManyRootAccess(className: Name, modelRef: Reference, manyAccessTraitRef: Reference,
 	                                descriptionReferences: Option[(Reference, Reference, Reference)],
-	                                manyAccessPackage: Package, author: String, isDeprecatable: Boolean)
+	                                manyAccessPackage: Package, author: String, isDeprecatable: Boolean,
+	                                useLongIds: Boolean)
 	                               (implicit naming: NamingRules, codec: Codec, setup: VaultProjectSetup) =
 	{
 		val pluralClassName = className.pluralClassName
@@ -732,29 +761,45 @@ object AccessWriter
 		}
 		
 		// There is also a nested object for id-based multi-access, which may have description support
-		val subsetClassName = s"Db${ pluralClassName }Subset"
-		val subSetClass = descriptionReferences match {
+		// These are only generated for classes which use descriptions.
+		// Other implementations just use apply (which may be from an extension)
+		val (customExtension, accessMethod, subSetClass) = descriptionReferences match {
+			// Case: Described class => Generates a subset class
 			case Some((describedRef, _, _)) =>
-				ClassDeclaration(subsetClassName,
+				val subSetClassName = s"Db${ pluralClassName }Subset"
+				val subSetClass = ClassDeclaration(subSetClassName,
 					constructionParams = Parameter("ids", ScalaType.set(ScalaType.int),
 						prefix = Some(DeclarationStart.overrideVal)),
 					extensions = Vector(manyAccessTraitRef,
 						citadel.manyDescribedAccessByIds(modelRef, describedRef))
 				)
+				val subSetClassAccessMethod = MethodDeclaration("apply",
+					returnDescription = s"Access to ${ className.pluralDoc } with the specified ids")(
+					Parameter("ids", ScalaType.set(ScalaType.int),
+						description = s"Ids of the targeted ${ className.pluralDoc }"))(
+					s"new $subSetClassName(ids)")
+				
+				(None, Some(subSetClassAccessMethod), Some(subSetClass))
+				
 			case None =>
-				ClassDeclaration(subsetClassName,
-					constructionParams = Parameter("targetIds", ScalaType.iterable(ScalaType.int)),
-					extensions = Vector(manyAccessTraitRef),
-					properties = Vector(ImmutableValue("accessCondition",
-						Set(flow.valueConversions), isOverridden = true)("Some(index in targetIds)"))
-				)
+				// Case: Class with ids of type long => Generates an apply function
+				if (useLongIds) {
+					val subSetAccessMethod = MethodDeclaration("apply",
+						explicitOutputType = Some(manyAccessTraitRef),
+						returnDescription = s"Access to ${ className.pluralDoc } with the specified ids",
+						isLowMergePriority = true)(
+						Parameter("ids", ScalaType.iterable(ScalaType.long),
+							description = s"Ids of the targeted ${ className.pluralDoc }"))(
+						"apply(index in ids)")
+					
+					(None, Some(subSetAccessMethod), None)
+				}
+				// Case: Class with ids of type int => Extends ViewManyByIntIds[...]
+				else {
+					val extension: Extension = viewManyByIntIds(manyAccessTraitRef)
+					(Some(extension), None, None)
+				}
 		}
-		val subSetClassAccessMethod = MethodDeclaration("apply",
-			returnDescription = s"An access point to ${ className.pluralDoc } with the specified ids")(
-			Parameter("ids",
-				if (descriptionReferences.isDefined) ScalaType.set(ScalaType.int) else ScalaType.iterable(ScalaType.int),
-				description = s"Ids of the targeted ${ className.pluralDoc }"))(
-			s"new $subsetClassName(ids)")
 		
 		// For deprecating items, there is also a sub-object for accessing all items,
 		// including those that were deprecated
@@ -769,28 +814,15 @@ object AccessWriter
 		val rootViewExtension: Extension =
 			if (isDeprecatable) nonDeprecatedView(modelRef) else unconditionalView
 		File(manyAccessPackage,
-			ObjectDeclaration(manyAccessName, Vector(manyAccessTraitRef, rootViewExtension),
+			ObjectDeclaration(manyAccessName,
+				extensions = Pair[Extension](manyAccessTraitRef, rootViewExtension) ++ customExtension,
 				properties = history.map { _._2 }.toVector,
-				methods = Set(subSetClassAccessMethod),
-				nested = Set[InstanceDeclaration](subSetClass) ++ history.map { _._1 },
-				description = s"The root access point when targeting multiple ${
-					className.pluralDoc } at a time",
+				methods = accessMethod.toSet,
+				nested = Set(subSetClass, history.map { _._1 }).flatten,
+				description = s"The root access point when targeting multiple ${ className.pluralDoc } at a time",
 				author = author, since = DeclarationDate.versionedToday
 			)
 		).write()
-	}
-	
-	private def accessCompanionObject(accessTraitType: ScalaType, subViewName: String) = {
-		ObjectDeclaration(
-			name = accessTraitType.toString,
-			methods = Set(
-				MethodDeclaration("apply", explicitOutputType = Some(accessTraitType),
-					returnDescription = "An access point that applies the specified filter condition (only)")(
-					Parameter("condition", condition, description = "Condition to apply to all requests"))(
-					s"new $subViewName(condition)")
-			),
-			nested = Set(subViewDeclaration(accessTraitType, subViewName))
-		)
 	}
 	
 	private def subViewDeclaration(accessTraitType: ScalaType, subViewName: String) = {
@@ -801,11 +833,6 @@ object AccessWriter
 			properties = Vector(ComputedProperty("accessCondition", isOverridden = true)("Some(condition)"))
 		)
 	}
-	
-	// Assumes that the companion object contains an apply method
-	private def filterMethod(traitType: ScalaType) =
-		MethodDeclaration("filter", explicitOutputType = Some(traitType), isOverridden = true)(
-			Parameter("filterCondition", condition))(s"$traitType(mergeCondition(filterCondition))")
 	
 	// Assumes that deprecation has been tested already
 	private def historyAccessAndProperty(className: Name, accessTraitRef: Reference,

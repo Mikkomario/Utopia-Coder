@@ -63,7 +63,7 @@ object Parameters
   * @since 2.9.2021, v0.1
   */
 case class Parameters(lists: Seq[Seq[Parameter]] = Empty, implicits: Seq[Parameter] = Empty)
-	extends ScalaConvertible with Documented with MaybeEmpty[Parameters]
+	extends ScalaConvertible with Documented with MaybeEmpty[Parameters] with Iterable[Parameter]
 {
 	// COMPUTED -----------------------------------
 	
@@ -76,11 +76,6 @@ case class Parameters(lists: Seq[Seq[Parameter]] = Empty, implicits: Seq[Paramet
 	  */
 	def isImplicitOnly = lists.isEmpty && implicits.nonEmpty
 	
-	/**
-	  * @return The first parameter in this list
-	  */
-	def head = apply(0)
-	
 	
 	// IMPLEMENTED  -------------------------------
 	
@@ -90,6 +85,15 @@ case class Parameters(lists: Seq[Seq[Parameter]] = Empty, implicits: Seq[Paramet
 	  * @return Whether this parameters list is empty
 	  */
 	override def isEmpty = lists.isEmpty && implicits.isEmpty
+	//noinspection ScalaDeprecation
+	override def nonEmpty = !isEmpty
+	
+	override def iterator: Iterator[Parameter] = lists.iterator.flatten ++ implicits
+	
+	/**
+	 * @return The first parameter in this list
+	 */
+	override def head = apply(0)
 	
 	override def documentation = (lists.flatten ++ implicits).flatMap { _.documentation }
 	

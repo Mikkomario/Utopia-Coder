@@ -8,6 +8,7 @@ import utopia.coder.model.scala.code.CodeBuilder
 import utopia.coder.model.merging.{MergeConflict, Mergeable}
 import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.datatype.{Extension, GenericType, ScalaType}
+import utopia.coder.model.scala.declaration.InstanceDeclarationType.{ClassD, ObjectD, TraitD}
 import utopia.coder.model.scala.doc.ScalaDocPart
 import utopia.coder.model.scala.{Annotation, DeclarationDate, Parameters, Visibility}
 import utopia.coder.model.scala.template.CodeConvertible
@@ -23,6 +24,11 @@ import scala.collection.immutable.VectorBuilder
 trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration, InstanceDeclaration]
 {
 	// ABSTRACT ------------------------------
+	
+	/**
+	 * @return Type of this declaration
+	 */
+	def declarationType: InstanceDeclarationType
 	
 	/**
 	  * @return Comments presented before the main declaration, but not included in the scaladoc
@@ -85,14 +91,29 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	  * @param headerComments New header comments
 	  * @return A modified copy of this instance
 	  */
-	protected def makeCopy(visibility: Visibility, genericTypes: Seq[GenericType], extensions: Seq[Extension],
-	                       types: Seq[TypeDeclaration], creationCode: Code,
-	                       properties: Seq[PropertyDeclaration], methods: Set[MethodDeclaration],
-	                       nested: Set[InstanceDeclaration], annotations: Seq[Annotation], description: String,
-	                       author: String, headerComments: Seq[String], since: DeclarationDate): InstanceDeclaration
+	protected def makeCopy(visibility: Visibility = visibility, genericTypes: Seq[GenericType] = genericTypes,
+	                       extensions: Seq[Extension] = extensions, types: Seq[TypeDeclaration] = types,
+	                       creationCode: Code = creationCode, properties: Seq[PropertyDeclaration] = properties,
+	                       methods: Set[MethodDeclaration] = methods, nested: Set[InstanceDeclaration] = nested,
+	                       annotations: Seq[Annotation] = annotations, description: String = description,
+	                       author: String = author, headerComments: Seq[String] = headerComments,
+	                       since: DeclarationDate = since): InstanceDeclaration
 	
 	
 	// COMPUTED ------------------------------
+	
+	/**
+	 * @return Whether this declares an object
+	 */
+	def isObject = declarationType == ObjectD
+	/**
+	 * @return Whether this declares a class
+	 */
+	def isClass = declarationType == ClassD
+	/**
+	 * @return Whether this declares a trait
+	 */
+	def isTrait = declarationType == TraitD
 	
 	/**
 	  * @return A basic type reference to the declared type.
@@ -252,13 +273,68 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	
 	// OTHER    ---------------------------------
 	
-	private def appendSegments(builder: CodeBuilder, segments: Seq[(Iterable[CodeConvertible], String)]) =
-	{
+	/**
+	 * @param function Searched function identifier
+	 * @return Whether this instance contains a function with that identifier
+	 */
+	def contains(function: FunctionIdentifier) =
+		(properties.iterator ++ methods).exists { _.identifier == function }
+	
+	/**
+	 * @param method Method to add to this instance
+	 * @return Copy of this instance with the specified method added
+	 */
+	def +(method: MethodDeclaration) = makeCopy(methods = methods + method)
+	/**
+	 * @param nested Nested instance to add to this one
+	 * @return Copy of this instance with the specified nested instance
+	 */
+	def +(nested: InstanceDeclaration) = makeCopy(nested = this.nested + nested)
+	
+	/**
+	 * @param function Identifier of the function to remove from this instance, if specified
+	 * @return Copy of this instance with the specified function removed
+	 */
+	def -(function: FunctionIdentifier) =
+		makeCopy(properties = properties.filterNot { _.identifier == function },
+			methods = methods.filterNot { _.identifier == function })
+	
+	/**
+	 * @param functions Identifiers of the functions to remove from this instance, if present
+	 * @return Copy of this instance with the specified functions removed
+	 */
+	def --(functions: Iterable[FunctionIdentifier]) = {
+		if (functions.isEmpty)
+			this
+		else
+			makeCopy(
+				properties = properties.filterNot { prop =>
+					val id = prop.identifier
+					functions.exists { _ == id }
+				},
+				methods = methods.filterNot { method =>
+					val id = method.identifier
+					functions.exists { _ == id }
+				}
+			)
+	}
+	
+	/**
+	 * @param f A filter function that returns true for the methods to keep
+	 * @return Copy of this instance with filtered methods
+	 */
+	def filterMethods(f: MethodDeclaration => Boolean) = makeCopy(methods = methods.filter(f))
+	/**
+	 * @param f A function that will return true for instance declarations to keep
+	 * @return Copy of this declaration with filtered nested declarations
+	 */
+	def filterNested(f: InstanceDeclaration => Boolean) = makeCopy(nested = nested.filter(f))
+	
+	private def appendSegments(builder: CodeBuilder, segments: Seq[(Iterable[CodeConvertible], String)]) = {
 		val segmentsToWrite = segments
 			.map { case (code, header) => code.map { _.toCode } -> header }
 			.filter { _._1.nonEmpty }
-		if (segmentsToWrite.nonEmpty)
-		{
+		if (segmentsToWrite.nonEmpty) {
 			builder.openBlock(forceNewLine = true)
 			segmentsToWrite.dropRight(1).foreach { case (codes, header) =>
 				builder += s"// $header\t--------------------"

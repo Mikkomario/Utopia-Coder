@@ -66,6 +66,8 @@ object VaultReferences
 		lazy val chronoRowFactoryView = Reference(viewAccess, "ChronoRowFactoryView")
 		lazy val timeDeprecatableView = Reference(viewAccess, "TimeDeprecatableView")
 		lazy val nullDeprecatableView = Reference(viewAccess, "NullDeprecatableView")
+		lazy val viewManyByIntIds = Reference(viewAccess, "ViewManyByIntIds")
+		lazy val viewFactory = Reference(viewAccess, "ViewFactory")
 		
 		lazy val singleModelAccess = Reference(pck.singleModelAccess, "SingleModelAccess")
 		lazy val singleRowModelAccess = Reference(pck.singleModelAccess, "SingleRowModelAccess")
