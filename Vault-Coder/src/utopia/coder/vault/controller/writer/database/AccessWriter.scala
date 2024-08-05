@@ -16,6 +16,8 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import Reference._
 import utopia.coder.model.enumeration.NameContext.{ClassPropName, FunctionName}
+import utopia.coder.model.scala.code.CodePiece
+import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.IntNumber
 import utopia.coder.vault.util.VaultReferences._
 import utopia.coder.vault.util.VaultReferences.Vault._
 
@@ -968,10 +970,17 @@ object AccessWriter
 					if (isCustomIndex) ("with" +: prop.name).function else ""
 				}
 				val inMethodName = prop.inAccessName.nonEmptyOrElse {
-					if (isCustomIndex)
-						(Name("with", "with", CamelCase.lower) + prop.name).pluralIn(naming(FunctionName))
-					else
-						""
+					prop.withAccessName.ifNotEmpty match {
+						// Case: "With" defined but "in" not defined => Generates "in" by pluralizing "with"
+						case Some(withAccessName) =>
+							val namingStyle = naming(FunctionName)
+							Name.interpret(withAccessName, namingStyle).pluralIn(namingStyle)
+						case None =>
+							if (isCustomIndex)
+								(Name("with", "with", CamelCase.lower) + prop.name).pluralIn(naming(FunctionName))
+							else
+								""
+					}
 				}
 				
 				// Writes the actual methods, if needed
@@ -987,14 +996,21 @@ object AccessWriter
 				}
 				val inMethod = inMethodName.notEmpty.map { name =>
 					val paramsName = prop.name.pluralIn(naming(ClassPropName))
-					val code = singleValueCode.mapText { valueCode =>
-						val valuesCode = {
-							if (valueCode == singleParamName)
-								paramsName
-							else
-								s"$paramsName.map { $singleParamName => $valueCode }"
+					val code = {
+						val valuesCode = concreteType match {
+							// Case: The parameter values are of type Int => Uses IntSet
+							case _: IntNumber => CodePiece(s"IntSet.from($paramsName)", Set(flow.intSet))
+							case _ =>
+								singleValueCode.mapText { valueCode =>
+									if (valueCode == singleParamName)
+										paramsName
+									else
+										s"$paramsName.map { $singleParamName => $valueCode }"
+								}
 						}
-						s"filter($modelPropName.${ dbProp.name.prop }.column.in($valuesCode))"
+						valuesCode.mapText { values =>
+							s"filter($modelPropName.${ dbProp.name.prop }.column.in($values))"
+						}
 					}
 					MethodDeclaration(name, code.references,
 						returnDescription = s"Copy of this access point that only includes ${

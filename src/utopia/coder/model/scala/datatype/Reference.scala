@@ -103,6 +103,7 @@ object Reference
 		lazy val pair = apply(immutableCollection, "Pair")
 		lazy val span = apply(ranges, "Span")
 		lazy val numericSpan = apply(ranges, "NumericSpan")
+		lazy val intSet = apply(immutableCollection, "IntSet")
 		
 		lazy val value = apply(immutableGenericModels, "Value")
 		lazy val property = apply(genericModelTemplates, "Property")
