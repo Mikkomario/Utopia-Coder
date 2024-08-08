@@ -337,9 +337,10 @@ object AccessWriter
 		// Writes the more generic trait version (-Like) first, if one is requested
 		val parentRef = {
 			if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
-				val item = GenericType.covariant("A")
+				val item = GenericType.covariant("A",
+					description = s"Type of read (${ classToWrite.name.pluralDoc } -like) instances")
 				val itemType = item.toScalaType
-				val repr = GenericType.covariant("Repr")
+				val repr = GenericType.covariant("Repr", description = "Type of this access point")
 				val reprType = repr.toScalaType
 				
 				val extensions = {
@@ -626,9 +627,11 @@ object AccessWriter
 		// Writes the more generic trait version (-Like) first, if one is requested
 		val parentRef = {
 			if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
-				val item = GenericType.covariant("A")
+				// WET WET
+				val item = GenericType.covariant("A",
+					description = s"Type of read (${ classToWrite.name.pluralDoc } -like) instances")
 				val itemType = item.toScalaType
-				val repr = GenericType.covariant("Repr")
+				val repr = GenericType.covariant("Repr", description = "Type of this access point")
 				val reprType = repr.toScalaType
 				
 				// The extended traits are different when inheritance is applied

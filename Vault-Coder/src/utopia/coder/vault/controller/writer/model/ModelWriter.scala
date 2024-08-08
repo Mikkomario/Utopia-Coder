@@ -153,7 +153,8 @@ object ModelWriter
 	                                     parentClassReferences: Seq[ClassReferences])
 	                                    (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val wrapped = GenericType("A", requirement = Some(TypeRequirement.childOf(factoryRef(ScalaType.basic("A")))))
+		val wrapped = GenericType("A", requirement = Some(TypeRequirement.childOf(factoryRef(ScalaType.basic("A")))),
+			description = "Type of constructed instances")
 		val repr = GenericType.covariant("Repr")
 		val reprType = repr.toScalaType
 		

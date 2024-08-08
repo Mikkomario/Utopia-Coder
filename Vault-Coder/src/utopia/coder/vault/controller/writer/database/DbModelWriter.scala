@@ -110,7 +110,7 @@ object DbModelWriter
 	                          (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Utilizes a generic type +Repr when creating copies of self
-		val repr = GenericType.covariant("Repr")
+		val repr = GenericType.covariant("Repr", description = "Type of this DB model")
 		val reprType = repr.toScalaType
 		
 		// Some extensions are different when inheriting other YModelLike[Repr] traits
@@ -232,10 +232,10 @@ object DbModelWriter
 	                                 (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Defines the generic type parameters (DbModel, A (i.e. the Stored instance) & Data)
-		// TODO: Add descriptions to these generic type parameters once the data types support it
-		val dbModel = GenericType.childOf("DbModel", storable, Covariance)
-		val stored = GenericType.covariant("A")
-		val data = GenericType.contravariant("Data")
+		val dbModel = GenericType.childOf("DbModel", storable, Covariance,
+			description = "Type of database interaction models constructed")
+		val stored = GenericType.covariant("A", description = "Type of read instances")
+		val data = GenericType.contravariant("Data", description = "Supported data-part type")
 		
 		val factoryLike = TraitDeclaration(
 			name = (classToWrite.name + factorySuffix + likeSuffix).className,

@@ -133,8 +133,7 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 		genericTypes.foreach { builder ++= _.documentation }
 		// If there are other scaladocs, adds author and since -tags
 		val since = this.since
-		if (description.nonEmpty)
-		{
+		if (description.nonEmpty) {
 			if (author.nonEmpty)
 				builder += ScalaDocPart(Author, author)
 			builder += ScalaDocPart(Since, since.toString)

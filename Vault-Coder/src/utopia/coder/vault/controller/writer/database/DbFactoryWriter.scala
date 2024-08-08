@@ -63,7 +63,7 @@ object DbFactoryWriter
 			//                         and XDbFactory companion object containing a concrete implementation
 			case Some(dbPropsRef) =>
 				// Starts with the XDbFactoryLike[+A] trait
-				val aGenericType = GenericType.covariant("A")
+				val aGenericType = GenericType.covariant("A", description = "Type of read instances")
 				val aType = aGenericType.toScalaType
 				
 				// Defines an abstract dbProps -property
