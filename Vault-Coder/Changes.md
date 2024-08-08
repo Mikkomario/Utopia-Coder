@@ -23,6 +23,7 @@
 - This version utilizes and supports Vault v1.20
 - Generated `in(...)` methods in access points, if they accept **Int** values, now wrap those values in **IntSets**
 - Generated access trait companion objects now extend **ViewFactory**
+- Modified access trait companion object syntax
 
 ## v1.11 - 28.7.2024
 This update introduces both a number of styling updates (breaking) and multiple new features.  

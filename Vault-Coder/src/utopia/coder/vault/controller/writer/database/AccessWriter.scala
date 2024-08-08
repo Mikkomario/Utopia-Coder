@@ -155,7 +155,7 @@ object AccessWriter
 					returnDescription = "An access point that applies the specified filter condition (only)",
 					isOverridden = true)(
 					Parameter("condition", condition, description = "Condition to apply to all requests"))(
-					s"new $subViewName(condition)")
+					s"$subViewName(Some(condition))")
 			),
 			nested = Set(subViewDeclaration(accessTraitType, subViewName))
 		)
@@ -829,10 +829,11 @@ object AccessWriter
 	
 	private def subViewDeclaration(accessTraitType: ScalaType, subViewName: String) = {
 		ClassDeclaration(subViewName,
-			constructionParams = Parameter("condition", condition),
+			constructionParams =
+				Parameter("accessCondition", ScalaType.option(condition), prefix = Some(DeclarationStart.overrideVal)),
 			extensions = Vector(accessTraitType),
 			visibility = Private,
-			properties = Vector(ComputedProperty("accessCondition", isOverridden = true)("Some(condition)"))
+			isCaseClass = true
 		)
 	}
 	
