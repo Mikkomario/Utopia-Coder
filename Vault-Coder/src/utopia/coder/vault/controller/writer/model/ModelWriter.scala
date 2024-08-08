@@ -14,7 +14,7 @@ import utopia.coder.vault.controller.writer.database.AccessWriter
 import utopia.coder.vault.model.data.{Class, ClassModelReferences, ClassReferences, GenericClassModelReferences, Property, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences._
-import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.CollectionExtensions.{RichIterable, _}
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.util.StringExtensions._
 
@@ -114,7 +114,7 @@ object ModelWriter
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val factoryTraitName = (classToWrite.name + factoryTraitSuffix).className
-		val genericType = GenericType.covariant("A")
+		val genericType = GenericType.covariant("A", description = "Type of constructed instances")
 		val aType = genericType.toScalaType
 		
 		// When extending another trait:
@@ -135,7 +135,7 @@ object ModelWriter
 				genericTypes = Single(genericType),
 				extensions = parentClassReferences.map { _.factory(aType) },
 				// Contains a withX(x) function for each data property
-				methods = (classToWrite.properties.view.filterNot { _.isRenamedExtension }.map { prop =>
+				methods = (classToWrite.properties.view.filterNot { _.isDirectExtension }.map { prop =>
 					MethodDeclaration.newAbstract(withMethodNameFor(prop), aType,
 						returnDescription = s"Copy of this item with the specified ${prop.name}")(
 						Parameter(prop.name.prop, prop.dataType.concrete.toScala,
@@ -155,15 +155,42 @@ object ModelWriter
 	{
 		val wrapped = GenericType("A", requirement = Some(TypeRequirement.childOf(factoryRef(ScalaType.basic("A")))),
 			description = "Type of constructed instances")
-		val repr = GenericType.covariant("Repr")
+		val repr = GenericType.covariant("Repr", description = "Implementing type of this factory")
 		val reprType = repr.toScalaType
 		
 		// When extending other classes:
 		//      1) Extends YFactoryWrapper[A]
-		//      2) Overrides renamed withX functions,
+		//      2) Will not redefine wrappedFactory, wrap(...) or mapWrapped(...)
+		//      3) Overrides renamed withX functions,
 		//         since both parent traits (XFactory and YFactoryWrapper) define those
-		//      3) Redefines the wrapped instance so that it extends both XFactory and YFactory
-		//      4) Will not redefine withX properties from directly extended properties
+		//      4) Redefines the wrapped instance so that it extends both XFactory and YFactory
+		//      5) Will not redefine withX properties from directly extended properties
+		
+		val (wrappedFactory, wrapMethods) = {
+			if (classToWrite.isExtension)
+				None -> Empty
+			else {
+				val wrappedFactory = PropertyDeclaration.newAbstract("wrappedFactory", wrapped.toScalaType,
+					description = "The factory wrapped by this instance",
+					isProtected = true,
+					isOverridden = classToWrite.isExtension)
+				val wrap = MethodDeclaration.newAbstract(
+					"wrap", reprType,
+					description = "Mutates this item by wrapping a mutated instance",
+					returnDescription = "Copy of this item with the specified wrapped factory",
+					isProtected = true)(
+					Parameter("factory", wrapped.toScalaType, description = "The new factory instance to wrap"))
+				val mapWrapped = MethodDeclaration("mapWrapped",
+					visibility = Protected,
+					description = "Modifies this item by mutating the wrapped factory instance",
+					returnDescription = "Copy of this item with a mutated wrapped factory")(
+					Parameter("f", mutate(wrapped.toScalaType),
+						description = "A function for mutating the wrapped factory instance"))(
+					"wrap(f(wrappedFactory))")
+				
+				Some(wrappedFactory) -> Pair(wrap, mapWrapped)
+			}
+		}
 		
 		File(factoryPackage,
 			TraitDeclaration(
@@ -171,33 +198,13 @@ object ModelWriter
 				genericTypes = Pair(wrapped, repr),
 				extensions = Single[Extension](factoryRef(reprType)) ++
 					parentClassReferences.map[Extension] { _.factoryWrapper(reprType) },
-				properties = Vector(
-					PropertyDeclaration.newAbstract("wrappedFactory", wrapped.toScalaType,
-						description = "The factory wrapped by this instance",
-						isProtected = true,
-						isOverridden = classToWrite.isExtension
-					)
-				),
+				properties = wrappedFactory.emptyOrSingle,
 				methods = withMethodsFor(classToWrite.properties.filterNot { _.isDirectExtension }) { (prop, propName) =>
 					if (prop.isRenamedExtension)
 						s"super[${ factoryRef.target }].${ withMethodNameFor(prop) }($propName)"
 					else
 						s"mapWrapped { _.${ withMethodNameFor(prop) }($propName) }"
-				} +
-					MethodDeclaration.newAbstract(
-						"wrap", reprType,
-						description = "Mutates this item by wrapping a mutated instance",
-						returnDescription = "Copy of this item with the specified wrapped factory",
-						isProtected = true)(
-						Parameter("factory", wrapped.toScalaType, description = "The new factory instance to wrap")) +
-					MethodDeclaration("mapWrapped",
-						visibility = Protected,
-						description = "Modifies this item by mutating the wrapped factory instance",
-						returnDescription = "Copy of this item with a mutated wrapped factory")(
-						Parameter("f", mutate(wrapped.toScalaType),
-							description = "A function for mutating the wrapped factory instance"))(
-						"wrap(f(wrappedFactory))")
-				,
+				} ++ wrapMethods,
 				description = s"Common trait for classes that implement ${factoryRef.target} by wrapping a ${
 					factoryRef.target } instance",
 				author = classToWrite.author,
@@ -228,13 +235,14 @@ object ModelWriter
 		}
 		val toModelCode = toModelImplementationFor(classToWrite,
 			parentClassReferences.flatMap { _.generic.map { _.hasProps } })
+		val toModel = toModelCode.map { code =>
+			ComputedProperty("toModel", code.references, isOverridden = true)(code.text)
+		}
 		
 		File(dataPackage, TraitDeclaration(
 			name = traitName.className,
 			extensions = extensions,
-			properties = (propertyDeclarations :+
-				ComputedProperty("toModel", toModelCode.references, isOverridden = true)(toModelCode.text)) ++
-				renamedImplementations,
+			properties = propertyDeclarations ++ toModel ++ renamedImplementations,
 			description = s"Common trait for classes which provide access to ${ classToWrite.name } properties",
 			author = classToWrite.author,
 			since = DeclarationDate.versionedToday
@@ -250,13 +258,15 @@ object ModelWriter
 		// When extending other classes, the Repr type is more restricted
 		val parentDataTraitReferences = parentClassReferences.map { _.data }
 		val repr = GenericType.covariant("Repr",
-			requirement = parentDataTraitReferences.headOption.map { dataRef => TypeRequirement.childOf(dataRef) })
+			requirement = parentDataTraitReferences.headOption.map { dataRef => TypeRequirement.childOf(dataRef) },
+			description = "Implementing data class or data wrapper class")
 		val reprType = repr.toScalaType
 		
 		// Introduces a function for creating copies
 		val buildCopy = MethodDeclaration.newAbstract((copyPrefix +: classToWrite.name).function, reprType,
 			description = s"Builds a modified copy of this ${ classToWrite.name }",
-			returnDescription = s"A copy of this ${ classToWrite.name } with the specified properties")(
+			returnDescription = s"A copy of this ${ classToWrite.name } with the specified properties",
+			isProtected = true)(
 			classToWrite.properties
 				.map { prop =>
 					val propName = prop.name.prop
@@ -296,6 +306,8 @@ object ModelWriter
 	                           factoryRef: Reference, dataLikeRef: Option[Reference], buildCopyName: String)
 	                          (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
+		// TODO: Must implement buildCopy when inheriting (and skip withX functions)
+		
 		// Prepares common data
 		val dataClassName = (classToWrite.name + dataClassSuffix).className
 		val dataClassType = ScalaType.basic(dataClassName)
@@ -321,6 +333,7 @@ object ModelWriter
 				(extensions, Empty, Set[MethodDeclaration]())
 				
 			// Case: Concrete class => Extends XFactory[XData] & ModelConvertible, implements toModel and withX methods
+			//                         (except when inheriting another trait)
 			case None =>
 				val factory = factoryRef(dataClassType)
 				// ModelConvertible extension is skipped when inheriting other Data traits
@@ -331,10 +344,18 @@ object ModelWriter
 						Single(modelConvertible)
 				}
 				val toModelCode = toModelImplementationFor(classToWrite, parentDataClassReferences)
-				val withMethods = concreteWithMethodsFor(classToWrite.properties, "copy")
-				(extensions,
-					Single(ComputedProperty("toModel", toModelCode.references, isOverridden = true)(toModelCode.text)),
-					withMethods)
+				val toModel = toModelCode.map { code =>
+					ComputedProperty("toModel", code.references, isOverridden = true)(code.text)
+				}
+				
+				// Only implements the withX methods which have not yet been implemented in a generic parent
+				// (via buildCopy)
+				val withMethods = concreteWithMethodsFor(classToWrite.properties.filterNot { _.isExtension }, "copy")
+				
+				// When inheriting abstract traits, also implements their buildCopy function
+				// TODO: Implement buildCopy (needs to know parent class name & properties)
+				
+				(extensions, toModel.emptyOrSingle, withMethods)
 		}
 		
 		// Defines either a trait or a class
@@ -434,9 +455,10 @@ object ModelWriter
 		val parentStoredRefs = parentClassReferences.map { _.stored }
 		
 		val dataType = ScalaType.basic("Data")
-		val data = GenericType.childOf("Data", dataLikeRef(dataType))
+		val data = GenericType.childOf("Data", dataLikeRef(dataType), description = "Type of the wrapped data")
 		val repr = GenericType.covariant("Repr",
-			requirement = parentStoredRefs.headOption.map { TypeRequirement.childOf(_) })
+			requirement = parentStoredRefs.headOption.map { TypeRequirement.childOf(_) },
+			description = "Implementing type")
 		val reprType = repr.toScalaType
 		
 		val inheritedExtensions = parentClassReferences.flatMap[Extension] { _.generic.map { _.storedLike(reprType) } } ++
@@ -736,19 +758,25 @@ object ModelWriter
 		}
 		// Utilizes toModel implementations from parents, if available
 		val parentToModels = toModelImplementingParentReferences.reverseIterator
-			.map { _.targetCode + ".toModel" }.reduceLeftOption { _.append(_, " ++ ") }
+			.map { _.targetCode.mapText { parent => s"super[$parent].toModel" } }
+			.reduceLeftOption { _.append(_, " ++ ") }
 		
-		if (propWrites.isEmpty)
-			parentToModels.getOrElse { CodePiece("Model.empty", Set(model)) }
+		if (propWrites.isEmpty) {
+			// If toModel would just refer to super.toModel, skips it
+			if (toModelImplementingParentReferences.hasSize(1))
+				None
+			else
+				Some(parentToModels.getOrElse { CodePiece("Model.empty", Set(model)) })
+		}
 		else {
 			val collection = CodePiece.collection(propWrites.size)
 			val propsToModel = CodePiece("Model", Set(model)) +
 				(collection + propWrites.reduceLeft { _.append(_, ", ") }.withinParenthesis).withinParenthesis
 			
-			parentToModels match {
+			Some(parentToModels match {
 				case Some(parentModels) => parentModels.append(propsToModel, " ++ ")
 				case None => propsToModel
-			}
+			})
 		}
 	}
 	

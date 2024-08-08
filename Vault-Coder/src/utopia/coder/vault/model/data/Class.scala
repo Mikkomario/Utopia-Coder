@@ -267,6 +267,7 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 			val overriddenParentProperties = resolvedPropertyReferences.valuesIterator.flatten.toSet
 			val (requiredPropsToAdd, optionalPropsToAdd) = newExtensions
 				.flatMap { _.properties }.filterNot(overriddenParentProperties.contains).distinctBy { _.name.singular }
+				.map { _.newChild }
 				.divideBy { _.defaultValue.nonEmpty }.toTuple
 			val mergedProperties = properties
 				.map { prop =>
