@@ -2,6 +2,7 @@ package utopia.coder.vault.controller.writer.database
 
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
+import utopia.coder.model.scala.Visibility.Private
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
 import utopia.coder.model.scala.declaration._
@@ -46,7 +47,7 @@ object DbPropsWriter
 	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences])
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val configPackage = setup.databasePackage/"config"/classToWrite.packageName
+		val configPackage = setup.databasePackage/"props"/classToWrite.packageName
 		writeDbPropsTrait(classToWrite, configPackage, parentClassReferences).flatMap { dbProps =>
 			writeDbPropsWrapperTrait(classToWrite, configPackage, dbProps)
 				.map { case (wrapper, wrappedName) => Pair(dbProps, wrapper) -> wrappedName }
@@ -93,7 +94,7 @@ object DbPropsWriter
 			.map { prop =>
 				val defaultName = prop.modelName.quoted
 				prop -> Parameter((prop.name + propNameSuffix).prop, ScalaType.string, defaultName,
-					description = s"Name of the database property matching ${ prop.name } (default = \"$defaultName\")")
+					description = s"Name of the database property matching ${ prop.name } (default = $defaultName)")
 			}
 			.toVector
 		val concreteProps = propNames.map { case (prop, propParam) =>
@@ -116,6 +117,7 @@ object DbPropsWriter
 			extensions = Single(traitType),
 			constructionParams = constructionParams,
 			properties = /*idProp +:*/ concreteProps,
+			visibility = Private,
 			isCaseClass = true
 		)
 		
@@ -137,7 +139,7 @@ object DbPropsWriter
 	{
 		val wrappedName = dbPropsRef.target.uncapitalize
 		val wrapped = ComputedProperty.newAbstract(wrappedName, dbPropsRef,
-			description = s"The wrapped ${ classToWrite.name } database properties")
+			description = s"The wrapped ${ classToWrite.name } database properties", isProtected = true)
 		// val idProp = ComputedProperty("id", isOverridden = true)(s"$wrappedName.id")
 		val props = classToWrite.dbProperties
 			.map { prop =>

@@ -61,6 +61,7 @@ object DbFactoryWriter
 		dbPropsRef match {
 			// Case: Abstract trait => Implements XDbFactoryLike, XDbFactory trait
 			//                         and XDbFactory companion object containing a concrete implementation
+			// FIXME: Correct errors here and check access generation, also
 			case Some(dbPropsRef) =>
 				// Starts with the XDbFactoryLike[+A] trait
 				val aGenericType = GenericType.covariant("A", description = "Type of read instances")

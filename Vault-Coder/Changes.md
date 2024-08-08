@@ -2,6 +2,7 @@
 
 # v1.12 (in development)
 ### Breaking changes
+- Database model classes are now named "XDbModel" instead of "XModel"
 - In "many" root access objects, an id-targeting subclass is no longer generated, 
   except for classes that have descriptions. Instead, the access point either extends **ViewManyByIntIds**, 
   if it uses **Int** ids, or defines a simple `.apply(Iterable[Long])` implementation (in case it uses **Long** ids)

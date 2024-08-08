@@ -306,8 +306,6 @@ object ModelWriter
 	                           factoryRef: Reference, dataLikeRef: Option[Reference], buildCopyName: String)
 	                          (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// TODO: Must implement buildCopy when inheriting (and skip withX functions)
-		
 		// Prepares common data
 		val dataClassName = (classToWrite.name + dataClassSuffix).className
 		val dataClassType = ScalaType.basic(dataClassName)
@@ -322,6 +320,7 @@ object ModelWriter
 		
 		// Extends the YData & YDataLike[XData] traits from the parent classes
 		val parentDataClassReferences = parentClassReferences.map { _.data }
+		// FIXME: For some reason, it seems like the YDataLike doesn't get included here
 		val inheritedExtensions: Seq[Extension] = parentDataClassReferences.map(Extension.fromReference) ++
 			parentClassReferences.flatMap { _.generic.map[Extension] { _.dataLike(dataClassType) } }
 		
@@ -353,9 +352,27 @@ object ModelWriter
 				val withMethods = concreteWithMethodsFor(classToWrite.properties.filterNot { _.isExtension }, "copy")
 				
 				// When inheriting abstract traits, also implements their buildCopy function
-				// TODO: Implement buildCopy (needs to know parent class name & properties)
+				val copyMethods = parentClassReferences.map { parentRefs =>
+					val parent = parentRefs.targetClass
+					val copyMethodName = (copyPrefix + parent.name).function
+					val buildCopyParams = parent.properties.map { prop =>
+						Parameter(prop.name.prop, prop.dataType.toScala)
+					}
+					
+					val parentPropNames = parent.properties.view.map { _.name }.toSet
+					val assignments = classToWrite.properties.view
+						.flatMap { prop =>
+							prop.parents.view.map { _.name }.find(parentPropNames.contains).map { parentName =>
+								s"${ prop.name.prop } = ${ parentName.prop }"
+							}
+						}
+						.mkString(", ")
+					
+					MethodDeclaration(copyMethodName, visibility = Protected, isOverridden = true)(buildCopyParams)(
+						s"copy($assignments)")
+				}
 				
-				(extensions, toModel.emptyOrSingle, withMethods)
+				(extensions, toModel.emptyOrSingle, withMethods ++ copyMethods)
 		}
 		
 		// Defines either a trait or a class
@@ -597,7 +614,7 @@ object ModelWriter
 				ClassDeclaration(
 					name = className,
 					constructionParams = constructionParams,
-					extensions = customExtensions,
+					extensions = customExtensions ++ inheritedExtensions,
 					properties = properties,
 					methods = methods,
 					description = description,

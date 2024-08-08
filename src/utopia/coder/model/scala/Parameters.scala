@@ -63,8 +63,13 @@ object Parameters
   * @since 2.9.2021, v0.1
   */
 case class Parameters(lists: Seq[Seq[Parameter]] = Empty, implicits: Seq[Parameter] = Empty)
-	extends ScalaConvertible with Documented with MaybeEmpty[Parameters] with Iterable[Parameter]
+	extends ScalaConvertible with Documented with MaybeEmpty[Parameters] with Seq[Parameter]
 {
+	// ATTRIBUTES   -------------------------------
+	
+	override lazy val length: Int = (lists.view :+ implicits).map { _.size }.sum
+	
+	
 	// COMPUTED -----------------------------------
 	
 	/**

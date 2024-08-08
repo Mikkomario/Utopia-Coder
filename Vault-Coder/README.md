@@ -572,11 +572,11 @@ This application will produce the following documents
       - storable
         - **SDescriptionLinkModel.scala** - An object that contains description link model factories for described classes
         - **P**
-          - **XModel.scala** - Database interaction model class + the associated companion object used for forming queries etc.
+          - **XDbModel.scala** - Database interaction model class + the associated companion object used for forming queries etc.
       - factory
         - **SDescriptionLinkFactory.scala** - An object that contains description link factories for described classes
         - **P**
-          - **XFactory.scala** - A factory object used for reading models from database
+          - **XDbFactory.scala** - A factory object used for reading models from database
             - These are also generated for various class combinations
       - access
         - single

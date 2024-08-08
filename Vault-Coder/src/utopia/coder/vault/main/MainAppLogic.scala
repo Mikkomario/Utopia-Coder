@@ -315,7 +315,7 @@ object MainAppLogic extends CoderAppLogic
 			// Writes project documentation
 			.flatMap { _ => DocumentationWriter(data, path("md")) }
 			// Writes the tables document, which is referred to later, also
-			.flatMap { _ => TablesWriter(data.classes) }
+			.flatMap { _ => TablesWriter(data.classes.filterNot { _.isGeneric }) }
 			.flatMap { tablesRef =>
 				DescriptionLinkInterfaceWriter(data.classes, tablesRef).flatMap { descriptionLinkObjects =>
 					// Next writes all required documents for each class in order
@@ -364,6 +364,10 @@ object MainAppLogic extends CoderAppLogic
 	                       parentClassReferences: Seq[ClassReferences])
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
+		if (!parentClassReferences.hasSize.of(classToWrite.parents))
+			println(s"Warning: ${ classToWrite.parents.size - parentClassReferences.size } of the ${
+				classToWrite.parents.size } parent references are missing for ${ classToWrite.name.className }")
+		
 		ModelWriter(classToWrite, parentClassReferences).flatMap { modelRefs =>
 			val dbPropsRefs = {
 				if (classToWrite.isGeneric)
@@ -415,8 +419,9 @@ object MainAppLogic extends CoderAppLogic
 													}
 												}
 											}
-											val classRefs = ClassReferences(modelRefs, dbFactoryRef, dbPropsRef,
-												genericUniqueAccessRef, genericManyAccessRef, genericReferences)
+											val classRefs = ClassReferences(classToWrite, modelRefs, dbFactoryRef,
+												dbPropsRef, genericUniqueAccessRef, genericManyAccessRef,
+												genericReferences)
 											classToWrite -> classRefs
 										}
 								}
