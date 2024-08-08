@@ -48,6 +48,7 @@ object StandardPropertyType
 		lowerTypeName.untilFirst("(") match {
 			case "requiredstring" | "nonemptystring" | "stringnotempty" | "textnotempty" =>
 				Some(NonEmptyText(appliedLength))
+			case "version" => Some(VersionType(appliedLength))
 			case "creation" | "created" => Some(CreationTime)
 			case "updated" | "modification" | "update" => Some(UpdateTime)
 			case "deprecation" | "deprecated" => Some(Deprecation)
@@ -720,6 +721,38 @@ object StandardPropertyType
 			CodePiece(s"$delegateCode: Path", Set(path, fileExtensions))
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
+	}
+	
+	case class VersionType(length: Int = 128) extends FacadePropertyType
+	{
+		// ATTRIBUTES   ----------------------
+		
+		override protected val delegate: PropertyType = Text(length)
+		
+		override lazy val nonEmptyDefaultValue: CodePiece = CodePiece("Version(1)", Set(flow.version))
+		
+		
+		// IMPLEMENTED  ----------------------
+		
+		override def scalaType: ScalaType = flow.version
+		
+		override def emptyValue: CodePiece = CodePiece.empty
+		
+		override def defaultPropertyName: Name = "version"
+		override def defaultPartNames: Seq[Name] = Empty
+		
+		override def defaultMutability: Option[Mutability] = None
+		
+		override def supportsDefaultJsonValues: Boolean = true
+		override protected def yieldsTryFromDelegate: Boolean = false
+		
+		override protected def toDelegateCode(instanceCode: String): CodePiece = s"$instanceCode.toString"
+		
+		override protected def fromDelegateCode(delegateCode: String): CodePiece =
+			CodePiece(s"Version($delegateCode)", Set(flow.version))
+		
+		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String =
+			s"Version of this ${ className.doc }"
 	}
 	
 	case class GenericValue(length: Int = 255) extends DirectlySqlConvertiblePropertyType

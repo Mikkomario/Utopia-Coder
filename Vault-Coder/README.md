@@ -272,6 +272,7 @@ Each property object should contain following properties:
     - Enables (timed) item deprecation
     - Indexes by default
   - `"path" / "file"` - Results in **java.nio.Path** file type being used
+  - `"version"` - Results in Version type being used. These are stored as strings in the database.
   - `"value" / "val"` - Results in a generic **Value** type, which are stored in the database as json strings
   - `"model" / "values"` - Results in a **Model** type, which are stored in the database as json strings
   - `"angle"` - Results in **Angle** type from **Paradigm**

@@ -282,7 +282,7 @@ object MainAppLogic extends CoderAppLogic
 		
 		val classes = modules.flatMap { _.classes }.toSeq.sorted
 		// Writes the table structure
-		SqlWriter(projectName, databaseName, version, classes, path("sql", "db", "structure"),
+		SqlWriter(projectName, databaseName, version, classes.filterNot { _.isGeneric }, path("sql", "db", "structure"),
 			prefixColumnNames)
 			.flatMap { _ =>
 				// Writes the inserts
