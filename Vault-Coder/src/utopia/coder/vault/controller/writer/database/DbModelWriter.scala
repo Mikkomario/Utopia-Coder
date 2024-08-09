@@ -179,7 +179,7 @@ object DbModelWriter
 			name = (classToWrite.name + modelSuffix + likeSuffix).className,
 			genericTypes = Single(repr),
 			extensions = customExtensions :+ factory,
-			properties = optionalProps ++ Pair(dbPropsProp, valueProps) ++ propRenameImplementations,
+			properties = (optionalProps :+ dbPropsProp) ++ valueProps ++ propRenameImplementations,
 			methods = (withMethods + buildCopy) ++ parentBuildCopyImplementations ++
 				withRenameImplementations ++ withId,
 			description = s"Common trait for database models used for interacting with ${
@@ -285,8 +285,8 @@ object DbModelWriter
 		)
 		
 		// The companion object contains a concrete XModel implementation
-		val (concreteClass, applyParams) = modelClassDeclarationFor(classToWrite, ScalaType.basic(s"_$dbModelRef"),
-			parentClassReferences, modelRefs,
+		val (concreteClass, applyParams) = modelClassDeclarationFor(classToWrite,
+			ScalaType.basic(s"_${ dbModelRef.target }"), parentClassReferences, modelRefs,
 			Some(Pair(ScalaType.referenceToType(dbPropsRef), ScalaType.referenceToType(dbModelRef)) -> buildCopy))
 		
 		// The companion object also contains a concrete XModelFactory implementation
@@ -298,7 +298,7 @@ object DbModelWriter
 		val companionObject = ObjectDeclaration(
 			name = traitName,
 			methods = Set(
-				MethodDeclaration("apply", explicitOutputType = Some(ScalaType.basic(traitName)),
+				MethodDeclaration("apply",
 					returnDescription = s"A factory for constructing ${ classToWrite.name } database models")(
 					Pair(Parameter("table", table), Parameter("dbProps", dbPropsRef)))(
 					s"$concreteFactoryName(table, dbProps)")),
@@ -308,7 +308,7 @@ object DbModelWriter
 		File(storablePackage, companionObject, traitDeclaration).write()
 	}
 	
-	// Writes either the XModel object or the concrete _XFactory(...) class.
+	// Writes either the XModel object or the concrete XFactoryImpl(...) class.
 	// Both of these perform a similar function,
 	// although the latter requires parameters and an external model trait/class to do so.
 	// dbPropsData contains 3 values:
@@ -363,7 +363,7 @@ object DbModelWriter
 				val applyMethod = MethodDeclaration("apply", explicitOutputType = Some(modelClassType),
 					returnDescription = s"Constructs a new ${
 						classToWrite.name } database model with the specified properties")(applyParams)(
-					s"$modelClassType(table, $dbPropsName, ${ applyParams.map { _.name }.mkString(", ") })")
+					s"_$modelClassType(table, $dbPropsName, ${ applyParams.map { _.name }.mkString(", ") })")
 				
 				(params, Pair[Extension](factory, dbPropsWrapperRef), Empty, Single(applyMethod))
 				
@@ -372,19 +372,29 @@ object DbModelWriter
 			case None =>
 				val factoryExtensions = extensionsForFactory(classToWrite, parentClassReferences, modelRefs.factory,
 					modelClassType, modelRefs.stored, modelRefs.data)
+				// When inheriting, extends the parent's YDbProps trait
+				val dbPropExtensions = parentClassReferences.flatMap { _.generic.map[Extension] { _.dbProps } }
 				
 				val tableProp = ComputedProperty("table", Set(tablesRef), isOverridden = true)(
 					s"${ tablesRef.target }.${ classToWrite.name.prop }")
-				val dbPropImplementations = classToWrite.dbProperties
-					.map { prop =>
-						// TODO: Add overridden keyword where applies, if necessary
-						LazyValue(prop.name.prop,
-							description = s"Database property used for interacting with ${ prop.name.pluralDoc }")(
-							s"property(${ prop.modelName.quoted })")
-					}
-					.toVector
 				
-				(Empty, factoryExtensions, tableProp +: dbPropImplementations, Empty)
+				// Defines database properties
+				// When inheriting, also defines renamed implementations
+				val dbPropImplementations = classToWrite.properties.flatMap { prop =>
+					val dbPropImplementations = prop.dbProperties.map { dbProp =>
+						LazyValue(prop.name.prop,
+							description = s"Database property used for interacting with ${ prop.name.pluralDoc }",
+							isOverridden = prop.isDirectExtension)(
+							s"property(${ dbProp.modelName.quoted })")
+					}
+					val renameImplementation = prop.rename.map { case (nameInParent, localName) =>
+						ComputedProperty(nameInParent.prop, isOverridden = true)(localName.prop)
+					}
+					
+					dbPropImplementations ++ renameImplementation
+				}
+				
+				(Empty, factoryExtensions ++ dbPropExtensions, tableProp +: dbPropImplementations, Empty)
 		}
 		
 		val extensions = customExtensions ++ deprecation.map { _.extensionFor(modelClassType) }
@@ -415,7 +425,8 @@ object DbModelWriter
 				methods = methods,
 				description = description,
 				author = classToWrite.author,
-				since = DeclarationDate.versionedToday
+				since = DeclarationDate.versionedToday,
+				isCaseClass = true
 			)
 	}
 	
@@ -438,10 +449,16 @@ object DbModelWriter
 			Parameter(prop.name.prop, inputType.scalaType, defaultValue)
 		}.toVector
 		
-		val withMethods = classToWrite.properties.flatMap { prop =>
-			withPropertyMethods(prop, "copy", "A new copy of this model with the specified ")
+		// Implements copy functions from the parent YDbModelLike traits
+		val buildCopyImplementations = parentClassReferences
+			.map { refs => buildCopyImplementationFor(classToWrite, refs.targetClass) }
+		
+		// When renaming properties from parent traits, defines these renames here
+		val renameImplementations = classToWrite.properties.flatMap { prop =>
+			prop.rename.map { case (nameInParent, localName) =>
+				ComputedProperty(nameInParent.prop, isOverridden = true)(localName.prop)
+			}
 		}
-		val withId = withIdMethod(classToWrite, "copy")
 		
 		// Some data differs between trait-based and class based implementations
 		val (className, visibility, customConstructionParams, customExtensions, customProps, customMethods) =
@@ -461,7 +478,7 @@ object DbModelWriter
 								.mkString(", ") })")
 					
 					// Only needs to extend the predefined XModel trait
-					(s"_$reprType", Private, Pair(table, dbPropsParam), Single[Extension](modelRef),
+					(reprType.toString, Private, Pair(table, dbPropsParam), Single[Extension](modelRef),
 						Empty, Single(buildCopyImplementation))
 					
 				// Case: Concrete / simple class
@@ -472,11 +489,10 @@ object DbModelWriter
 					// Implements 1) Storable, 2) XFactory[Self] and 3) FromIdFactory[Id, Self], 4) HasIdProperty
 					// (and/or parent YModel trait(s))
 					val factory = modelRefs.factory(reprType)
-					// TODO: It looks like these parent references are not getting applied (same issue as in Stored / ModelWriter)
 					val customExtensions = parentClassReferences
 						.flatMap[Extension] { refs =>
 							refs.generic.view.flatMap { genericRefs =>
-								Pair[Extension](genericRefs.dbModel.modelLike(classType), genericRefs.dbModel.model)
+								Pair[Extension](genericRefs.dbModel.model, genericRefs.dbModel.modelLike(classType))
 							}
 						}
 						.notEmpty
@@ -487,6 +503,14 @@ object DbModelWriter
 							)
 						}
 					
+					// When inheriting, implements the dbProps -property
+					val dbProps = {
+						if (classToWrite.isExtension)
+							Some(ComputedProperty("dbProps", isOverridden = true)(reprType.toString))
+						else
+							None
+					}
+					
 					// Defines table by referring to the companion object
 					val table = ComputedProperty("table", isOverridden = true)(s"$reprType.table")
 					// Same thing with the value properties
@@ -494,7 +518,15 @@ object DbModelWriter
 					val valueProps = valuePropertiesPropertyFor(classToWrite,
 						parentClassReferences.map { _.dbModel.targetCode }, reprType.toString)
 					
-					(className, Public, Empty, customExtensions :+[Extension] factory, Pair(table, valueProps), Empty)
+					// Implements withX(...) functions and the withId(...) function,
+					// but only if not already defined in parent traits
+					val withMethods = classToWrite.properties.filterNot { _.isDirectExtension }.flatMap { prop =>
+						withPropertyMethods(prop, "copy", "A new copy of this model with the specified ")
+					}
+					val withId = if (classToWrite.isExtension) None else Some(withIdMethod(classToWrite, "copy"))
+					
+					(className, Public, Empty, customExtensions :+[Extension] factory,
+						(dbProps.emptyOrSingle :+ table) ++ valueProps, withMethods ++ withId)
 			}
 			
 		val constructionParams = customConstructionParams ++ (idParam +: classApplyParams)
@@ -503,8 +535,8 @@ object DbModelWriter
 			visibility = visibility,
 			constructionParams = constructionParams,
 			extensions = customExtensions,
-			properties = customProps,
-			methods = withMethods.toSet + withId ++ customMethods,
+			properties = renameImplementations ++ customProps,
+			methods = customMethods.toSet ++ buildCopyImplementations,
 			description = s"Used for interacting with ${ classToWrite.name.plural } in the database",
 			author = classToWrite.author, since = DeclarationDate.versionedToday, isCaseClass = true)
 		
@@ -517,7 +549,6 @@ object DbModelWriter
 	{
 		// When extending other YModelFactoryLike traits,
 		// will not repeat the StorableFactory & FromIdFactory inheritance
-		// TODO: Same issue here as above: Parent class references are not getting applied
 		val customExtensions = parentClassReferences
 			.flatMap[Extension] { _.generic.map { _.dbModel.factoryLike(dbModelType, storedType, dataType) } }
 			.notEmpty
@@ -541,36 +572,42 @@ object DbModelWriter
 		// The other properties are defined here manually
 		val remainingProperties = classToWrite.properties.filterNot { _.isExtension }
 		
-		def quotedId = s"$dbPropsName.id.name"
-		// The implementation is different when inheriting parents
-		val implementation = {
-			// Case: No more properties left to define
-			if (remainingProperties.isEmpty) {
-				// Case: Topmost trait => Only defines the id property
-				if (parentValuePropsCode.isEmpty)
-					CodePiece(s"Single($quotedId -> id)", Set(flow.valueConversions, flow.single))
-				// Case: Inheriting another trait => Only refers to the parent(s)
-				else
-					parentValuePropsCode
+		// Case: Implementation would be merely referencing the parent => Skips this whole property
+		if (remainingProperties.isEmpty && parentReferences.hasSize(1))
+			None
+		else {
+			def quotedId = s"$dbPropsName.id.name"
+			// The implementation is different when inheriting parents
+			val implementation = {
+				// Case: No more properties left to define
+				if (remainingProperties.isEmpty) {
+					// Case: Topmost trait => Only defines the id property
+					if (parentValuePropsCode.isEmpty)
+						CodePiece(s"Single($quotedId -> id)", Set(flow.valueConversions, flow.single))
+					// Case: Inheriting another trait => Only refers to the parent(s)
+					else
+						parentValuePropsCode
+				}
+				// Case: Properties must be defined manually
+				else {
+					val propsPart = remainingProperties.view.flatMap { _.dbProperties }
+						.map { prop => prop.toValueCode.withPrefix(s"$dbPropsName.${ prop.name.prop }.name -> ") }
+						.reduceLeft { _.append(_, ", ") }
+					
+					// Case: No inheritance applied => Wraps the properties in a collection and includes the id property
+					if (parentValuePropsCode.isEmpty)
+						CodePiece.collection(remainingProperties.size + 1) +
+							(s"$quotedId -> id, " +: propsPart).withinParenthesis
+					// Case: Inheritance applied => Appends these properties to those defined in parents
+					else
+						parentValuePropsCode
+							.append(CodePiece.collection(remainingProperties.size) + propsPart.withinParenthesis, " ++ ")
+				}
 			}
-			// Case: Properties must be defined manually
-			else {
-				val propsPart = remainingProperties.view.flatMap { _.dbProperties }
-					.map { prop => prop.toValueCode.withPrefix(s"$dbPropsName.${ prop.name.prop }.name -> ") }
-					.reduceLeft { _.append(_, ", ") }
-				
-				// Case: No inheritance applied => Wraps the properties in a collection and includes the id property
-				if (parentValuePropsCode.isEmpty)
-					CodePiece.collection(remainingProperties.size + 1) +
-						(s"$quotedId -> id, " +: propsPart).withinParenthesis
-				// Case: Inheritance applied => Appends these properties to those defined in parents
-				else
-					parentValuePropsCode
-						.append(CodePiece.collection(remainingProperties.size) + propsPart.withinParenthesis, " ++ ")
-			}
+			
+			Some(ComputedProperty("valueProperties", implementation.references, isOverridden = true)(
+				implementation.text))
 		}
-		
-		ComputedProperty("valueProperties", implementation.references, isOverridden = true)(implementation.text)
 	}
 	
 	private def withIdMethod(classToWrite: Class, assignFunctionName: String) =
@@ -628,14 +665,29 @@ object DbModelWriter
 			s"$calledMethodName($constructionParamsCode)")
 	}
 	
-	private def buildCopyParamsFor(classToWrite: Class)(implicit naming: NamingRules) =
-		classToWrite.dbProperties
+	private def buildCopyImplementationFor(childClass: Class, parentClass: Class)(implicit naming: NamingRules) =
+	{
+		val params = buildCopyParamsFor(parentClass)
+		val renames = childClass.propertyRenames
+		
+		MethodDeclaration((copyPrefix +: parentClass.name).function, isOverridden = true)(params)(s"copy(${
+			params.map { p => s"${ renames(p.name) } = ${ p.name }" }.mkString(", ") })")
+	}
+	
+	private def buildCopyParamsFor(classToWrite: Class)(implicit naming: NamingRules) = {
+		val idPropType = classToWrite.idType.sqlConversion.intermediate
+		val idParam = Parameter("id", idPropType.toScala, "id",
+			description = "Id to assign to the new model (default = currently assigned id)")
+		
+		idParam +: classToWrite.dbProperties
 			.map { prop =>
+				val propName = prop.name.prop
 				val propType = prop.conversion.intermediate
-				Parameter(prop.name.prop, propType.scalaType, propType.emptyValue,
+				Parameter(propName, propType.scalaType, propName,
 					description = s"${ prop.name } to assign to the new model (default = currently assigned value)")
 			}
 			.toVector
+	}
 	
 	private def withMethodNameFor(prop: Named)(implicit naming: NamingRules): String = withMethodNameFor(prop.name)
 	private def withMethodNameFor(name: Name)(implicit naming: NamingRules) = (withPrefix + name).prop

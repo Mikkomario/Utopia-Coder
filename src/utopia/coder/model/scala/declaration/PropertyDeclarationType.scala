@@ -37,9 +37,18 @@ sealed trait PropertyDeclarationType extends ScalaConvertible
 	          description: String = "", isOverridden: Boolean = false,
 	          isImplicit: Boolean = false, isLowMergePriority: Boolean = false)
 	         (line1: String, moreLines: String*) =
-		PropertyDeclaration(this, name, Code.from(line1 +: moreLines).referringTo(references), visibility,
+	{
+		// Empty body leads to an abstract property
+		val codeLines = {
+			if (line1.isEmpty && moreLines.forall { _.isEmpty })
+				Empty
+			else
+				line1 +: moreLines
+		}
+		PropertyDeclaration(this, name, Code.from(codeLines).referringTo(references), visibility,
 			explicitOutputType, implicitParams, annotations, description, Empty,
 			isOverridden, isImplicit, isLowMergePriority)
+	}
 	
 	/**
 	 * Creates a new abstract property

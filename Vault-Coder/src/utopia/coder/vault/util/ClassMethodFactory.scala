@@ -21,7 +21,7 @@ object ClassMethodFactory
 	/**
 	  * Creates a new method that parses an instance from a model
 	  * @param targetClass Class being parsed
-	  * @param validatedModelCode Code that provides a try containing a validated model based on the input parameter
+	  * @param validatedModelCode Code that provides a Try containing a validated model based on the input parameter
 	  * @param methodName Name of this method
 	  * @param param (Model) parameter accepted by this method (default = template model named 'model')
 	  * @param isFromJson Whether the input model is from json (true) or from a database model (false).
@@ -38,7 +38,7 @@ object ClassMethodFactory
 	                  (wrapAssignments: CodePiece => CodePiece)
 	                  (implicit naming: NamingRules) =
 		MethodDeclaration.usingCode(methodName,
-			classFromModelCode(targetClass, validatedModelCode, isFromJson)(wrapAssignments),
+			classFromModelCode(targetClass, validatedModelCode, isFromJson, modelIsTry = true)(wrapAssignments),
 			isOverridden = true)(param)
 	
 	/**
@@ -80,15 +80,17 @@ object ClassMethodFactory
 	/**
 	 * Creates a new method code that parses an instance from a model
 	 * @param targetClass Class being parsed
-	 * @param validatedModelCode Code that provides a try containing a validated model based on the input parameter
+	 * @param validatedModelCode Code that provides a validated model based on the input parameter
 	 * @param isFromJson Whether the input model is from json (true) or from a database model (false).
 	 *                   Default = database model.
+	 * @param modelIsTry Whether 'validatedModelCode' yields a Try (default = false)
 	 * @param wrapAssignments A function that accepts assignments that provide enough data for a data instance
 	 *                        creation (e.g. "param1Value, param2Value, param3Value") and produces the code
 	 *                        resulting in the desired output type (like stored model, for example)
 	 * @return A method for parsing class data from models
 	 */
-	def classFromModelCode(targetClass: Class, validatedModelCode: CodePiece, isFromJson: Boolean = false)
+	def classFromModelCode(targetClass: Class, validatedModelCode: CodePiece, isFromJson: Boolean = false,
+	                       modelIsTry: Boolean = false)
 	                      (wrapAssignments: CodePiece => CodePiece)
 	                      (implicit naming: NamingRules): Code =
 	{
@@ -96,11 +98,11 @@ object ClassMethodFactory
 		if (targetClass.properties.isEmpty)
 			wrapAssignments(CodePiece.empty)
 		else
-			tryApplyCode(targetClass, validatedModelCode, isFromJson)(wrapAssignments)
+			tryApplyCode(targetClass, validatedModelCode, isFromJson, modelIsTry)(wrapAssignments)
 	}
 	
 	private def tryApplyCode(classToWrite: Class, validatedModelCode: CodePiece,
-	                         isFromJson: Boolean)
+	                         isFromJson: Boolean, modelIsTry: Boolean)
 	                        (wrapAssignments: CodePiece => CodePiece)
 	                        (implicit naming: NamingRules) =
 	{
@@ -109,15 +111,22 @@ object ClassMethodFactory
 		
 		val builder = new CodeBuilder()
 		
-		// Needs to validate the specified model
-		val validateMapMethod = if (tryProperties.isEmpty) ".map" else ".flatMap"
-		builder += validatedModelCode + validateMapMethod + " { valid => "
-		builder.indent()
+		// Unwraps the validated model (optional feature)
+		val initialIndentCount = {
+			if (modelIsTry) {
+				val validateMapMethod = if (tryProperties.isEmpty) ".map" else ".flatMap"
+				builder += validatedModelCode + validateMapMethod + " { valid => "
+				builder.indent()
+				1
+			}
+			else
+				0
+		}
 		
 		lazy val dbPropsAccessor = dbPropsAccessorFor(classToWrite)
 		declareTryProps(builder, tryProperties.dropRight(1), "flatMap", dbPropsAccessor, isFromJson)
 		declareTryProps(builder, tryProperties.lastOption, "map", dbPropsAccessor, isFromJson)
-		val innerIndentCount = tryProperties.size + 1
+		val innerIndentCount = initialIndentCount + tryProperties.size
 		
 		// Writes the instance creation now that the "try-properties" properties have been declared
 		// Imports the db properties, if needed

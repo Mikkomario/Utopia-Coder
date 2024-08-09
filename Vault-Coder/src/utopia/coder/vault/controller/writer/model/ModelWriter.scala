@@ -76,7 +76,7 @@ object ModelWriter
 										factoryRef)
 										.flatMap { case (dataLikeRef, buildCopyName) =>
 											writeStoredLike(classToWrite, storePackage, parentClassReferences,
-												dataLikeRef, factoryWrapperRef)
+												dataLikeRef, factoryWrapperRef, buildCopyName)
 												.map { storedLikeRef =>
 													Some(GenericClassModelReferences(
 														hasPropsRef, dataLikeRef, storedLikeRef) -> buildCopyName)
@@ -97,7 +97,7 @@ object ModelWriter
 							genericRefs.map { _.dataLike }, buildCopyName)
 							.flatMap { dataRef =>
 								writeStored(classToWrite, storePackage, parentClassReferences, factoryWrapperRef,
-									dataRef, genericRefs.map { _.storedLike }, buildCopyName)
+									dataRef, genericRefs.map { _.storedLike })
 									.map { storedRef =>
 										// Returns references to generated classes
 										ClassModelReferences(dataRef, storedRef, factoryRef, factoryWrapperRef,
@@ -265,8 +265,7 @@ object ModelWriter
 		// Introduces a function for creating copies
 		val buildCopy = MethodDeclaration.newAbstract((copyPrefix +: classToWrite.name).function, reprType,
 			description = s"Builds a modified copy of this ${ classToWrite.name }",
-			returnDescription = s"A copy of this ${ classToWrite.name } with the specified properties",
-			isProtected = true)(
+			returnDescription = s"A copy of this ${ classToWrite.name } with the specified properties")(
 			classToWrite.properties
 				.map { prop =>
 					val propName = prop.name.prop
@@ -320,16 +319,28 @@ object ModelWriter
 		
 		// Extends the YData & YDataLike[XData] traits from the parent classes
 		val parentDataClassReferences = parentClassReferences.map { _.data }
-		// FIXME: For some reason, it seems like the YDataLike doesn't get included here
 		val inheritedExtensions: Seq[Extension] = parentDataClassReferences.map(Extension.fromReference) ++
 			parentClassReferences.flatMap { _.generic.map[Extension] { _.dataLike(dataClassType) } }
 		
+		// Defines renamed parent properties
+		val renameImplementations = classToWrite.properties.flatMap { prop =>
+			prop.rename.map { case (nameInParent, localName) =>
+				ComputedProperty(nameInParent.prop, isOverridden = true)(localName.prop)
+			}
+		}
+		
 		// Some of the data differs based on whether the class is generic or not
 		val (customExtensions, customProps, customMethods) = dataLikeRef match {
-			// Case: Abstract class => Extends XDataLike[XData] trait
+			// Case: Abstract class => Extends XDataLike[XData] trait and implements renamed property references
 			case Some(dataLikeRef) =>
 				val extensions: Seq[Extension] = Single[Extension](dataLikeRef(dataClassType))
-				(extensions, Empty, Set[MethodDeclaration]())
+				val renamedProperties = classToWrite.properties.flatMap { prop =>
+					prop.rename.map { case (originalName, localName) =>
+						ComputedProperty(originalName.prop, isOverridden = true)(localName.prop)
+					}
+				}
+				
+				(extensions, renamedProperties, Set[MethodDeclaration]())
 				
 			// Case: Concrete class => Extends XFactory[XData] & ModelConvertible, implements toModel and withX methods
 			//                         (except when inheriting another trait)
@@ -368,8 +379,7 @@ object ModelWriter
 						}
 						.mkString(", ")
 					
-					MethodDeclaration(copyMethodName, visibility = Protected, isOverridden = true)(buildCopyParams)(
-						s"copy($assignments)")
+					MethodDeclaration(copyMethodName, isOverridden = true)(buildCopyParams)(s"copy($assignments)")
 				}
 				
 				(extensions, toModel.emptyOrSingle, withMethods ++ copyMethods)
@@ -381,7 +391,7 @@ object ModelWriter
 				TraitDeclaration(
 					name = dataClassName,
 					extensions = customExtensions ++ inheritedExtensions,
-					properties = deprecationProps ++ customProps,
+					properties = renameImplementations ++ deprecationProps ++ customProps,
 					methods = customMethods,
 					description = classToWrite.description,
 					author = classToWrite.author,
@@ -392,7 +402,7 @@ object ModelWriter
 					name = dataClassName,
 					constructionParams = constructionParams,
 					extensions = customExtensions ++ inheritedExtensions,
-					properties = deprecationProps ++ customProps,
+					properties = renameImplementations ++ deprecationProps ++ customProps,
 					methods = customMethods,
 					description = classToWrite.description,
 					author = classToWrite.author,
@@ -431,8 +441,7 @@ object ModelWriter
 					constructionParams = constructionParams,
 					extensions = Vector(dataClassType),
 					methods = Set(
-						MethodDeclaration(buildCopyName, visibility = Protected, isOverridden = true)(
-							constructionParams)(constructConcrete)
+						MethodDeclaration(buildCopyName, isOverridden = true)(constructionParams)(constructConcrete)
 					),
 					visibility = Private,
 					description = s"Concrete implementation of the ${ classToWrite.name } data trait",
@@ -465,7 +474,7 @@ object ModelWriter
 	
 	// Writes XLike trait for generic implementations
 	private def writeStoredLike(classToWrite: Class, storedPackage: Package, parentClassReferences: Seq[ClassReferences],
-	                            dataLikeRef: Reference, factoryWrapperRef: Reference)
+	                            dataLikeRef: Reference, factoryWrapperRef: Reference, buildCopyName: String)
 	                           (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// When extending YStoredLike[Repr] with YStored, the Repr type must conform to YStored
@@ -506,13 +515,19 @@ object ModelWriter
 			ComputedProperty(propName, isOverridden = true)(s"data.$propName")
 		}
 		
+		// Implements the copyX(...) function required by XDataLike
+		val copyParams = classToWrite.properties
+			.map { prop => Parameter(prop.name.prop, prop.dataType.toScala) }
+		val buildCopy = MethodDeclaration(buildCopyName, isOverridden = true)(
+			copyParams)(s"copy(data = data.$buildCopyName(${ copyParams.map { _.name }.mkString(", ") }))")
+		
 		File(storedPackage, TraitDeclaration(
 			name = ((storedPrefix +: classToWrite.name) + likeSuffix).className,
 			genericTypes = Pair(data, repr),
 			extensions = customExtensions ++
 				Pair[Extension](factoryWrapperRef(dataType, reprType), dataLikeRef(reprType)) ++ inheritedExtensions,
 			properties = propertyAccessors :+ wrappedFactory,
-			methods = withId.toSet,
+			methods = Set(buildCopy) ++ withId,
 			description = s"Common trait for ${ classToWrite.name.pluralDoc } which have been stored in the database",
 			author = classToWrite.author,
 			since = DeclarationDate.versionedToday
@@ -522,8 +537,7 @@ object ModelWriter
 	// Writes the stored model version
 	// Returns a reference
 	private def writeStored(classToWrite: Class, storedPackage: Package, parentClassReferences: Seq[ClassReferences],
-	                        factoryWrapperRef: Reference, dataClassRef: Reference, storedLikeRef: Option[Reference],
-	                        buildCopyName: String)
+	                        factoryWrapperRef: Reference, dataClassRef: Reference, storedLikeRef: Option[Reference])
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Prepares common data
@@ -543,7 +557,7 @@ object ModelWriter
 		val storedClass = {
 			// When inheriting other classes, extends their StoredYLike[X] with StoredY
 			val inheritedExtensions = parentClassReferences.flatMap[Extension] { refs =>
-				refs.generic.map[Extension] { _.storedLike(classType) }.emptyOrSingle :+ refs.stored
+				refs.stored +: refs.generic.map[Extension] { _.storedLike(classType) }.emptyOrSingle
 			}
 			
 			// Some of the implementation differs greatly between abstract and concrete implementations
@@ -651,16 +665,11 @@ object ModelWriter
 					val constructConcrete = s"$concreteClassName(${
 						constructionParams.map { _.name }.mkString(", ") })"
 					
-					val copyParams = classToWrite.properties
-						.map { prop => Parameter(prop.name.prop, prop.dataType.toScala) }
-					val buildCopy = MethodDeclaration(buildCopyName, visibility = Protected, isOverridden = true)(
-						copyParams)(s"copy(data = data.$buildCopyName(${ copyParams.map { _.name }.mkString(", ") }))")
-					
 					val nestedClass = ClassDeclaration(
 						name = concreteClassName,
 						constructionParams = constructionParams,
 						extensions = Single(classType),
-						methods = Set(buildCopy, wrap),
+						methods = Set(wrap),
 						visibility = Private,
 						description = s"Concrete implementation of the ${ classToWrite.name } trait",
 						author = classToWrite.author,

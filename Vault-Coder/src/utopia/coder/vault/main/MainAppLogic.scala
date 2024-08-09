@@ -369,6 +369,7 @@ object MainAppLogic extends CoderAppLogic
 				classToWrite.parents.size } parent references are missing for ${ classToWrite.name.className }")
 		
 		ModelWriter(classToWrite, parentClassReferences).flatMap { modelRefs =>
+			// dbPropsRefs is stored as: Try[Option[(Pair(DbPropsRef, DbPropsWrapperRef), wrapperPropName)]]
 			val dbPropsRefs = {
 				if (classToWrite.isGeneric)
 					DbPropsWriter(classToWrite, parentClassReferences).map { Some(_) }
@@ -377,13 +378,13 @@ object MainAppLogic extends CoderAppLogic
 			}
 			dbPropsRefs.flatMap { dbPropsRefs =>
 				DbModelWriter(classToWrite, parentClassReferences, modelRefs, tablesRef, dbPropsRefs)
+					// dbModelRefs is either Left: Multiple references (generic use-case), or Right: Reference to DbModel
 					.flatMap { dbModelRefs =>
-						val dbPropsRef = dbPropsRefs match {
-							case None =>
-								dbModelRefs.rightOrMap { _.model }
+						val dbPropsOrModelRef = dbPropsRefs match {
+							case None => dbModelRefs.rightOrMap { _.model }
 							case Some((refs, _)) => refs.first
 						}
-						DbFactoryWriter(classToWrite, parentClassReferences, modelRefs, dbPropsRef)
+						DbFactoryWriter(classToWrite, parentClassReferences, modelRefs, dbPropsOrModelRef)
 							.flatMap { case (dbFactoryRef, dbFactoryLikeRef) =>
 								// Adds description-specific references if applicable
 								(descriptionLinkObjects match {
@@ -405,9 +406,8 @@ object MainAppLogic extends CoderAppLogic
 									case None => Success(None)
 								}).flatMap { descriptionReferences =>
 									// Finally writes the access points
-									val modelFactoryRef = dbModelRefs.rightOrMap { _.factory }
 									AccessWriter(classToWrite, parentClassReferences, modelRefs.stored, dbFactoryRef,
-										modelFactoryRef, descriptionReferences)
+										dbPropsOrModelRef, descriptionReferences)
 										.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
 											val genericReferences = modelRefs.generic.flatMap { modelRefs =>
 												dbPropsRefs.flatMap { case (dbPropsRefs, _) =>
@@ -420,7 +420,7 @@ object MainAppLogic extends CoderAppLogic
 												}
 											}
 											val classRefs = ClassReferences(classToWrite, modelRefs, dbFactoryRef,
-												dbPropsRef, genericUniqueAccessRef, genericManyAccessRef,
+												dbPropsOrModelRef, genericUniqueAccessRef, genericManyAccessRef,
 												genericReferences)
 											classToWrite -> classRefs
 										}
