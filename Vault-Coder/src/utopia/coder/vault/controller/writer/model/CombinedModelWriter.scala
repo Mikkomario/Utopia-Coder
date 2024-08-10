@@ -48,7 +48,7 @@ object CombinedModelWriter
 		File(setup.combinedModelPackage/parent.packageName,
 			TraitDeclaration(traitName,
 				extensions = standardExtensions(traitType, parent, modelRefs),
-				properties = standardProperties(parent.name, parent.name.prop),
+				properties = standardProperties(parent.name, modelRefs.stored),
 				description = s"Common trait for combinations that add additional data to ${ parent.name.pluralDoc }",
 				author = parent.author,
 				since = DeclarationDate.versionedToday
@@ -88,11 +88,16 @@ object CombinedModelWriter
 			case Some(combinedTrait) => Single[Extension](combinedTrait)
 			case None => standardExtensions(traitType, data.parentClass, parentRefs)
 		}
+		
+		val childDocName = if (data.combinationType.isOneToMany) data.childName.pluralDoc else data.childName.doc
+		val childParam = constructorParams(1)
+		val childProp = ComputedProperty.newAbstract(childParam.name, childParam.dataType,
+			description = s"$childDocName that are attached to this ${ parentName.doc }")
 		val traitProps = {
 			if (combinedTraitRef.isDefined)
-				Empty
+				Single(childProp)
 			else
-				standardProperties(parentName, parentPropName)
+				standardProperties(parentName, parentRefs.stored) :+ childProp
 		}
 		
 		val comboTrait = TraitDeclaration(
@@ -147,10 +152,12 @@ object CombinedModelWriter
 	}
 	
 	// Generates the properties placed to the highest level combined model -trait
-	private def standardProperties(parentName: Name, parentPropName: String)
+	private def standardProperties(parentName: Name, parentType: ScalaType)
 	                              (implicit naming: NamingRules, setup: VaultProjectSetup) =
 	{
+		val parentPropName = parentName.prop
 		Vector(
+			ComputedProperty.newAbstract(parentPropName, parentType, description = s"Wrapped ${ parentName.doc }"),
 			// Provides direct access to parent.id
 			ComputedProperty("id", description = s"Id of this ${ parentName.doc } in the database",
 				isOverridden = setup.modelCanReferToDB)(s"$parentPropName.id"),

@@ -63,8 +63,19 @@ sealed trait CombinationType
 	  */
 	def applyParamsWith(parentName: Name, childName: Name, parentRef: Reference, childRef: Reference)
 	                   (implicit naming: NamingRules) =
-		Parameters(Parameter(parentName.prop, parentRef),
-			Parameter(if (isOneToMany) childName.props else childName.prop, childParamTypeFrom(childRef)))
+	{
+		val (childPropName, childDocName) = {
+			if (isOneToMany)
+				childName.props -> childName.pluralDoc
+			else
+				childName.prop -> childName.doc
+		}
+		
+		Parameters(
+			Parameter(parentName.prop, parentRef, description = s"${ parentName.doc } to wrap"),
+			Parameter(childPropName, childParamTypeFrom(childRef),
+				description = s"$childDocName to attach to this ${ parentName.doc }"))
+	}
 	
 	/**
 	  * @param parentName Name of the parent parameter
