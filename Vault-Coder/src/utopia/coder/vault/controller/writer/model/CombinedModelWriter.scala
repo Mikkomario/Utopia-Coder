@@ -3,10 +3,11 @@ package utopia.coder.vault.controller.writer.model
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.{Private, Protected}
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{ClassModelReferences, CombinationData, CombinationReferences, VaultProjectSetup}
 import utopia.coder.model.scala.{DeclarationDate, Parameter}
-import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
+import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
 import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, TraitDeclaration}
 import utopia.coder.vault.model.data
@@ -42,12 +43,14 @@ object CombinedModelWriter
 	def writeGeneralCombinationTrait(parent: data.Class, modelRefs: ClassModelReferences)
 	                                (implicit setup: VaultProjectSetup, codec: Codec, naming: NamingRules) =
 	{
-		val traitName = (combinedPrefix +: parent.name).className
-		val traitType = ScalaType.basic(traitName)
+		val repr = GenericType.covariant("Repr", description = "Type of the implementing class")
+		val reprType = repr.toScalaType
 		
 		File(setup.combinedModelPackage/parent.packageName,
-			TraitDeclaration(traitName,
-				extensions = standardExtensions(traitType, parent, modelRefs),
+			TraitDeclaration(
+				name = (combinedPrefix +: parent.name).className,
+				genericTypes = Single(repr),
+				extensions = standardExtensions(parent, modelRefs, reprType),
 				properties = standardProperties(parent.name, modelRefs.stored),
 				description = s"Common trait for combinations that add additional data to ${ parent.name.pluralDoc }",
 				author = parent.author,
@@ -80,30 +83,46 @@ object CombinedModelWriter
 		val parentName = data.parentName
 		val constructorParams = data.combinationType.applyParamsWith(
 			parentName, data.childName, parentRefs.stored, childRef)
-		val parentPropName = constructorParams.head.name
+		
+		val parentParam = constructorParams.head
+		val parentPropName = parentParam.name
+		
+		val childParam = constructorParams(1)
+		val (childDocName, beVerb) = {
+			if (data.combinationType.isOneToMany)
+				data.childName.pluralDoc -> "are"
+			else
+				s"the ${ data.childName.doc }" -> "is"
+		}
 		
 		// Generates the trait first
 		
 		val traitExtensions = combinedTraitRef match {
-			case Some(combinedTrait) => Single[Extension](combinedTrait)
-			case None => standardExtensions(traitType, data.parentClass, parentRefs)
+			case Some(combinedTrait) => Single[Extension](combinedTrait(traitType))
+			case None => standardExtensions(data.parentClass, parentRefs, traitType)
 		}
 		
-		val childDocName = if (data.combinationType.isOneToMany) data.childName.pluralDoc else data.childName.doc
-		val childParam = constructorParams(1)
-		val childProp = ComputedProperty.newAbstract(childParam.name, childParam.dataType,
-			description = s"$childDocName that are attached to this ${ parentName.doc }")
-		val traitProps = {
-			if (combinedTraitRef.isDefined)
-				Single(childProp)
+		// If the parent is defined with different names in this trait and the parent trait, implements the rename
+		val renamedParentProp = combinedTraitRef.flatMap { _ =>
+			val defaultParentPropName = data.parentClass.name.prop
+			if (defaultParentPropName != parentPropName)
+				Some(ComputedProperty(defaultParentPropName, isOverridden = true)(parentPropName))
 			else
-				standardProperties(parentName, parentRefs.stored) :+ childProp
+				None
+		}
+		val childProp = ComputedProperty.newAbstract(childParam.name, childParam.dataType,
+			description = s"${ childDocName.capitalize } that $beVerb attached to this ${ parentName.doc }")
+		val customTraitProps = {
+			if (combinedTraitRef.isDefined)
+				Empty
+			else
+				standardProperties(parentName, parentRefs.stored)
 		}
 		
 		val comboTrait = TraitDeclaration(
 			name = traitName,
 			extensions = traitExtensions,
-			properties = traitProps,
+			properties = renamedParentProp.emptyOrSingle ++ customTraitProps :+ childProp,
 			description = data.description
 				.nonEmptyOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
 			author = data.author,
@@ -137,12 +156,12 @@ object CombinedModelWriter
 	}
 	
 	// Generates the extensions applied to the highest level combined model -trait
-	private def standardExtensions(traitType: ScalaType, parent: data.Class, parentRefs: ClassModelReferences)
+	private def standardExtensions(parent: data.Class, parentRefs: ClassModelReferences, reprType: ScalaType)
 	                              (implicit setup: VaultProjectSetup) =
 	{
 		// Provides implicit access to the data model (because that's where most of the properties are)
 		val extender: Extension = Reference.flow.extender(parentRefs.data)
-		val factory: Extension = parentRefs.factoryWrapper(parentRefs.stored, traitType)
+		val factory: Extension = parentRefs.factoryWrapper(parentRefs.stored, reprType)
 		
 		// Extends the HasId trait only if Vault references are enabled
 		if (setup.modelCanReferToDB)
