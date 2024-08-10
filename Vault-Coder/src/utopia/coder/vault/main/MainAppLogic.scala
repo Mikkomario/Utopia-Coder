@@ -321,7 +321,19 @@ object MainAppLogic extends CoderAppLogic
 					// Next writes all required documents for each class in order
 					writeClassesInOrder(data.classes, Map(), tablesRef, descriptionLinkObjects).flatMap { classRefs =>
 						// Finally writes the combined models
-						data.combinations.tryForeach { writeCombo(_, classRefs) }
+						data.combinations.groupBy { _.parentClass }.tryForeach { case (parent, combos) =>
+							// May write a generic combination trait first
+							val commonComboTrait = {
+								if (parent.writeCommonComboTrait)
+									CombinedModelWriter.writeGeneralCombinationTrait(parent, classRefs(parent))
+										.map { Some(_) }
+								else
+									Success(None)
+							}
+							commonComboTrait.flatMap { commonComboTrait =>
+								combos.tryForeach { writeCombo(_, classRefs, commonComboTrait) }
+							}
+						}
 					}
 				}
 			}
@@ -431,12 +443,13 @@ object MainAppLogic extends CoderAppLogic
 		}
 	}
 	
-	private def writeCombo(combination: CombinationData, classRefsMap: Map[Class, ClassReferences])
+	private def writeCombo(combination: CombinationData, classRefsMap: Map[Class, ClassReferences],
+	                       commonComboTraitRef: Option[Reference])
 	                      (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val parentRefs = classRefsMap(combination.parentClass)
 		val childRefs = classRefsMap(combination.childClass)
-		CombinedModelWriter(combination, parentRefs.stored, parentRefs.data, childRefs.stored, parentRefs.factoryWrapper)
+		CombinedModelWriter(combination, parentRefs.model, childRefs.stored, commonComboTraitRef)
 			.flatMap { combinedRefs =>
 				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory)
 					.flatMap { comboFactoryRef =>

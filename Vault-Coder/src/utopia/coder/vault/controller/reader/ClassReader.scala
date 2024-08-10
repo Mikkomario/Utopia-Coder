@@ -483,6 +483,8 @@ object ClassReader
 			}
 		}
 		
+		val hasManyCombos = classModel("has_many_combos", "write_combo_trait", "many_combos")
+			.booleanOr(comboInfo.hasSize > 1)
 		val readClass = new Class(name, tableName.map { _.table }, idName.getOrElse(Class.defaultIdName),
 			properties, packageName, classModel("access_package", "sub_package", "access").getString,
 			comboIndexColumnNames, descriptionLinkColumnName,
@@ -493,7 +495,8 @@ object ClassReader
 			useLongId = classModel("use_long_id").getBoolean,
 			// Writes generic access point if this class has combinations, or if explicitly specified
 			writeGenericAccess = classModel("has_combos", "generic_access", "tree_inheritance")
-				.booleanOr(comboInfo.nonEmpty),
+				.booleanOr(comboInfo.nonEmpty) || hasManyCombos,
+			writeCommonComboTrait = hasManyCombos,
 			isGeneric = classModel("is_generic", "generic", "is_trait", "trait").getBoolean)
 		
 		// Parses class instances if they are present

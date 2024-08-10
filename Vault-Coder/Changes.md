@@ -9,6 +9,7 @@ TODO: Document inheritance features here and in the README
   if it uses **Int** ids, or defines a simple `.apply(Iterable[Long])` implementation (in case it uses **Long** ids)
   - Please note, however, that the nested instances and the apply implementations from previous versions 
     are not removed automatically
+- Combined models are now written as traits with concrete implementations included as nested objects
 ### Bugfixes
 - When specifying multiple directories, the separator is now `:` instead of `&`, since `&` had issues on Linux
 - Fixed an issue where classes with **Long** ids 
@@ -18,7 +19,9 @@ TODO: Document inheritance features here and in the README
   - `list`: Lists all projects that have been registered
   - `show <project>`: Shows paths that are relevant to a project
   - `upgrade <...>`: Performs automated refactoring, facilitating the transitioning between Vault versions
-    - At this time, only upgrade to Vault v1.20 (changes in **FilteringView**) is supported 
+    - At this time, only upgrade to Vault v1.20 (changes in **FilteringView**) is supported
+- Added the generation of common combination traits, when appropriate
+  - This feature may be managed manually with the new `has_many_combos` -property in class models
 - Added **Version** as a new data type
 ### Other changes
 - If the "with" method is specified in class documentation, 

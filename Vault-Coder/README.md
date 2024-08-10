@@ -7,6 +7,8 @@ converts it to a class structure.
 At the end of this document, you will also find instructions on how to generate input model templates based on 
 existing database structure.
 
+TODO: Document inheritance features. Also apply the new combined model syntax changes.
+
 ## Main App Use Instructions
 First, you need to prepare a .json file describing the model structure you want to create / use. 
 See the required document structure below.  

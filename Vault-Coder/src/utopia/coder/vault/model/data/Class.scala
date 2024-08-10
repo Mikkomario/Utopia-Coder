@@ -42,19 +42,23 @@ object Class
 	  * @param useLongId Whether to use long instead of int in the id property (default = false)
 	  * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
 	  *                           (default = false)
-	  * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
+	 * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
+	 *                              Generating such a trait is recommended when intending to generate or build multiple
+	 *                              combinations around this class.
+	 * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
 	 *                  (default = false)
 	 * @return A new class
 	  */
 	def apply(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
 	          comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	          description: String = "", author: String = "", useLongId: Boolean = false,
-	          writeGenericAccess: Boolean = false, isGeneric: Boolean = false): Class =
+	          writeGenericAccess: Boolean = false, writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
 		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None, Empty,
-			description, author, useLongId, writeGenericAccess, isGeneric)
+			description, author, useLongId, writeGenericAccess, writeCommonComboTrait, isGeneric)
 	
 	/**
 	  * Creates a new class with automatic table-naming with description support
+ *
 	  * @param name Name of this class (in code)
 	  * @param properties Properties in this class
 	  * @param packageName Name of the package in which to wrap this class (default = empty)
@@ -68,7 +72,10 @@ object Class
 	  * @param useLongId Whether to use long instead of int in the id property (default = false)
 	  * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
 	  *                           (default = false)
-	  * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
+	 * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
+	 *                              Generating such a trait is recommended when intending to generate or build multiple
+	 *                              combinations around this class.
+	 * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
 	 *                  (default = false)
 	 * @return A new class
 	  */
@@ -76,12 +83,11 @@ object Class
 	def described(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
 	              comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	              description: String = "", author: String = "", descriptionLinkName: Option[Name] = None,
-	              useLongId: Boolean = false, writeGenericAccess: Boolean = false, isGeneric: Boolean = false): Class =
-	{
+	              useLongId: Boolean = false, writeGenericAccess: Boolean = false,
+	              writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
 		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames,
 			Some[Name](descriptionLinkName.getOrElse { name + "id" }), Empty, description, author, useLongId,
-			writeGenericAccess, isGeneric)
-	}
+			writeGenericAccess, writeCommonComboTrait, isGeneric)
 }
 
 /**
@@ -102,13 +108,16 @@ object Class
   * @param description A description of this class
   * @param useLongId Whether to use long instead of int in the id property
   * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
+ * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
+ *                              Generating such a trait is recommended when intending to generate or build multiple
+ *                              combinations around this class.
  * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
   */
 // TODO: customTableName should be Option[Name]
 case class Class(name: Name, customTableName: Option[String], idName: Name, properties: Seq[Property],
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
                  descriptionLinkName: Option[Name], parents: Seq[Class], description: String, author: String,
-                 useLongId: Boolean, writeGenericAccess: Boolean, isGeneric: Boolean)
+                 useLongId: Boolean, writeGenericAccess: Boolean, writeCommonComboTrait: Boolean, isGeneric: Boolean)
 {
 	// ATTRIBUTES   ---------------------------------
 	
