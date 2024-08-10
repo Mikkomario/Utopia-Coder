@@ -103,13 +103,19 @@ object CombinedModelWriter
 		}
 		
 		// If the parent is defined with different names in this trait and the parent trait, implements the rename
-		val renamedParentProp = combinedTraitRef.flatMap { _ =>
-			val defaultParentPropName = data.parentClass.name.prop
-			if (defaultParentPropName != parentPropName)
-				Some(ComputedProperty(defaultParentPropName, isOverridden = true)(parentPropName))
-			else
-				None
-		}
+		val renamedParentProps = combinedTraitRef.view
+			.flatMap { _ =>
+				val defaultParentPropName = data.parentClass.name.prop
+				if (defaultParentPropName != parentPropName) {
+					val newParentProp = parentProp(parentPropName, parentRefs.stored, data.parentClass.name.doc)
+					val rename = ComputedProperty(defaultParentPropName, isOverridden = true)(parentPropName)
+					
+					Pair(newParentProp, rename)
+				}
+				else
+					Empty
+			}
+			.toOptimizedSeq
 		val childProp = ComputedProperty.newAbstract(childParam.name, childParam.dataType,
 			description = s"${ childDocName.capitalize } that $beVerb attached to this ${ parentName.doc }")
 		val customTraitProps = {
@@ -122,7 +128,7 @@ object CombinedModelWriter
 		val comboTrait = TraitDeclaration(
 			name = traitName,
 			extensions = traitExtensions,
-			properties = renamedParentProp.emptyOrSingle ++ customTraitProps :+ childProp,
+			properties = renamedParentProps ++ customTraitProps :+ childProp,
 			description = data.description
 				.nonEmptyOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
 			author = data.author,
@@ -176,11 +182,14 @@ object CombinedModelWriter
 	{
 		val parentPropName = parentName.prop
 		Vector(
-			ComputedProperty.newAbstract(parentPropName, parentType, description = s"Wrapped ${ parentName.doc }"),
+			parentProp(parentPropName, parentType, parentName.doc),
 			// Provides direct access to parent.id
 			ComputedProperty("id", description = s"Id of this ${ parentName.doc } in the database",
 				isOverridden = setup.modelCanReferToDB)(s"$parentPropName.id"),
 			ComputedProperty("wrapped", isOverridden = true)(s"$parentPropName.data"),
 			ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)(parentPropName))
 	}
+	
+	private def parentProp(name: String, dataType: ScalaType, docName: String) =
+		ComputedProperty.newAbstract(name, dataType, description = s"Wrapped $docName")
 }
