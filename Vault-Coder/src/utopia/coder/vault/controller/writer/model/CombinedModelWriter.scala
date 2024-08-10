@@ -42,7 +42,7 @@ object CombinedModelWriter
 		// Extends the HasId trait only if Vault references are enabled
 		val parents = {
 			if (setup.modelCanReferToDB)
-				Vector[Extension](extender, vault.hasId, factory)
+				Vector[Extension](extender, vault.hasId(data.parentClass.idType.toScala), factory)
 			else
 				Pair(extender, factory)
 		}

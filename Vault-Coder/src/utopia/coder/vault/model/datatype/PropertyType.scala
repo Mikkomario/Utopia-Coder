@@ -469,11 +469,11 @@ trait FacadePropertyType extends PropertyType
 		override def valueDataType: Reference = FacadePropertyType.this.valueDataType
 		
 		override def sqlConversions: Seq[SqlTypeConversion] =
-			optionDelegate.sqlConversions
-				.map { lowerConversion => SqlTypeConversion.delegatingTo(lowerConversion, scalaType) { delegateOption =>
-					fromDelegateCode("v")
-						.mapText { fromDelegate => s"$delegateOption.map { v => $fromDelegate }" }
-				} }
+			optionDelegate.sqlConversions.map { lowerConversion =>
+				SqlTypeConversion.delegatingTo(lowerConversion, scalaType) { delegateOption =>
+					toDelegateCode("v").mapText { toDelegate => s"$delegateOption.map { v => $toDelegate }" }
+				}
+			}
 		
 		override def emptyValue: CodePiece = CodePiece.none
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
@@ -520,7 +520,7 @@ trait FacadePropertyType extends PropertyType
 		
 		private def _toValueCode(instanceCode: String)(wrappedToValue: String => CodePiece) =
 			wrappedToValue("v").mapText { instanceToValue =>
-				s"$instanceCode match { case Some(v) => $instanceToValue; case None => Value.empty }"
+				s"($instanceCode match { case Some(v) => $instanceToValue; case None => Value.empty })"
 			}.referringTo(Reference.flow.value)
 		private def _fromValueCode(wrappedCode: CodePiece, isTry: Boolean) = {
 			// Case: Converting Try to Option

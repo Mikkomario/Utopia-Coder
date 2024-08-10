@@ -1,6 +1,7 @@
 # Utopia Vault Coder
 
 # v1.12 (in development)
+TODO: Document inheritance features here and in the README
 ### Breaking changes
 - Database model classes are now named "XDbModel" instead of "XModel"
 - In "many" root access objects, an id-targeting subclass is no longer generated, 

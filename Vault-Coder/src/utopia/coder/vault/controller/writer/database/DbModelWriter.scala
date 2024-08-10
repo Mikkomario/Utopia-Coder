@@ -355,8 +355,6 @@ object DbModelWriter
 					Parameter(dbPropsName, dbPropsRef,
 						description = "Properties which specify how the database interactions are performed")
 				)
-				// Extends the XModelFactory trait (from the same file)
-				val factory = parentTrait(modelClassType, modelRefs.stored, modelRefs.data)
 				
 				// Implements a custom apply function since case class shortcut is not available
 				val applyParams = modelApplyParams.drop(2)
@@ -365,7 +363,8 @@ object DbModelWriter
 						classToWrite.name } database model with the specified properties")(applyParams)(
 					s"_$modelClassType(table, $dbPropsName, ${ applyParams.map { _.name }.mkString(", ") })")
 				
-				(params, Pair[Extension](factory, dbPropsWrapperRef), Empty, Single(applyMethod))
+				// Extends the XModelFactory trait (from the same file)
+				(params, Pair[Extension](parentTrait, dbPropsWrapperRef), Empty, Single(applyMethod))
 				
 			// Case: Standard implementation => Defines and implements the concrete DB properties, as well as extensions.
 			//                                  Also, obviously doesn't accept any construction parameters
@@ -472,7 +471,7 @@ object DbModelWriter
 						description = "Configurations of the interacted database properties")
 					
 					// Needs to implement the buildCopy function
-					val buildCopyImplementation = buildCopy.copy(isOverridden = true,
+					val buildCopyImplementation = buildCopy.copy(explicitOutputType = None, isOverridden = true,
 						bodyCode = s"copy(${
 							buildCopy.parameters.lists.flatten.map { p => s"${ p.name } = ${ p.name }" }
 								.mkString(", ") })")
@@ -486,7 +485,7 @@ object DbModelWriter
 					val className = reprType.toString
 					val classType = ScalaType.basic(className)
 					
-					// Implements 1) Storable, 2) XFactory[Self] and 3) FromIdFactory[Id, Self], 4) HasIdProperty
+					// Implements 1) Storable, 2) XFactory[Self], 3) HasId[Option] and 4) FromIdFactory[Id, Self]
 					// (and/or parent YModel trait(s))
 					val factory = modelRefs.factory(reprType)
 					val customExtensions = parentClassReferences
@@ -497,8 +496,9 @@ object DbModelWriter
 						}
 						.notEmpty
 						.getOrElse {
-							Pair[Extension](
+							Vector[Extension](
 								storable,
+								vault.hasId(ScalaType.option(classToWrite.idType.toScala)),
 								vault.fromIdFactory(classToWrite.idType.toScala, reprType)
 							)
 						}
@@ -553,9 +553,10 @@ object DbModelWriter
 			.flatMap[Extension] { _.generic.map { _.dbModel.factoryLike(dbModelType, storedType, dataType) } }
 			.notEmpty
 			.getOrElse {
-				Pair[Extension](
+				Vector[Extension](
 					storableFactory(dbModelType, storedType, dataType),
-					fromIdFactory(classToWrite.idType.toScala, dbModelType)
+					fromIdFactory(classToWrite.idType.toScala, dbModelType),
+					hasIdProperty
 				)
 			}
 		
@@ -596,12 +597,11 @@ object DbModelWriter
 					
 					// Case: No inheritance applied => Wraps the properties in a collection and includes the id property
 					if (parentValuePropsCode.isEmpty)
-						CodePiece.collection(remainingProperties.size + 1) +
-							(s"$quotedId -> id, " +: propsPart).withinParenthesis
+						CodePiece.collection(remainingProperties.size + 1)(s"$quotedId -> id, " +: propsPart)
 					// Case: Inheritance applied => Appends these properties to those defined in parents
 					else
 						parentValuePropsCode
-							.append(CodePiece.collection(remainingProperties.size) + propsPart.withinParenthesis, " ++ ")
+							.append(CodePiece.collection(remainingProperties.size)(propsPart), " ++ ")
 				}
 			}
 			

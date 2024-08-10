@@ -35,6 +35,9 @@ object DbFactoryWriter
 	
 	private val likeSuffix = Name("Like", "Likes", CamelCase.capitalized)
 	
+	private lazy val defaultOrderingProp = ComputedProperty("defaultOrdering",
+		explicitOutputType = Some(ScalaType.option(orderBy)), isOverridden = true, isLowMergePriority = true)("None")
+	
 	
 	// OTHER    -------------------------
 	
@@ -149,12 +152,14 @@ object DbFactoryWriter
 				name = concreteImplementationName,
 				extensions = Single(factoryType),
 				constructionParams = constructorParams,
+				properties = Single(defaultOrderingProp),
 				// NB: The drop(2) here is not very elegant. May require refactoring later.
 				methods = Set(MethodDeclaration("apply", Set(modelRefs.stored, modelRefs.data),
 					visibility = Protected, isOverridden = true)(
 					applyParams)(
 					s"${ modelRefs.stored.target }(id, ${ modelRefs.data.target }(${
-						applyParams.drop(2).map { _.name }.mkString(", ") }))"))
+						applyParams.drop(2).map { _.name }.mkString(", ") }))")),
+				isCaseClass = true
 			)
 			
 			val constructConcrete = MethodDeclaration("apply", explicitOutputType = Some(factoryType),
@@ -178,11 +183,9 @@ object DbFactoryWriter
 	{
 		val builder = new VectorBuilder[Extension]()
 		
-		// When inheriting, extends the YDbFactoryLike[Self] and YDbFactory traits
+		// When inheriting, extends the YDbFactoryLike[X]
 		if (classToWrite.isExtension)
-			builder ++= parentClassReferences.flatMap { refs =>
-				refs.generic.map[Extension] { _.dbFactoryLike(modelType) }.emptyOrSingle :+ refs.dbFactory
-			}
+			builder ++= parentClassReferences.flatMap { _.generic.map[Extension] { _.dbFactoryLike(modelType) } }
 		// If no enumerations are included, the inheritance is more specific (=> uses automatic validation)
 		else if (classToWrite.fromDbModelConversionMayFail)
 			builder += fromRowModelFactory(modelType)
@@ -220,8 +223,8 @@ object DbFactoryWriter
 			}
 		// Non-timestamp-based factories need to specify default ordering
 		else
-			builder += ComputedProperty("defaultOrdering", explicitOutputType = Some(ScalaType.option(orderBy)),
-				isOverridden = true, isLowMergePriority = true)("None")
+			builder += defaultOrderingProp
+			
 		// Deprecatable factories specify the deprecation condition (read from the database model)
 		if (classToWrite.isDeprecatable) {
 			builder += ComputedProperty("nonDeprecatedCondition", Set(dbModelRef), isOverridden = true)(

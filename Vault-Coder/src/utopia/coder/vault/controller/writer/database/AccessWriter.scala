@@ -195,9 +195,11 @@ object AccessWriter
 						writeSingleIdAccess(classToWrite, modelRef, uniqueAccessRef, descriptionReferences,
 							singleAccessPackage)
 							.flatMap { singleIdAccessRef =>
+								val modifiedModelProperty = modelProperty
+									.copy(isOverridden = false, visibility = Private)
 								writeSingleRootAccess(classToWrite.name, classToWrite.idType, modelRef,
 									singleRowModelAccess, uniqueAccessRef, singleIdAccessRef, singleAccessPackage,
-									Pair(modelProperty, factoryProperty), rootViewExtension, classToWrite.author,
+									Pair(modifiedModelProperty, factoryProperty), rootViewExtension, classToWrite.author,
 									isDeprecatable = classToWrite.isDeprecatable)
 									.map { _ => genericUniqueTraitRef }
 							}
@@ -244,7 +246,8 @@ object AccessWriter
 			if (combo.combinationType.isOneToMany)
 				Empty
 			else
-				propertyGettersFor(combo.childClass, childModelProp.name) { n => (combo.childName + n).prop }
+				propertyGettersFor(combo.childClass, childModelProp.name,
+					isCombo = true) { n => (combo.childName + n).prop }
 		}
 		val childSetters = {
 			// Won't write setters if there are no getters
@@ -305,7 +308,7 @@ object AccessWriter
 						if (combo.combinationType.isOneToMany) singleModelAccess else singleRowModelAccess,
 						uniqueRef, singleIdAccessRef, singleAccessPackage,
 						Vector(factoryProp,
-							ComputedProperty("model", Set(parentDbModelRef), visibility = Protected,
+							ComputedProperty("model", Set(parentDbModelRef), visibility = Private,
 								description = s"A database model (factory) used for interacting with linked ${
 									combo.parentName.pluralDoc }")(parentDbModelRef.target),
 							childModelProp),
@@ -583,8 +586,8 @@ object AccessWriter
 					self,
 					ComputedProperty("factory", Set(factoryRef), isOverridden = true)(factoryRef.target),
 					childModelProp
-				) ++ propertyGettersFor(combo.childClass, childModelProp.name,
-					pullMany = true) { n => (combo.childName + n).props },
+				) ++ propertyGettersFor(combo.childClass, childModelProp.name, pullMany = true,
+					isCombo = true) { n => (combo.childName + n).props },
 				methods = propertySettersFor(combo.childClass,
 					childModelProp.name) { n => (combo.childName +: n).props } +
 					filteringApply(traitType),
@@ -728,7 +731,8 @@ object AccessWriter
 								
 							// Case: Inherits other access traits instead
 							if (classToWrite.isExtension)
-								(parentClassReferences.flatMap { _.genericManyAccessTrait.map[Extension] { _(traitType) } } ++
+								(parentClassReferences
+									.flatMap { _.genericManyAccessTrait.map[Extension] { _(modelRef, traitType) } } ++
 									extraParents) :+ rowModelAccess
 							// Case: No special inheritances => Applies standard extensions
 							else {
@@ -881,19 +885,27 @@ object AccessWriter
 		historyAccess -> historyAccessProperty
 	}
 	
-	private def propertyGettersFor(classToWrite: Class, modelPropName: String = "model",
-	                               pullMany: Boolean = false)(parsePropName: Name => String)
+	private def propertyGettersFor(classToWrite: Class, modelPropName: String = "model", pullMany: Boolean = false,
+	                               isCombo: Boolean = false)
+	                              (parsePropName: Name => String)
 	                              (implicit naming: NamingRules) =
 	{
 		// Will not redefine getters defined in parent traits
-		classToWrite.properties.filterNot { _.isDirectExtension }.flatMap { prop =>
-			prop.rename match {
+		val propertiesToWrite = {
+			if (isCombo)
+				classToWrite.properties
+			else
+				classToWrite.properties.filterNot { _.isDirectExtension }
+		}
+		propertiesToWrite.flatMap { prop =>
+			// Rename-processing is not available in combo access points
+			prop.rename.filterNot { _ => isCombo } match {
 				// Case: Extending and renaming another property => Refers to the original implementation
 				case Some((original, local)) =>
-					Some(ComputedProperty(local.prop,
+					Some(ComputedProperty(parsePropName(local),
 						description = getterDescriptionFor(classToWrite.name, prop, prop.name, pullMany),
 						implicitParams = Single(connectionParam))(
-						original.prop))
+						parsePropName(original)))
 				
 				// Case: New property
 				case None =>

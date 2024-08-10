@@ -3,7 +3,7 @@ package utopia.coder.vault.controller.writer.database
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.Private
-import utopia.coder.model.scala.datatype.{Reference, ScalaType}
+import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
@@ -82,7 +82,7 @@ object DbPropsWriter
 		
 		val dbPropsTrait = TraitDeclaration(
 			name = traitName,
-			extensions = parentClassReferences.flatMap { _.generic.map { _.dbProps } },
+			extensions = parentClassReferences.flatMap { _.generic.map[Extension] { _.dbProps } } :+ vault.hasIdProperty,
 			properties = abstractProps ++ renameImplementations,
 			author = classToWrite.author,
 			description = s"Common trait for classes which provide access to ${ classToWrite.name } database properties",
@@ -99,9 +99,9 @@ object DbPropsWriter
 			.toVector
 		val concreteProps = propNames.map { case (prop, propParam) =>
 			LazyValue(prop.name.prop, Set(vault.dbProp), isOverridden = true)(
-				s"${ vault.dbProp.target }(table, ${ propParam.name })")
+				s"${ vault.dbProp.target }.from(table, ${ propParam.name })")
 		}
-		// val idProp = LazyValue("id", Set(vault.dbProp), isOverridden = true)("DbPropertyDeclaration(idPropName, index)")
+		val idProp = LazyValue("id", Set(vault.dbProp), isOverridden = true)("DbPropertyDeclaration(\"id\", index)")
 		
 		// val defaultIdPropName = classToWrite.idDatabasePropName.quoted
 		/*
@@ -116,7 +116,7 @@ object DbPropsWriter
 			name = concreteClassName,
 			extensions = Single(traitType),
 			constructionParams = constructionParams,
-			properties = /*idProp +:*/ concreteProps,
+			properties = idProp +: concreteProps,
 			visibility = Private,
 			isCaseClass = true
 		)
@@ -140,7 +140,8 @@ object DbPropsWriter
 		val wrappedName = dbPropsRef.target.uncapitalize
 		val wrapped = ComputedProperty.newAbstract(wrappedName, dbPropsRef,
 			description = s"The wrapped ${ classToWrite.name } database properties", isProtected = true)
-		// val idProp = ComputedProperty("id", isOverridden = true)(s"$wrappedName.id")
+		
+		val idProp = ComputedProperty("id", isOverridden = true)(s"$wrappedName.id")
 		val props = classToWrite.dbProperties
 			.map { prop =>
 				val propName = prop.name.prop
@@ -151,7 +152,7 @@ object DbPropsWriter
 		File(configPackage, TraitDeclaration(
 			name = (classToWrite.name + dbPropsSuffix + wrapperSuffix).className,
 			extensions = Single(dbPropsRef),
-			properties = wrapped +: props,
+			properties = Pair(wrapped, idProp) ++ props,
 			description = s"Common trait for interfaces that provide access to ${
 				classToWrite.name } database properties by wrapping a ${ dbPropsRef.target }",
 			author = classToWrite.author,

@@ -695,6 +695,7 @@ object StandardPropertyType
 	 * Represents a path to a file or a directory
 	 * @param length Maximum number of characters allocated for this path
 	 */
+	// TODO: This type requires a custom Option to String conversion
 	case class FilePath(length: Int = 255) extends FacadePropertyType
 	{
 		// ATTRIBUTES   ------------------------
@@ -723,6 +724,7 @@ object StandardPropertyType
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
 	
+	// TODO: This type requires a custom Option to String conversion
 	case class VersionType(length: Int = 128) extends FacadePropertyType
 	{
 		// ATTRIBUTES   ----------------------

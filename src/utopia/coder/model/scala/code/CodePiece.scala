@@ -47,13 +47,20 @@ object CodePiece extends FromValueFactory[CodePiece]
 	 * Generates a code piece to represent a collection that holds n values.
 	 * The type of collection used depends on the number of items.
 	 * @param numberOfEntries Number of items that will be stored within the collection.
-	 * @return Code which refers to a collection of suitable type
+	 * @param contents Code that contains the contents of the collection
+	 * @return Code which constructs a collection of suitable type
 	 */
-	def collection(numberOfEntries: Int) = numberOfEntries match {
-		case 0 => flow.empty.targetCode
-		case 1 => flow.single.targetCode
-		case 2 => flow.pair.targetCode
-		case _ => CodePiece("Vector")
+	def collection(numberOfEntries: Int)(contents: => CodePiece) = {
+		val (collRef, writeContents) = numberOfEntries match {
+			case 0 => flow.empty.targetCode -> false
+			case 1 => flow.single.targetCode -> true
+			case 2 => flow.pair.targetCode -> true
+			case _ => CodePiece("Vector") -> true
+		}
+		if (writeContents)
+			collRef.flatMapText { coll => contents.mapText { contents => s"$coll($contents)" } }
+		else
+			collRef
 	}
 	
 	/**
