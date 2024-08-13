@@ -425,8 +425,8 @@ object ModelWriter
 		val schemaCode = modelDeclaration.targetCode +
 			CodePiece.collection(classToWrite.properties.size)(
 				classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
-					.getOrElse(CodePiece.empty).withinParenthesis
-			)
+					.getOrElse(CodePiece.empty)
+			).withinParenthesis
 		val schema = LazyValue("schema", schemaCode.references,
 			isOverridden = !fromModelMayFail, isLowMergePriority = true)(schemaCode.text)
 		
@@ -833,8 +833,7 @@ object ModelWriter
 		var paramsCode = CodePiece(name.quoted).append(prop.dataType.valueDataType.targetCode, ", ")
 		if (altNames.nonEmpty || default.isDefined)
 			paramsCode = paramsCode.append(CodePiece.collection(altNames.size)(
-				s"(${ altNames.map { _.quoted }.mkString(", ") })"),
-				", ")
+				altNames.map { _.quoted }.mkString(", ")), ", ")
 		default.foreach { default => paramsCode = paramsCode.append(default, ", ") }
 		if (prop.dataType.isOptional || !prop.dataType.supportsDefaultJsonValues)
 			paramsCode = paramsCode.append("isOptional = true", ", ")

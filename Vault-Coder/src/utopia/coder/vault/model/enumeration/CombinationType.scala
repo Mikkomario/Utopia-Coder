@@ -102,8 +102,7 @@ object CombinationType
 	  * @return A combination type based on that string
 	  */
 	def interpret(typeName: String) =
-		typeName.toLowerCase match
-		{
+		typeName.toLowerCase match {
 			case "one" | "link" => Some(Combined)
 			case "optional" | "option" => Some(PossiblyCombined)
 			case "multi" | "many" => Some(MultiCombined)
