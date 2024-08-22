@@ -274,21 +274,34 @@ case class Class(name: Name, customTableName: Option[String], idName: Name, prop
 				child -> parentProps
 			}
 			val overriddenParentProperties = resolvedPropertyReferences.valuesIterator.flatten.toSet
-			val (requiredPropsToAdd, optionalPropsToAdd) = newExtensions
+			val (requiredPropsFromParent, optionalPropsFromParent) = newExtensions
 				.flatMap { _.properties }.filterNot(overriddenParentProperties.contains).distinctBy { _.name.singular }
 				.map { _.newChild }
 				.divideBy { _.defaultValue.nonEmpty }.toTuple
-			val mergedProperties = properties
-				.map { prop =>
-					resolvedPropertyReferences.get(prop) match {
-						case Some(parents) => prop.extending(parents)
-						case None => prop
-					}
+			val childProperties = properties.map { prop =>
+				resolvedPropertyReferences.get(prop) match {
+					case Some(parents) => prop.extending(parents)
+					case None => prop
 				}
-			// Inserts the additional properties to different locations based on whether they have default values or not
-			val lastRequiredPropertyIndex = mergedProperties.lastIndexWhere { _.defaultValue.isEmpty }
-			val newProperties = requiredPropsToAdd ++ mergedProperties.take(lastRequiredPropertyIndex + 1) ++
-				optionalPropsToAdd ++ mergedProperties.drop(lastRequiredPropertyIndex + 1)
+			}
+			// First level grouping is: 1) Props from child & 2) Parent prop overrides
+			// Second level grouping is: 1) Required & 2) Optional
+			val groupedChildProps = childProperties
+				.divideBy { _.isExtension }.map { _.divideBy { _.defaultValue.nonEmpty } }
+			
+			// Inserts the properties to different locations based on:
+			//      1) Whether they are originated from the parent (left) or from the child (right)
+			//      2) Whether they have a default value (right) right not (left)
+			// I.e. The final order of adding properties is:
+			//      1) Overridden required properties from the parent
+			//      2) Inherited required properties
+			//      3) Required properties from the child
+			//      4) Overridden optional properties
+			//      5) Optional properties from the parent
+			//      6) Optional properties from the child
+			val newProperties = groupedChildProps.second.first ++
+				requiredPropsFromParent ++ groupedChildProps.first.first ++ groupedChildProps.second.second ++
+				optionalPropsFromParent ++ groupedChildProps.first.second
 			
 			// Combines class information, replacing empty values with defined values from parents
 			val orderedImplementations = this +: newExtensions
