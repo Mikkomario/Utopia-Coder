@@ -8,9 +8,9 @@
         <element id="module-output" name="Flow" />
         <element id="module-output" name="Utopia-Coder" />
       </element>
-      <element id="library" level="application" name="scala-sdk-2.13.12" />
       <element id="file-copy" path="$PROJECT_DIR$/Reach-Coder/input-template.json" />
       <element id="file-copy" path="$PROJECT_DIR$/Reach-Coder/README.md" />
+      <element id="library" level="application" name="scala-sdk-2.13.14" />
     </root>
   </artifact>
 </component>

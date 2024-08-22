@@ -511,7 +511,7 @@ object AccessWriter
 			else
 				("distinct", "condition", s"${ uniqueAccessRef.target }(condition)")
 		}
-		val filterDec = MethodDeclaration(distinctMethodName, Set(uniqueAccessRef), Protected,
+		val filterDec = MethodDeclaration(distinctMethodName, Set(uniqueAccessRef), Private,
 			returnDescription = s"An access point to the ${className.doc} that satisfies the specified condition")(
 			Parameter(distinctConditionParamName, condition,
 				description = s"Filter condition to apply in addition to this root view's condition. Should yield unique ${

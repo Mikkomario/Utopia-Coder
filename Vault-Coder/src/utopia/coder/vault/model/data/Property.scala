@@ -221,10 +221,16 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 					else
 						name
 				}
+				// Parent property data types may be overridden with referencing types
+				val newDataType = dataType match {
+					case ref: ClassReference => ref
+					case _ => primaryParent.dataType
+				}
+				
 				val orderedImplementations = this +: parents
 				copy(
 					name = newName,
-					dataType = primaryParent.dataType,
+					dataType = newDataType,
 					customDefaultValue = orderedImplementations.view.map { _.customDefaultValue }
 						.find { _.nonEmpty }.getOrElse(customDefaultValue),
 					dbPropertyOverrides = orderedImplementations.view.reverse.map { _.dbPropertyOverrides }
@@ -242,6 +248,7 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 					description = orderedImplementations.view.map { _.description }
 						.find { _.nonEmpty }.getOrElse(description)
 				)
+				
 			// Case: No parents listed => No change
 			case None => this
 		}

@@ -1,4 +1,4 @@
 Manifest-Version: 1.0
 Main-Class: utopia.coder.reach.controller.app.ReachCoderApp
-Class-Path: scala-library-2.13.12.jar scala-reflect-2.13.12.jar
+Class-Path: scala-library-2.13.14.jar scala-reflect-2.13.14.jar
 

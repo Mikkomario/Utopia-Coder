@@ -44,8 +44,6 @@ Adding refactoring support
 - **Files** now generate backups when merging with existing source files
 - Added **InputFiles** object that offers a function for identifying the latest versioned file in some directory
 - Added support for type declarations
-- The generation process now produces a .ndjson file, which contains descriptive information of all the 
-  classes / tables and their properties / columns
 - Added preliminary support for bulk class renaming
 - Added **LazyProjectPaths** class
 ### New methods

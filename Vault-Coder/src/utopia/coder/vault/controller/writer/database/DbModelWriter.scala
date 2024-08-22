@@ -381,8 +381,8 @@ object DbModelWriter
 				// When inheriting, also defines renamed implementations
 				val dbPropImplementations = classToWrite.properties.flatMap { prop =>
 					val dbPropImplementations = prop.dbProperties.map { dbProp =>
-						LazyValue(prop.name.prop,
-							description = s"Database property used for interacting with ${ prop.name.pluralDoc }",
+						LazyValue(dbProp.name.prop,
+							description = s"Database property used for interacting with ${ dbProp.name.pluralDoc }",
 							isOverridden = prop.isDirectExtension)(
 							s"property(${ dbProp.modelName.quoted })")
 					}
