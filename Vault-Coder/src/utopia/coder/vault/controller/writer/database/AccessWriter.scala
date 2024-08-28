@@ -18,6 +18,7 @@ import Reference._
 import utopia.coder.model.enumeration.NameContext.{ClassPropName, FunctionName}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.IntNumber
+import utopia.coder.vault.model.datatype.StandardPropertyType.ClassReference
 import utopia.coder.vault.util.VaultReferences._
 import utopia.coder.vault.util.VaultReferences.Vault._
 
@@ -1035,27 +1036,32 @@ object AccessWriter
 					.filterNot { name => prop.parents.exists { _.inAccessName == name } }
 					.map { name =>
 						val paramsName = prop.name.pluralIn(naming(ClassPropName))
-						val code = {
-							val valuesCode = concreteType match {
-								// Case: The parameter values are of type Int => Uses IntSet
-								case _: IntNumber => CodePiece(s"IntSet.from($paramsName)", Set(flow.intSet))
+						val (code, inputCollectionName) = {
+							def usingIntSet =
+								CodePiece(s"IntSet.from($paramsName)", Set(flow.intSet)) -> "IterableOnce"
+							val (valuesCode, inputCollectionName) = concreteType match {
+								// Case: The parameter values are of type Int => Uses IntSet from IterableOnce[Int]
+								case _: IntNumber => usingIntSet
+								case c: ClassReference if c.referencedType.isInstanceOf[IntNumber] => usingIntSet
 								case _ =>
-									singleValueCode.mapText { valueCode =>
+									val implementation = singleValueCode.mapText { valueCode =>
 										if (valueCode == singleParamName)
 											paramsName
 										else
 											s"$paramsName.map { $singleParamName => $valueCode }"
 									}
+									implementation -> "Iterable"
 							}
-							valuesCode.mapText { values =>
+							val code = valuesCode.mapText { values =>
 								s"filter($modelPropName.${ dbProp.name.prop }.column.in($values))"
 							}
+							code -> inputCollectionName
 						}
 						MethodDeclaration(name, code.references,
 							returnDescription = s"Copy of this access point that only includes ${
 								classToWrite.name.pluralDoc } where ${ prop.name } is within the specified value set",
 							isLowMergePriority = true)(
-							Parameter(paramsName, ScalaType.generic("Iterable", concreteType.toScala),
+							Parameter(paramsName, ScalaType.generic(inputCollectionName, concreteType.toScala),
 								description = s"Targeted ${ prop.name.pluralDoc }"))(code.text)
 					}
 				
