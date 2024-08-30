@@ -53,7 +53,7 @@ object Class
 	          comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	          description: String = "", author: String = "", useLongId: Boolean = false,
 	          writeGenericAccess: Boolean = false, writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
-		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None, Empty,
+		apply(name, None, "", idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None, Empty,
 			description, author, useLongId, writeGenericAccess, writeCommonComboTrait, isGeneric)
 	
 	/**
@@ -85,7 +85,7 @@ object Class
 	              description: String = "", author: String = "", descriptionLinkName: Option[Name] = None,
 	              useLongId: Boolean = false, writeGenericAccess: Boolean = false,
 	              writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
-		apply(name, None, idName, properties, packageName, customSubPackageName, comboIndexColumnNames,
+		apply(name, None, "", idName, properties, packageName, customSubPackageName, comboIndexColumnNames,
 			Some[Name](descriptionLinkName.getOrElse { name + "id" }), Empty, description, author, useLongId,
 			writeGenericAccess, writeCommonComboTrait, isGeneric)
 }
@@ -96,9 +96,10 @@ object Class
   * @since 30.8.2021, v0.1
   * @param name Name of this class (in code)
   * @param customTableName Overridden name of this class' table (optional)
-  * @param idName Name of this class' id (index) property
+  * @param storedPrefix Prefix to apply to the "stored" class version's name
+ * @param idName Name of this class' id (index) property
   * @param properties Properties in this class
-  * @param packageName Name of the package in which to wrap this class (may be empty)
+  * @param packageName Name of the package in which to wrap this class (maybe empty)
   * @param customAccessSubPackageName Name to apply for this class's package when writing access points.
   *                                   Empty if to be auto-generated.
   *                                   "-" if sub-packaging is to be omitted altogether.
@@ -114,7 +115,7 @@ object Class
  * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
   */
 // TODO: customTableName should be Option[Name]
-case class Class(name: Name, customTableName: Option[String], idName: Name, properties: Seq[Property],
+case class Class(name: Name, customTableName: Option[String], storedPrefix: String, idName: Name, properties: Seq[Property],
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
                  descriptionLinkName: Option[Name], parents: Seq[Class], description: String, author: String,
                  useLongId: Boolean, writeGenericAccess: Boolean, writeCommonComboTrait: Boolean, isGeneric: Boolean)

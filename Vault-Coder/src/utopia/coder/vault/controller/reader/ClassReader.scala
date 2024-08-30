@@ -485,9 +485,16 @@ object ClassReader
 		
 		val hasManyCombos = classModel("has_many_combos", "write_combo_trait", "many_combos")
 			.booleanOr(comboInfo.hasSize > 1)
-		val readClass = new Class(name, tableName.map { _.table }, idName.getOrElse(Class.defaultIdName),
-			properties, packageName, classModel("access_package", "sub_package", "access").getString,
-			comboIndexColumnNames, descriptionLinkColumnName,
+		val readClass = new Class(name,
+			customTableName = tableName.map { _.table },
+			storedPrefix = classModel("prefix")
+				.stringOr { if (classModel("prefix_stored", "stored").getBoolean) "Stored" else "" },
+			idName = idName.getOrElse(Class.defaultIdName),
+			properties = properties,
+			packageName = packageName,
+			customAccessSubPackageName = classModel("access_package", "sub_package", "access").getString,
+			comboIndexColumnNames = comboIndexColumnNames,
+			descriptionLinkName = descriptionLinkColumnName,
 			// Doesn't add extensions at this point. These are inserted later.
 			parents = Empty,
 			description = classModel("doc").getString,

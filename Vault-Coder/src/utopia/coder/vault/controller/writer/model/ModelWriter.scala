@@ -542,7 +542,7 @@ object ModelWriter
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Prepares common data
-		val className = classToWrite.name.className
+		val className = (classToWrite.storedPrefix +: classToWrite.name).className
 		val classType = ScalaType.basic(className)
 		
 		val idType = classToWrite.idType.toScala

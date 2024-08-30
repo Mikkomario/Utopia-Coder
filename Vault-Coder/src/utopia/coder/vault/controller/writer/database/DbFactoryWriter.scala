@@ -211,7 +211,7 @@ object DbFactoryWriter
 		// (when inheriting, this is called dbProps instead)
 		val modelName = if (classToWrite.isExtension) "dbProps" else "model"
 		builder += ComputedProperty(modelName, Set(dbModelRef),
-			description = "Model that specifies the how data is read", isOverridden = classToWrite.isExtension)(
+			description = "Model that specifies how the data is read", isOverridden = classToWrite.isExtension)(
 			dbModelRef.target)
 		
 		// All objects define the table property (implemented)
