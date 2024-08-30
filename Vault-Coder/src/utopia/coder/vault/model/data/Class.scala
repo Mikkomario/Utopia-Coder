@@ -7,6 +7,7 @@ import utopia.coder.vault.model.enumeration.IntSize.Default
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, CreationTime, Deprecation, EnumValue, Expiration, UpdateTime}
 import utopia.coder.model.enumeration.NameContext.{ColumnName, DbModelPropName}
+import utopia.coder.model.scala.Package
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.flow.operator.Identity
@@ -54,7 +55,7 @@ object Class
 	          description: String = "", author: String = "", useLongId: Boolean = false,
 	          writeGenericAccess: Boolean = false, writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
 		apply(name, None, "", idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None, Empty,
-			description, author, useLongId, writeGenericAccess, writeCommonComboTrait, isGeneric)
+			description, author, None, useLongId, writeGenericAccess, writeCommonComboTrait, isGeneric)
 	
 	/**
 	  * Creates a new class with automatic table-naming with description support
@@ -86,7 +87,7 @@ object Class
 	              useLongId: Boolean = false, writeGenericAccess: Boolean = false,
 	              writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
 		apply(name, None, "", idName, properties, packageName, customSubPackageName, comboIndexColumnNames,
-			Some[Name](descriptionLinkName.getOrElse { name + "id" }), Empty, description, author, useLongId,
+			Some[Name](descriptionLinkName.getOrElse { name + "id" }), Empty, description, author, None, useLongId,
 			writeGenericAccess, writeCommonComboTrait, isGeneric)
 }
 
@@ -107,7 +108,11 @@ object Class
   *                              The items (strings) in combo-indices represent column names.
   * @param descriptionLinkName Name of the property that refers to this class from a description link (optional)
   * @param description A description of this class
-  * @param useLongId Whether to use long instead of int in the id property
+  * @param author Author of this class
+ * @param referenceFrom Package from which this class should be referenced from.
+ *                      Specify this value only for classes which
+ *                      exist in another project and should not generate any files.
+ * @param useLongId Whether to use long instead of int in the id property
   * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
  * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
  *                              Generating such a trait is recommended when intending to generate or build multiple
@@ -118,6 +123,7 @@ object Class
 case class Class(name: Name, customTableName: Option[String], storedPrefix: String, idName: Name, properties: Seq[Property],
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
                  descriptionLinkName: Option[Name], parents: Seq[Class], description: String, author: String,
+                 referenceFrom: Option[Package],
                  useLongId: Boolean, writeGenericAccess: Boolean, writeCommonComboTrait: Boolean, isGeneric: Boolean)
 {
 	// ATTRIBUTES   ---------------------------------

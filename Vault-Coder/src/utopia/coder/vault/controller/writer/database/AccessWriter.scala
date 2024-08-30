@@ -2,25 +2,25 @@ package utopia.coder.vault.controller.writer.database
 
 import utopia.coder.model.data
 import utopia.coder.model.data.{Name, NamingRules}
+import utopia.coder.model.enumeration.NameContext.{ClassPropName, FunctionName}
+import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
+import utopia.coder.model.scala.Visibility.{Private, Protected}
+import utopia.coder.model.scala.code.CodePiece
+import utopia.coder.model.scala.datatype.Reference._
+import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
+import utopia.coder.model.scala.declaration._
+import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
+import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, DbProperty, Property, VaultProjectSetup}
+import utopia.coder.vault.model.datatype.PropertyType
+import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.IntNumber
+import utopia.coder.vault.model.datatype.StandardPropertyType.ClassReference
+import utopia.coder.vault.util.VaultReferences.Vault._
+import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.model.data.{Class, ClassModelReferences, ClassReferences, CombinationData, DbProperty, Property, VaultProjectSetup}
-import utopia.coder.vault.model.datatype.PropertyType
-import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
-import utopia.coder.model.scala.Visibility.{Private, Protected}
-import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
-import utopia.coder.model.scala.declaration._
-import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
-import Reference._
-import utopia.coder.model.enumeration.NameContext.{ClassPropName, FunctionName}
-import utopia.coder.model.scala.code.CodePiece
-import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.IntNumber
-import utopia.coder.vault.model.datatype.StandardPropertyType.ClassReference
-import utopia.coder.vault.util.VaultReferences._
-import utopia.coder.vault.util.VaultReferences.Vault._
 
 import scala.io.Codec
 import scala.util.Success
@@ -51,6 +51,27 @@ object AccessWriter
 	
 	
 	// OTHER    ------------------------------
+	
+	/**
+	 * Generates access point references for a class, as if files were written normally
+	 * @param accessPackage Package where many & single access packages are placed
+	 * @param classToWrite Class for which these references are generated
+	 * @param naming implicit naming rules
+	 * @return Reference to the generic single access trait + generic many access trait.
+	 *         None if these traits would not have been generated.
+	 */
+	def generateReferences(accessPackage: Package, classToWrite: Class)(implicit naming: NamingRules) = {
+		if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
+			val many = Reference(packageFor(accessPackage/"many", classToWrite),
+				((manyPrefix +: classToWrite.name) + accessTraitSuffix + genericAccessSuffix).className)
+			val single = Reference(packageFor(accessPackage/"single", classToWrite),
+				((singleAccessPrefix +: classToWrite.name) + accessTraitSuffix + genericAccessSuffix).className)
+			
+			Some(Pair(single, many))
+		}
+		else
+			None
+	}
 	
 	/**
 	  * @param c     A class

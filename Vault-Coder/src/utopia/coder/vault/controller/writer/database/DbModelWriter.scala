@@ -103,6 +103,34 @@ object DbModelWriter
 		}
 	}
 	
+	/**
+	 * Generates class references, as if files had been written
+	 * @param storablePackage Package where these files would have been placed
+	 * @param classToWrite Class for which references are generated
+	 * @param naming Implicit naming convention
+	 * @return Either
+	 *              - Left: Generic DB model references
+	 *              - Right reference to the DB model class
+	 */
+	def generateReferences(storablePackage: Package, classToWrite: Class)(implicit naming: NamingRules) = {
+		val pck = storablePackage / classToWrite.packageName
+		val cName = classToWrite.name
+		val modelName = cName + modelSuffix
+		val model = Reference(pck, modelName.className)
+		
+		if (classToWrite.isGeneric) {
+			val factoryName = modelName + factorySuffix
+			
+			val modelLike = Reference(pck, (modelName + likeSuffix).className)
+			val factoryLike = Reference(pck, (factoryName + likeSuffix).className)
+			val factory = Reference(pck, factoryName.className)
+			
+			Left(GenericDbModelRefs(modelLike, factoryLike, model, factory))
+		}
+		else
+			Right(model)
+	}
+	
 	// Writes XModelLike trait used with generic traits
 	// Returns a reference + buildCopy function
 	private def writeModelLike(classToWrite: Class, storablePackage: Package,

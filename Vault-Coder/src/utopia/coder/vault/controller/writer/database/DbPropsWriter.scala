@@ -25,6 +25,8 @@ object DbPropsWriter
 {
 	// ATTRIBUTES   -----------------------
 	
+	private val packageName = "props"
+	
 	private val dbPropsSuffix = Name("DbProps", "DbProps", CamelCase.capitalized)
 	private val wrapperSuffix = Name("Wrapper", "Wrappers", CamelCase.capitalized)
 	
@@ -47,11 +49,27 @@ object DbPropsWriter
 	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences])
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val configPackage = setup.databasePackage/"props"/classToWrite.packageName
+		val configPackage = setup.databasePackage/packageName/classToWrite.packageName
 		writeDbPropsTrait(classToWrite, configPackage, parentClassReferences).flatMap { dbProps =>
 			writeDbPropsWrapperTrait(classToWrite, configPackage, dbProps)
 				.map { case (wrapper, wrappedName) => Pair(dbProps, wrapper) -> wrappedName }
 		}
+	}
+	
+	/**
+	 * Generates class references, as if files were written
+	 * @param databasePackage Package where the properties package would have been placed
+	 * @param classToWrite Class for which these references are generated
+	 * @param naming Implicit naming convention
+	 * @return References to 1) XDbProps trait and 2) XDbPropsWrapper trait
+	 */
+	def generateReferences(databasePackage: Package, classToWrite: Class)(implicit naming: NamingRules) = {
+		val propsPackage = databasePackage/packageName/classToWrite.packageName
+		val propsName = classToWrite.name + dbPropsSuffix
+		val props = Reference(propsPackage, propsName.className)
+		val propsWrapper = Reference(propsPackage, (propsName + wrapperSuffix).className)
+		
+		Pair(props, propsWrapper)
 	}
 	
 	// Writes XDbProps trait and companion object

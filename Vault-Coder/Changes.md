@@ -1,7 +1,7 @@
 # Utopia Vault Coder
 
 # v1.12 (in development)
-TODO: Document inheritance features here and in the README
+TODO: Document inheritance features here and in the README. Remember to include the new "from" property support, also.
 ### Breaking changes
 - Database model classes are now named "XDbModel" instead of "XModel"
 - In "many" root access objects, an id-targeting subclass is no longer generated, 
@@ -23,6 +23,9 @@ TODO: Document inheritance features here and in the README
 - Added the generation of common combination traits, when appropriate
   - This feature may be managed manually with the new `has_many_combos` -property in class models
 - Added **Version** as a new data type
+- Added an option skipping file-generation for specific classes and instead referencing them from another project
+  - The main use-case for this is when utilizing generic classes from other projects or modules
+  - See README for more details
 - The stored class version may now be prefixed by specifying a `"prefix"` property
   - This can help avoid naming conflicts when you want to use the same name elsewhere, also
 ### Other changes

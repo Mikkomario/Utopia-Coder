@@ -89,6 +89,27 @@ object DbFactoryWriter
 		}
 	}
 	
+	/**
+	 * Generates references to class files, as if they had been written
+	 * @param factoryPackage Package where these factory classes would have been placed
+	 * @param classToWrite Class for which these references are written
+	 * @param naming Implicit naming rules
+	 * @return Reference to the factory class/object + reference to the factory like -trait, if applicable
+	 */
+	def generateReferences(factoryPackage: Package, classToWrite: Class)(implicit naming: NamingRules) = {
+		val pck = factoryPackage / classToWrite.packageName
+		val factoryName = classToWrite.name + factorySuffix
+		val factory = Reference(pck, factoryName.className)
+		
+		val factoryLike = {
+			if (classToWrite.isGeneric)
+				Some(Reference(pck, (factoryName + likeSuffix).className))
+			else
+				None
+		}
+		factory -> factoryLike
+	}
+	
 	private def writeGenericFactory(classToWrite: Class, factoryPackage: Package, factoryName: String,
 	                                parentClassReferences: Seq[ClassReferences],
 	                                modelRefs: ClassModelReferences, dbPropsOrDbModelRef: Reference)

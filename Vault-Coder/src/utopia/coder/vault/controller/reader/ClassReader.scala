@@ -499,6 +499,7 @@ object ClassReader
 			parents = Empty,
 			description = classModel("doc").getString,
 			author = classModel("author").stringOr(defaultAuthor),
+			referenceFrom = classModel("reference_from", "from", "source").string.map(Package.apply),
 			useLongId = classModel("use_long_id").getBoolean,
 			// Writes generic access point if this class has combinations, or if explicitly specified
 			writeGenericAccess = classModel("has_combos", "generic_access", "tree_inheritance")

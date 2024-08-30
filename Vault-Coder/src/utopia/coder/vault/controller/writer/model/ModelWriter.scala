@@ -30,6 +30,10 @@ object ModelWriter
 {
 	// ATTRIBUTES   -------------------------
 	
+	private val factoryPackageName = "factory"
+	private val storedPackageName = "stored"
+	private val dataPackageName = "partial"
+	
 	private val dataClassSuffix = data.Name("Data", "Data", CamelCase.capitalized)
 	private val factoryTraitSuffix = data.Name("Factory", "Factories", CamelCase.capitalized)
 	private val wrapperSuffix = Name("Wrapper", "Wrappers", CamelCase.capitalized)
@@ -60,12 +64,12 @@ object ModelWriter
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Writes the factory traits
-		val factoryPackage = setup.modelPackage / s"factory.${ classToWrite.packageName }"
+		val factoryPackage = setup.modelPackage / s"$factoryPackageName.${ classToWrite.packageName }"
 		writeFactoryTrait(classToWrite, factoryPackage, parentClassReferences).flatMap { factoryRef =>
 			writeFactoryWrapperTrait(classToWrite, factoryRef, factoryPackage, parentClassReferences)
 				.flatMap { factoryWrapperRef =>
-					val dataPackage = setup.modelPackage / s"partial.${ classToWrite.packageName }"
-					lazy val storePackage = setup.modelPackage / s"stored.${ classToWrite.packageName }"
+					val dataPackage = setup.modelPackage / s"$dataPackageName.${ classToWrite.packageName }"
+					lazy val storePackage = setup.modelPackage / s"$storedPackageName.${ classToWrite.packageName }"
 					
 					// For generic classes / traits, writes some traits
 					// Will contain: 1) XDataLike, 2) XLike and 3) name of the buildCopy function used
@@ -107,6 +111,43 @@ object ModelWriter
 					}
 				}
 		}
+	}
+	
+	/**
+	 * Generates references for a class without generating any files
+	 * @param modelPackage Package where all model packages and files would have been written
+	 * @param classToWrite Class for which references are written
+	 * @param naming Implicit naming convention
+	 * @return References to that class's model files
+	 */
+	def generateReferences(modelPackage: Package, classToWrite: Class)(implicit naming: NamingRules) = {
+		val pName = classToWrite.packageName
+		val factoryPackage = modelPackage / s"$factoryPackageName.$pName"
+		val storedPackage = modelPackage / s"$storedPackageName.$pName"
+		val dataPackage = modelPackage / s"$dataPackageName.$pName"
+		
+		val cName = classToWrite.name
+		val dataName = cName + dataClassSuffix
+		val storedName = classToWrite.storedPrefix +: cName
+		val generic = {
+			if (classToWrite.isGeneric) {
+				val hasProps = Reference(dataPackage, ((traitPropsPrefix +: cName) + traitPropsSuffix).className)
+				val dataLike = Reference(dataPackage, (dataName + likeSuffix).className)
+				val storedLike = Reference(storedPackage, ((storedPrefix +: storedName) + likeSuffix).className)
+				Some(GenericClassModelReferences(hasProps, dataLike, storedLike))
+			}
+			else
+				None
+		}
+		
+		val factoryName = cName + factoryTraitSuffix
+		val factory = Reference(factoryPackage, factoryName.className)
+		val factoryWrapper = Reference(factoryPackage, (factoryName + wrapperSuffix).className)
+		
+		val data = Reference(dataPackage, dataName.className)
+		val stored = Reference(storedPackage, storedName.className)
+		
+		ClassModelReferences(data, stored, factory, factoryWrapper, generic)
 	}
 	
 	private def writeFactoryTrait(classToWrite: Class, factoryPackage: Package,

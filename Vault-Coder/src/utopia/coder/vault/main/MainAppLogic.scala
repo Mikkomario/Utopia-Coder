@@ -4,6 +4,7 @@ import utopia.coder.controller.app.CoderAppLogic
 import utopia.coder.controller.parsing.file.InputFiles
 import utopia.coder.model.data.{Filter, LazyProjectPaths, Name, NamingRules, ProjectPaths}
 import utopia.coder.model.enumeration.NameContext.FileName
+import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.datatype.Reference
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.operator.equality.EqualsExtensions._
@@ -348,9 +349,17 @@ object MainAppLogic extends CoderAppLogic
 		val (pendingClasses, readyClasses) = classesToWrite
 			.divideBy { _.parents.forall(classReferenceMap.contains) }.toTuple
 		
-		def write(classToWrite: Class) =
-			writeClass(classToWrite, tablesRef, descriptionLinkObjects,
-				classToWrite.parents.flatMap(classReferenceMap.get))
+		// If the class has been marked as an external reference, won't write any files for it
+		def write(classToWrite: Class) = classToWrite.referenceFrom match {
+			// Case: Externally referenced class => Only generates references
+			case Some(externalPackage) =>
+				val refs = generateReferencesForClass(classToWrite, externalPackage)
+				Success(classToWrite -> refs)
+			// Case: Normal class => Proceeds to write the class files
+			case None =>
+				writeClass(classToWrite, tablesRef, descriptionLinkObjects,
+					classToWrite.parents.flatMap(classReferenceMap.get))
+		}
 		
 		// Case: All remaining classes may be written => Writes and returns
 		if (pendingClasses.isEmpty)
@@ -468,5 +477,34 @@ object MainAppLogic extends CoderAppLogic
 							}
 					}
 			}
+	}
+	
+	// Generates references as if class files had been written
+	private def generateReferencesForClass(classToWrite: Class, rootPackage: Package)(implicit naming: NamingRules) = {
+		val dbPackage = rootPackage/"database"
+		
+		val modelRefs = ModelWriter.generateReferences(rootPackage/"model", classToWrite)
+		val dbModelRefs = DbModelWriter.generateReferences(dbPackage/"storable", classToWrite)
+		val (dbFactory, dbFactoryLike) = DbFactoryWriter.generateReferences(dbPackage/"factory", classToWrite)
+		val accessRefs = AccessWriter.generateReferences(dbPackage/"access", classToWrite)
+		
+		val (dbModel, dbPropsRefs) = dbModelRefs match {
+			case Left(_) =>
+				val dbPropsRefs = DbPropsWriter.generateReferences(dbPackage, classToWrite)
+				dbPropsRefs.first -> Some(dbPropsRefs)
+			case Right(model) => model -> None
+		}
+		val generic = modelRefs.generic.flatMap { model =>
+			dbPropsRefs.flatMap { dbProps =>
+				dbModelRefs.leftOption.flatMap { dbModel =>
+					dbFactoryLike.map { factory =>
+						GenericClassReferences(model, dbProps.first, dbProps.second, dbModel, factory)
+					}
+				}
+			}
+		}
+		
+		ClassReferences(classToWrite, modelRefs, dbFactory, dbModel,
+			accessRefs.map { _.first }, accessRefs.map { _.second }, generic)
 	}
 }
