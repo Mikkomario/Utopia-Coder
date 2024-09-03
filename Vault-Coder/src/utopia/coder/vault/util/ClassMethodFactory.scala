@@ -136,7 +136,8 @@ object ClassMethodFactory
 				CodePiece(prop.originalName.prop)
 			// Case: Normal property / value => reads the value from the model
 			else
-				propFromValidModelCode(prop, dbPropAccessor = dbPropsAccessor, isFromJson = isFromJson)
+				propFromValidModelCode(prop, validatedModelCode.text, dbPropAccessor = dbPropsAccessor,
+					isFromJson = isFromJson)
 		}.reduceLeft { _.append(_, ", ") }
 		builder += wrapAssignments(assignments)
 		
@@ -171,5 +172,6 @@ object ClassMethodFactory
 	}
 	
 	// Not the most elegant implementation, but for now it works (utilized in XDbFactory)
-	private def dbPropsAccessorFor(classToWrite: Class) = if (classToWrite.isGeneric) "dbProps" else "this.model"
+	private def dbPropsAccessorFor(classToWrite: Class) =
+		if (classToWrite.isGeneric || classToWrite.isExtension) "dbProps" else "this.model"
 }

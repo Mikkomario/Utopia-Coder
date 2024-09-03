@@ -12,7 +12,6 @@ import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.model.data.{Class, ClassModelReferences, ClassReferences, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences.Vault._
-import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Pair, Single}
 import utopia.flow.util.Mutate
 
@@ -135,6 +134,15 @@ object DbFactoryWriter
 			val modelName = if (classToWrite.isExtension) "model" else "valid"
 			s"apply($modelName, " +: accessIdInApply(classToWrite).append(propAssignments, ", ").append(")")
 		}
+		// When inheriting another trait, makes sure the new apply is not identical to the old
+		val methods = {
+			// Case: New apply would just override the old one with no effect => Skips listing either function
+			if (classToWrite.isExtension && applyMethod.matches(fromModelImplementation))
+				Set[MethodDeclaration]()
+			else
+				Set(applyMethod, fromModelImplementation)
+		}
+		
 		val factoryDescription = s"Common trait for factories which parse ${
 			classToWrite.name } data from database-originated models"
 		
@@ -143,7 +151,7 @@ object DbFactoryWriter
 			genericTypes = Single(aGenericType),
 			extensions = extensionsFor(classToWrite, parentClassReferences, aType),
 			properties = Single(dbProps),
-			methods = Set(applyMethod, fromModelImplementation),
+			methods = methods,
 			description = factoryDescription,
 			author = classToWrite.author,
 			since = DeclarationDate.versionedToday
@@ -154,8 +162,7 @@ object DbFactoryWriter
 			// The trait doesn't add additional functionality, it simply removes the generic A type
 			val traitDeclaration = TraitDeclaration(
 				name = factoryName,
-				extensions = factoryLikeRef(modelRefs.stored) +:
-					parentClassReferences.map[Extension] { _.dbFactory },
+				extensions = factoryLikeRef(modelRefs.stored),
 				description = factoryDescription,
 				author = classToWrite.author,
 				since = DeclarationDate.versionedToday

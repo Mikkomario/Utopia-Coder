@@ -186,7 +186,8 @@ object DbModelWriter
 			val params = buildCopyParamsFor(parent)
 			val renames = classToWrite.propertyRenames
 			MethodDeclaration((copyPrefix +: parent.name).function, isOverridden = true)(params)(
-				s"$buildCopyName(${ params.map { param => s"${ renames(param.name) } = ${ param.name }" } })")
+				s"$buildCopyName(${
+					params.map { param => s"${ renames(param.name) } = ${ param.name }" }.mkString(", ") })")
 		}
 		
 		// Generates withX for all class properties, except for those already defined in parents
@@ -361,7 +362,8 @@ object DbModelWriter
 			prop.dataType.sqlConversions
 				.map { conversion => conversion.midConversion(propAccessCode) }
 		}).mkString(", ")
-		val applyFromData = MethodDeclaration("apply", isOverridden = true)(Parameter("data", modelRefs.data))(
+		val applyFromData = MethodDeclaration("apply", explicitOutputType = Some(modelClassType), isOverridden = true)(
+			Parameter("data", modelRefs.data))(
 			s"apply($passApplyDataParams)")
 		
 		// Implements the complete(...) method from DataInserter
@@ -544,7 +546,8 @@ object DbModelWriter
 					// Same thing with the value properties
 					// => The property names are acquired using the companion object
 					val valueProps = valuePropertiesPropertyFor(classToWrite,
-						parentClassReferences.map { _.dbModel.targetCode }, reprType.toString)
+						parentClassReferences.flatMap { _.generic.map { _.dbModel.modelLike } }.map { _.targetCode },
+						reprType.toString)
 					
 					// Implements withX(...) functions and the withId(...) function,
 					// but only if not already defined in parent traits

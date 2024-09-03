@@ -14,6 +14,7 @@ TODO: Document inheritance features here and in the README. Remember to include 
 - When specifying multiple directories, the separator is now `:` instead of `&`, since `&` had issues on Linux
 - Fixed an issue where classes with **Long** ids 
   would be targeted with **Int** ids in their "many" root access -variants
+- When using filtering, parent classes are now included also
 ### New features
 - Added 3 new commands / alternative modes:
   - `list`: Lists all projects that have been registered

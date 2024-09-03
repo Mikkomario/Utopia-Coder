@@ -262,6 +262,7 @@ case class Class(name: Name, customTableName: Option[String], storedPrefix: Stri
 	
 	/**
 	 * @param newExtensions New extensions to assign to this class
+	 * @param propertyReferences Properties within this class which refer to parent properties
 	 * @return Copy of this class with the specified extensions added
 	 */
 	def extending(newExtensions: Seq[Class], propertyReferences: Map[Property, Seq[String]]) = {
@@ -280,41 +281,37 @@ case class Class(name: Name, customTableName: Option[String], storedPrefix: Stri
 						
 				child -> parentProps
 			}
-			val overriddenParentProperties = resolvedPropertyReferences.valuesIterator.flatten.toSet
-			val (requiredPropsFromParent, optionalPropsFromParent) = newExtensions
-				.flatMap { _.properties }.filterNot(overriddenParentProperties.contains).distinctBy { _.name.singular }
-				.map { _.newChild }
-				.divideBy { _.defaultValue.nonEmpty }.toTuple
-			val childProperties = properties.map { prop =>
-				resolvedPropertyReferences.get(prop) match {
-					case Some(parents) => prop.extending(parents)
-					case None => prop
-				}
+			// Keys are parent properties, values are child properties that have their inheritance resolved
+			val parentToChildMap = resolvedPropertyReferences.flatMap { case (inheritingProp, parentProps) =>
+				val resolvedChildProp = inheritingProp.extending(parentProps)
+				parentProps.map { _ -> resolvedChildProp }
 			}
-			// First level grouping is: 1) Props from child & 2) Parent prop overrides
-			// Second level grouping is: 1) Required & 2) Optional
-			val groupedChildProps = childProperties
-				.divideBy { _.isExtension }.map { _.divideBy { _.defaultValue.nonEmpty } }
+			// Prepares an ordered sequence of properties listed in the parents (whether overridden or not)
+			// and properties only present in the child
+			val inheritedProps = newExtensions
+				.flatMap { parent => parent.properties.map { p => parentToChildMap.getOrElse(p, p.newChild) } }
+			val uninheritedProps = properties.filterNot(resolvedPropertyReferences.contains)
 			
-			// Inserts the properties to different locations based on:
-			//      1) Whether they are originated from the parent (left) or from the child (right)
-			//      2) Whether they have a default value (right) right not (left)
-			// I.e. The final order of adding properties is:
-			//      1) Overridden required properties from the parent
-			//      2) Inherited required properties
-			//      3) Required properties from the child
-			//      4) Overridden optional properties
-			//      5) Optional properties from the parent
-			//      6) Optional properties from the child
-			val newProperties = groupedChildProps.second.first ++
-				requiredPropsFromParent ++ groupedChildProps.first.first ++ groupedChildProps.second.second ++
-				optionalPropsFromParent ++ groupedChildProps.first.second
+			// Orders the properties in the following order,
+			// respecting the original ordering in both parents and locally
+			//      1. Required properties from the parents
+			//      2. Required properties from this child
+			//      3. Optional properties from the parents
+			//      4. Optional properties from this child
+			// Divides parent properties to the left & child properties to the right
+			val orderedProps = Pair(inheritedProps, uninheritedProps)
+				// In both groups, divides required properties to the left & optional to the right
+				.map { _.divideBy { _.defaultValue.nonEmpty } }
+				.merge { (parentProps, childProps) =>
+					// Combines the required from both and the optional from both, then adds all together
+					parentProps.zip(childProps).mapAndMerge { case (p, c) => p ++ c } { _ ++ _ }
+				}
 			
 			// Combines class information, replacing empty values with defined values from parents
 			val orderedImplementations = this +: newExtensions
 			copy(
 				idName = orderedImplementations.view.map { _.idName }.find { _.nonEmpty }.getOrElse(idName),
-				properties = newProperties,
+				properties = orderedProps,
 				comboIndexColumnNames = orderedImplementations.flatMap { _.comboIndexColumnNames },
 				descriptionLinkName = orderedImplementations.view.flatMap { _.descriptionLinkName }.headOption,
 				parents = parents ++ newExtensions,

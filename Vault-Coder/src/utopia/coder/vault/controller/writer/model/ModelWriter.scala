@@ -376,13 +376,8 @@ object ModelWriter
 			// Case: Abstract class => Extends XDataLike[XData] trait and implements renamed property references
 			case Some(dataLikeRef) =>
 				val extensions: Seq[Extension] = Single[Extension](dataLikeRef(dataClassType))
-				val renamedProperties = classToWrite.properties.flatMap { prop =>
-					prop.rename.map { case (originalName, localName) =>
-						ComputedProperty(originalName.prop, isOverridden = true)(localName.prop)
-					}
-				}
 				
-				(extensions, renamedProperties, Set[MethodDeclaration]())
+				(extensions, None, Set[MethodDeclaration]())
 				
 			// Case: Concrete class => Extends XFactory[XData] & ModelConvertible, implements toModel and withX methods
 			//                         (except when inheriting another trait)
@@ -425,7 +420,7 @@ object ModelWriter
 					MethodDeclaration(copyMethodName, isOverridden = true)(buildCopyParams)(s"copy($assignments)")
 				}
 				
-				(extensions, toModel.emptyOrSingle, withMethods ++ copyMethods)
+				(extensions, toModel, withMethods ++ copyMethods)
 		}
 		
 		// Defines either a trait or a class
@@ -520,7 +515,7 @@ object ModelWriter
 	                            dataLikeRef: Reference, factoryWrapperRef: Reference, buildCopyName: String)
 	                           (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// When extending YStoredLike[Repr] with YStored, the Repr type must conform to YStored
+		// When extending YStoredLike[Data, Repr], the Repr type must conform to YStored
 		val parentStoredRefs = parentClassReferences.map { _.stored }
 		
 		val dataType = ScalaType.basic("Data")
@@ -530,8 +525,8 @@ object ModelWriter
 			description = "Implementing type")
 		val reprType = repr.toScalaType
 		
-		val inheritedExtensions = parentClassReferences.flatMap[Extension] { _.generic.map { _.storedLike(reprType) } } ++
-			parentStoredRefs.map(Extension.fromReference)
+		val inheritedExtensions = parentClassReferences
+			.flatMap[Extension] { _.generic.map { _.storedLike(dataType, reprType) } }
 		
 		// Certain extensions are different if Vault references are enabled
 		// However, if extending another YStoredLike trait, expects these to be defined there already

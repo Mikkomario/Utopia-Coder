@@ -65,7 +65,7 @@ object AccessWriter
 			val many = Reference(packageFor(accessPackage/"many", classToWrite),
 				((manyPrefix +: classToWrite.name) + accessTraitSuffix + genericAccessSuffix).className)
 			val single = Reference(packageFor(accessPackage/"single", classToWrite),
-				((singleAccessPrefix +: classToWrite.name) + accessTraitSuffix + genericAccessSuffix).className)
+				((uniqueAccessPrefix +: classToWrite.name) + accessTraitSuffix + genericAccessSuffix).className)
 			
 			Some(Pair(single, many))
 		}

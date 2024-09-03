@@ -104,7 +104,7 @@ case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: 
 	  * @return Classes accepted by the specified filter. Won't include any combos or related classes.
 	  */
 	def filterClassesOnly(f: Class => Boolean) =
-		copy(enumerations = Empty, classes = classes.filter(f), combinations = Empty)
+		copy(enumerations = Empty, classes = parentInclusiveClasses(classes.filter(f)), combinations = Empty)
 	/**
 	  * @param includeClass A function that returns true for classes that should be included in the results
 	  *                     (also includes their related combinations)
@@ -128,10 +128,22 @@ case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: 
 	private def comboInclusiveClasses(filteredClasses: Seq[Class])
 	                                 (comboInclusionCondition: CombinationData => Boolean) =
 	{
-		val filteredCombos = combinations.filter { c => comboInclusionCondition(c) ||
-			filteredClasses.contains(c.childClass) || filteredClasses.contains(c.parentClass) }
+		val filteredCombos = combinations.filter { c =>
+			comboInclusionCondition(c) || filteredClasses.contains(c.childClass) ||
+				filteredClasses.contains(c.parentClass)
+		}
 		val comboClasses = filteredCombos.flatMap { c => Pair(c.parentClass, c.childClass) }
 		
-		(filteredClasses ++ comboClasses).distinct -> filteredCombos
+		parentInclusiveClasses((filteredClasses ++ comboClasses).distinct) -> filteredCombos
+	}
+	
+	private def parentInclusiveClasses(filteredClasses: Seq[Class]): Seq[Class] = {
+		val referencedParents = filteredClasses.flatMap { _.parents }
+		// Case: Some parents were added => Makes sure their parents are included, also
+		if (referencedParents.nonEmpty)
+			(filteredClasses ++ parentInclusiveClasses(referencedParents)).distinct
+		// Case: No parents were added
+		else
+			filteredClasses
 	}
 }
