@@ -162,7 +162,7 @@ object DbFactoryWriter
 			// The trait doesn't add additional functionality, it simply removes the generic A type
 			val traitDeclaration = TraitDeclaration(
 				name = factoryName,
-				extensions = factoryLikeRef(modelRefs.stored),
+				extensions = Single(factoryLikeRef(modelRefs.stored)),
 				description = factoryDescription,
 				author = classToWrite.author,
 				since = DeclarationDate.versionedToday
