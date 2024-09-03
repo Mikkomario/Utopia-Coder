@@ -104,11 +104,24 @@ object AccessWriter
 		// are present in both single and many model access points
 		// However, these properties are only implemented in concrete classes (i.e. not in generic classes)
 		val factoryProperty = ComputedProperty("factory", Set(factoryRef), isOverridden = true)(factoryRef.target)
-		val modelProperty = ComputedProperty("model", Set(dbPropsOrDbModelRef),
-			explicitOutputType = if (classToWrite.isGeneric) Some(dbPropsOrDbModelRef) else None, visibility = Protected,
-			description = "Model which contains the primary database properties interacted with in this access point",
-			isOverridden = classToWrite.isExtension)(
-			if (classToWrite.isGeneric) "" else dbPropsOrDbModelRef.target)
+		val modelProperty = {
+			// When writing generic traits, specifies model type explicitly
+			val explicitType: Option[ScalaType] = {
+				if (classToWrite.isGeneric) {
+					val base = dbPropsOrDbModelRef
+					if (classToWrite.isNullDeprecatable)
+						Some((base: ScalaType).withOther(vault.nullDeprecatable(vault.storable)))
+					else Some(base)
+				}
+				else
+					None
+			}
+			ComputedProperty("model", Set(dbPropsOrDbModelRef),
+				explicitOutputType = explicitType, visibility = Protected,
+				description = "Model which contains the primary database properties interacted with in this access point",
+				isOverridden = classToWrite.isExtension)(
+				if (classToWrite.isGeneric) "" else dbPropsOrDbModelRef.target)
+		}
 		
 		// For classes that support expiration, deprecate() -method is added for all traits
 		// Null-deprecation -supporting classes already inherit this method

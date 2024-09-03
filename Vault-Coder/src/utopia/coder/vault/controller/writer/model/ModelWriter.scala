@@ -515,13 +515,13 @@ object ModelWriter
 	                            dataLikeRef: Reference, factoryWrapperRef: Reference, buildCopyName: String)
 	                           (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// When extending YStoredLike[Data, Repr], the Repr type must conform to YStored
-		val parentStoredRefs = parentClassReferences.map { _.stored }
+		// When extending YStoredLike[Data, Repr], the Repr type must conform to YStoredData
+		val parentDataRefs = parentClassReferences.map { _.data }
 		
 		val dataType = ScalaType.basic("Data")
 		val data = GenericType.childOf("Data", dataLikeRef(dataType), description = "Type of the wrapped data")
 		val repr = GenericType.covariant("Repr",
-			requirement = parentStoredRefs.headOption.map { TypeRequirement.childOf(_) },
+			requirement = parentDataRefs.headOption.map { TypeRequirement.childOf(_) },
 			description = "Implementing type")
 		val reprType = repr.toScalaType
 		

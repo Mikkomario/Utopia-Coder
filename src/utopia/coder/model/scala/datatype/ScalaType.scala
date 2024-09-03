@@ -190,6 +190,12 @@ case class ScalaType(code: CodePiece, typeParameters: Seq[ScalaType] = Empty, ca
 		copy(typeParameters = firstTypeParameter +: moreTypeParameters)
 	
 	/**
+	 * @param otherType Another type
+	 * @return A combination of these two types
+	 */
+	def withOther(otherType: ScalaType) = ScalaType(code.append(otherType.code, " with "))
+	
+	/**
 	  * @param parameterTypes A list of accepted parameter types
 	  * @return A functional data type that returns this data type
 	  */
