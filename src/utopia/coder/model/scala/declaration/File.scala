@@ -2,15 +2,16 @@ package utopia.coder.model.scala.declaration
 
 import utopia.coder.controller.parsing.scala.ScalaParser
 import utopia.coder.model.data.ProjectSetup
-import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.util.StringExtensions._
-import utopia.coder.model.scala.code.CodeBuilder
 import utopia.coder.model.merging.{MergeConflict, Mergeable}
-import utopia.coder.model.scala.{Package, datatype}
+import utopia.coder.model.scala.code.CodeBuilder
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.model.scala.template.CodeConvertible
+import utopia.coder.model.scala.{Package, datatype}
+import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.util.EitherExtensions._
 import utopia.flow.util.Mutate
+import utopia.flow.util.StringExtensions._
 
 import scala.collection.immutable.VectorBuilder
 import scala.io.Codec

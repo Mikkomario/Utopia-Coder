@@ -1,6 +1,7 @@
 # Utopia Coder - list of changes
 
-## v1.1.1 (in development)
+## v1.1.1 - 4.10.2024
+This update adds a couple of important bugfixes to v1.1, as well as some new commands and refactoring tools.
 ### Bugfixes
 - Fixed a bug where project sources would not get applied automatically
 - Changed the syntax for including multiple paths from separation with `&` to separation with `:` since 

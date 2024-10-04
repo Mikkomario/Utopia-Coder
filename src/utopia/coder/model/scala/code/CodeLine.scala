@@ -24,11 +24,11 @@ object CodeLine
 	// that the splitting part should be preserved on the original line
 	private lazy val repeatableRegexes = Vector(
 		Regex("with ") -> false,
-		(Regex.escape(',') + Regex.whiteSpace.noneOrOnce).withinParenthesis.ignoringQuotations -> true,
+		(Regex.escape(',') + Regex.whiteSpace.noneOrOnce).withinParentheses.ignoringQuotations -> true,
 		Regex("s").noneOrOnce + Regex.escape('\"') + (!Regex.escape('\"')).anyTimes + Regex.escape('\"') -> false,
 		(Regex.anyOf("+-*/").oneOrMoreTimes + Regex.whiteSpace) -> true,
 		(Regex.whiteSpace + Regex.word + Regex.whiteSpace) +
-			!(Regex.escape('=') + Regex.escape('>')).withinParenthesis -> false
+			!(Regex.escape('=') + Regex.escape('>')).withinParentheses -> false
 	)
 	private lazy val oneTimeRegexes = Vector(
 		Regex.escape('.') + Regex.letter.oneOrMoreTimes + Regex.whiteSpace.noneOrOnce + Regex.escape('{'),

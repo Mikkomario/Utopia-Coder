@@ -9,6 +9,7 @@ import utopia.flow.generic.model.mutable.DataType.StringType
 import utopia.flow.generic.model.template.ModelConvertible
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.parse.file.FileUtils
+import utopia.flow.util.EitherExtensions._
 
 import java.nio.file.Path
 

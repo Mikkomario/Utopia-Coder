@@ -4,18 +4,20 @@ import utopia.coder.controller.parsing.file.InputFiles
 import utopia.coder.model.data.{Filter, LazyProjectPaths, ProjectPaths}
 import utopia.flow.async.AsyncExtensions._
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.{Empty, Pair, Single}
+import utopia.flow.collection.immutable.Empty
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.parse.file.FileUtils
 import utopia.flow.parse.file.container.ObjectMapFileContainer
 import utopia.flow.parse.json.{JsonParser, JsonReader}
 import utopia.flow.parse.string.Regex
 import utopia.flow.time.TimeExtensions._
+import utopia.flow.util.EitherExtensions._
+import utopia.flow.util.NotEmpty
 import utopia.flow.util.StringExtensions._
+import utopia.flow.util.TryExtensions._
 import utopia.flow.util.console.ConsoleExtensions._
 import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
 import utopia.flow.util.logging.Logger
-import utopia.flow.util.{NotEmpty, Version}
 import utopia.flow.view.immutable.View
 import utopia.flow.view.immutable.caching.Lazy
 
@@ -266,5 +268,5 @@ trait CoderAppLogic extends AppLogic
 	 * @return Created directory or the parent directory if file-creation failed
 	 */
 	protected def subDirectory(parent: Path, dirName: String)(implicit log: Logger) =
-		(parent/dirName).createDirectories().getOrElseLog(parent)
+		(parent/dirName).createDirectories().log.getOrElse(parent)
 }

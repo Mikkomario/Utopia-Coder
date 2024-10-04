@@ -10,17 +10,17 @@ import utopia.flow.parse.string.Regex
   */
 object ReadRegexTest extends App
 {
-	private val visibilityRegex = (Regex("protected ") || Regex("private ")).withinParenthesis
+	private val visibilityRegex = (Regex("protected ") || Regex("private ")).withinParentheses
 	private val declarationPrefixRegex = DeclarationPrefix.values.map { p => Regex(s"${ p.keyword } ") }
-		.reduceLeft { _ || _ }.withinParenthesis
-	private val declarationModifierRegex = (visibilityRegex || declarationPrefixRegex).withinParenthesis
+		.reduceLeft { _ || _ }.withinParentheses
+	private val declarationModifierRegex = (visibilityRegex || declarationPrefixRegex).withinParentheses
 	private val declarationKeywordRegex = DeclarationType.values.map { d => Regex(s"${ d.keyword } ") }
-		.reduceLeft { _ || _ }.withinParenthesis
+		.reduceLeft { _ || _ }.withinParentheses
 	private val declarationStartRegex = declarationModifierRegex.anyTimes + declarationKeywordRegex
 	private val namedDeclarationStartRegex = declarationStartRegex +
-		((Regex.escape('_') + Regex.letterOrDigit).withinParenthesis || Regex.letter).withinParenthesis +
-		(Regex.word + Regex.letterOrDigit).withinParenthesis.noneOrOnce +
-		(Regex.escape('_') + Regex.escape('=')).withinParenthesis.noneOrOnce
+		((Regex.escape('_') + Regex.letterOrDigit).withinParentheses || Regex.letter).withinParentheses +
+		(Regex.word + Regex.letterOrDigit).withinParentheses.noneOrOnce +
+		(Regex.escape('_') + Regex.escape('=')).withinParentheses.noneOrOnce
 	val testRegex = Regex("protected |private ")
 	private lazy val segmentSeparatorRegex = (Regex.escape('/') * 2) + Regex.whiteSpace +
 		Regex.upperCaseLetter.oneOrMoreTimes + Regex.escape('\t').oneOrMoreTimes +
@@ -48,8 +48,8 @@ object ReadRegexTest extends App
 	
 	assert(namedDeclarationStartRegex.findFirstFrom("def value_=(newValue: Value) = _value = newValue").get ==
 		"def value_=")
-	val test = ((Regex.escape('_') + Regex.letterOrDigit).withinParenthesis || Regex.letter).withinParenthesis
-	println((Regex.escape('_') + Regex.letterOrDigit).withinParenthesis)
+	val test = ((Regex.escape('_') + Regex.letterOrDigit).withinParentheses || Regex.letter).withinParentheses
+	println((Regex.escape('_') + Regex.letterOrDigit).withinParentheses)
 	println(namedDeclarationStartRegex.findFirstFrom("val _a = 3").get)
 	println(test.findFirstFrom("_a = 3").get)
 	println((declarationStartRegex + test).findFirstFrom("val _a = 3").get)

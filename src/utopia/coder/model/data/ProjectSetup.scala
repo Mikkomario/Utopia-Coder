@@ -5,7 +5,7 @@ import utopia.coder.model.merging.MergeConflict
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Single}
 import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.util.StringExtensions._
+import utopia.flow.util.TryExtensions._
 import utopia.flow.util.Version
 import utopia.flow.util.logging.Logger
 

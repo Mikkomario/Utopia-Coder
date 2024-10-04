@@ -25,6 +25,7 @@ import utopia.flow.generic.model.mutable.DataType.{ModelType, StringType, Vector
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.StringExtensions._
+import utopia.flow.util.TryExtensions._
 import utopia.flow.util.logging.Logger
 import utopia.flow.util.{UncertainBoolean, Version}
 
@@ -109,7 +110,7 @@ object ClassReader
 	private def moduleReferencesFrom(root: Model, rootPath: Path)(implicit log: Logger) =
 		root("modules").getVector.flatMap { v =>
 			val parsed = v.castTo(ModelType, StringType) match {
-				case Left(modelVal) => modelVal.tryModel.flatMap(ProjectPaths.apply).logToOption
+				case Left(modelVal) => modelVal.tryModel.flatMap(ProjectPaths.apply).log
 				case Right(stringVal) => Some(ProjectPaths(stringVal.getString))
 			}
 			parsed.map { _.under(rootPath) }
@@ -298,7 +299,7 @@ object ClassReader
 						s"Custom data types must be presented as json objects. ${ typeProperty.name }/'${
 							typeProperty.value }' is not a model.") }
 					.flatMap(CustomPropertyType.apply)
-					.logToOption
+					.log
 					.map { typeProperty.name.toLowerCase -> _ }
 			}
 			.toMap

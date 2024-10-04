@@ -7,8 +7,6 @@ converts it to a class structure.
 At the end of this document, you will also find instructions on how to generate input model templates based on 
 existing database structure.
 
-TODO: Document inheritance features. Also apply the new combined model syntax changes.
-
 ## Main App Use Instructions
 First, you need to prepare a .json file describing the model structure you want to create / use. 
 See the required document structure below.  
@@ -54,6 +52,14 @@ Once you have created a specification document, run the application using the fo
 - Additionally, if you specify the `-NC` flag, you may prevent any combo classes from being written
 
 The program will inform you if there were any problems during input file processing or during output write operations.
+
+Alternatively, you can run this program in the following modes:
+- `list` - Lists all registered projects
+- `show <project>` - Shows a project's current paths (input, output, source)
+- `upgrade <project> <from> <to>` - Performs automated refactoring, 
+  upgrading your project to support a more recent Vault version
+- `read ...` - Generates model files from an existing database structure
+  - For usage instructions, see [Generating Model Templates](#generating-model-templates)
 
 ## Input File Structure
 This section instructs you on how to write a correct input json document and shows you what options you have 
@@ -176,6 +182,13 @@ Class objects should contain following properties:
 - `"prefix": String (optional)` - Prefix to add to the "stored" version of the class model
   - May be used to avoid name conflicts
   - Alternatively, you may add `"stored": true`, in order to prefix the class name with "Stored"
+- `"generic": Boolean (optional)` - Set this to true if this is a generic trait, 
+  intended to be inherited by multiple different models
+- `"extends": String (optional)` - Name here the generic trait model you want this model to inherit, if applicable
+  - When inheriting, the lower level model will receive all parent model's properties and inherit the generated traits 
+- `"from": String (optional)` - If you don't want to generate any files, 
+  but want this model to be available for inheriting, name here the root package in which this model's code appears. 
+  - This is only necessary in multimodal projects. 
 - `"id": String (optional)` - Name of this class' id (primary key) property
   - Default is `"id"`
 - `"use_long_id": Boolean (optional)` - Whether Long should be used in the id property instead of `Int`. 
@@ -193,6 +206,8 @@ Class objects should contain following properties:
 - `"has_combos"` / `"generic_access"` / `"tree_inheritance": Boolean (optional)` - Determines whether a more generic 
   access point (**ManyXAccessLike**) will be written for this class
   - If omitted or `null`, a more generic access point will be written if this declaration includes any combo classes 
+  - Note: Alternatively, you can specify `"has_many_combos": true`, 
+    which will set this value to true and also generate more generic combo traits.
 - `"description_link"` / `"desc_link": String (optional)` - Specifies the name of 
   the property in a description link table that refers to this class (e.g. `"testClassId"`)
   - Please note that if you specify this value, localized description support is added for this class
@@ -221,6 +236,9 @@ The following guide assumes a standard single-column data type. For multi-column
 see the additional instructions under [multi-column properties](#multi-column-properties).
 
 Each property object should contain following properties:
+- `"extends": String (optional)` - When overriding a property from a parent model, specify the parent property here
+  - When inheriting, all parent property's settings will be applied by default, unless overridden in this 
+    property definition. For example, by specifying `"name"`, you can rename the property in the implementing code.
 - `"name": String (optional)` - Name of this property (e.g. `"testProperty"`)
   - If not specified, column name will be parsed into a property name. 
     Alternatively the name is based on the data type used. 
@@ -571,6 +589,7 @@ This application will produce the following documents
           - **X.scala** - A stored variant of the class model
       - combined
         - **P**
+          - **CombinedX.scala** - If there were multiple combinations or if `has_many_combos` was set to true
           - **DescribedX.scala** - A version of the class which includes descriptions
             (only for classes with description support)
     - database
@@ -612,6 +631,8 @@ This application will produce the following documents
           - description
             - **DbXDescriptions.scala** - The root access point for accessing multiple **X**-descriptions at once
               - Only generated for classes which support descriptions
+
+Note: The file structure for generic traits and inheriting classes is different from this structure above.
 
 ## Generating Model Templates
 There's an alternative mode available. This mode reads one or more tables from a database and writes 

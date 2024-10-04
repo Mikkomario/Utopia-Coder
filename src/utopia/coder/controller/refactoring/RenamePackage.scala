@@ -2,14 +2,13 @@ package utopia.coder.controller.refactoring
 
 import utopia.coder.model.refactoring.PackageTarget
 import utopia.coder.model.scala.Package
-import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.parse.file.FileConflictResolution.Rename
 import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.util.NotEmpty
-import utopia.flow.util.logging.{LogQueue, Logger}
+import utopia.flow.util.TryExtensions._
+import utopia.flow.util.logging.LogQueue
 
-import java.nio.file.{Path, Paths}
+import java.nio.file.Path
 
 /**
  * Used for renaming or moving a specific package or a linear sequence of packages
@@ -32,7 +31,7 @@ case class RenamePackage(target: PackageTarget, to: Package)
 				// Creates or otherwise acquires the renamed directory
 				to.toPathIn(parent).createDirectories()
 					// If directory-creation failed. Logs and skips this group of packages
-					.logToOptionWithMessage(s"Failed to create the new package $to")
+					.logWithMessage(s"Failed to create the new package $to")
 					.map { targetDirectory =>
 						// Moves all the lowest level target directory contents to the new directory
 						packagesToRename
@@ -46,7 +45,7 @@ case class RenamePackage(target: PackageTarget, to: Package)
 								}
 								fileMoves
 									// If file-iteration failed, logs rather than interrupts the process
-									.logToOptionWithMessage(s"Failed to acquire a list of files in $packageToRename")
+									.logWithMessage(s"Failed to acquire a list of files in $packageToRename")
 									.map { fileMoves =>
 										val (moveFailures, movedFiles) = fileMoves.divided
 										// Logs move errors

@@ -1,8 +1,8 @@
 package utopia.coder.controller.app
 
 import utopia.coder.model.data.{Filter, LazyProjectPaths}
-import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.util.EitherExtensions._
 import utopia.flow.util.console.CommandArguments
 import utopia.flow.util.logging.Logger
 import utopia.flow.view.immutable.caching.Lazy

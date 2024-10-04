@@ -1,7 +1,13 @@
 # Utopia Vault Coder
 
-# v1.12 (in development)
-TODO: Document inheritance features here and in the README. Remember to include the new "from" property support, also.
+# v1.12 - 4.10.2024
+A major upgrade introducing multiple new features:
+1. Support for generic traits and inheritance
+2. Automated code refactoring
+3. Commands for listing project information
+
+This update also changes syntax for combined models and uses different database model naming logic. 
+Also, **IntSets** are now automatically supported in the generated with functions and id-based accessing.
 ### Breaking changes
 - Database model classes are now named "XDbModel" instead of "XModel"
 - In "many" root access objects, an id-targeting subclass is no longer generated, 
@@ -16,6 +22,10 @@ TODO: Document inheritance features here and in the README. Remember to include 
   would be targeted with **Int** ids in their "many" root access -variants
 - When using filtering, parent classes are now included also
 ### New features
+- Added support for inheritance
+  - Generic trait models (i.e. those marked with `"generic": true`) can now be extended by adding 
+    `"extends": "<parent class name>"` to the model declaration
+    - See README for more details
 - Added 3 new commands / alternative modes:
   - `list`: Lists all projects that have been registered
   - `show <project>`: Shows paths that are relevant to a project

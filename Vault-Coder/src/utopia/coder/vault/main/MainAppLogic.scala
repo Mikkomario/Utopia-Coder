@@ -2,27 +2,26 @@ package utopia.coder.vault.main
 
 import utopia.coder.controller.app.CoderAppLogic
 import utopia.coder.controller.parsing.file.InputFiles
-import utopia.coder.model.data.{Filter, LazyProjectPaths, Name, NamingRules, ProjectPaths}
+import utopia.coder.model.data._
 import utopia.coder.model.enumeration.NameContext.FileName
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.datatype.Reference
-import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.operator.equality.EqualsExtensions._
-import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.time.Today
-import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
-import utopia.flow.util.logging.Logger
-import utopia.flow.view.immutable.caching.Lazy
-import utopia.coder.vault.controller.reader
 import utopia.coder.vault.controller.reader.ClassReader
 import utopia.coder.vault.controller.writer.database._
 import utopia.coder.vault.controller.writer.documentation.{DocumentationWriter, TableDescriptionsWriter}
 import utopia.coder.vault.controller.writer.model.{CombinedModelWriter, DescribedModelWriter, EnumerationWriter, ModelWriter}
 import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, GenericClassReferences, ModuleData, VaultProjectSetup}
-import utopia.coder.vault.model.enumeration.Mutability
 import utopia.coder.vault.util.Common
-import utopia.flow.collection.immutable.{Empty, Pair, Single}
+import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.immutable.Single
+import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.time.Today
+import utopia.flow.util.EitherExtensions._
+import utopia.flow.util.TryExtensions._
+import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
+import utopia.flow.util.logging.Logger
 import utopia.flow.util.{Mutate, Version}
+import utopia.flow.view.immutable.caching.Lazy
 
 import java.nio.file.Path
 import java.time.LocalTime
@@ -103,7 +102,7 @@ object MainAppLogic extends CoderAppLogic
 							project.modulePaths.findMap { paths =>
 								InputFiles.versionedFileOrDirectoryFrom(paths.input, "json").flatMap { inputPath =>
 									ClassReader.moduleFrom(inputPath, project)
-										.logToOptionWithMessage(s"Failed to parse module data from $inputPath")
+										.logWithMessage(s"Failed to parse module data from $inputPath")
 										.filter { _.moduleName ~== moduleName }
 								}
 							} match {
@@ -118,7 +117,7 @@ object MainAppLogic extends CoderAppLogic
 							val modules = project.modulePaths.flatMap { modulePaths =>
 								InputFiles.versionedFileOrDirectoryFrom(modulePaths.input, "json").flatMap { inputPath =>
 									ClassReader.moduleFrom(inputPath, project)
-										.logToOptionWithMessage(s"Failed to parse module data from $inputPath")
+										.logWithMessage(s"Failed to parse module data from $inputPath")
 										.map { _ -> modulePaths }
 								}
 							}

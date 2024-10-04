@@ -7,9 +7,9 @@ import utopia.coder.model.scala.datatype.ScalaType
 import utopia.coder.model.scala.declaration.FunctionIdentifier
 import utopia.coder.vault.controller.writer.database.AccessWriter
 import utopia.coder.vault.util.VaultReferences._
-import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.Pair
 import utopia.flow.parse.string.Regex
+import utopia.flow.util.TryExtensions._
 import utopia.flow.util.Version
 import utopia.flow.util.logging.Logger
 
@@ -59,8 +59,8 @@ object UpgradeVault
 		val oldFilterIdentifiers = oldFilterMethodNames.map { FunctionIdentifier(_, vault.condition) }
 		
 		// Finds sub-view implementations and replaces them with new ones
-		val subAccessTargetRegex = Regex("Sub") + (Regex("Access") || "View").withinParenthesis + Regex.escape('(') +
-			(Regex("override val parent") || Regex("condition\\: Condition\\) extends")).withinParenthesis
+		val subAccessTargetRegex = Regex("Sub") + (Regex("Access") || "View").withinParentheses + Regex.escape('(') +
+			(Regex("override val parent") || Regex("condition\\: Condition\\) extends")).withinParentheses
 		val replaceAccessCompanions = ReplaceCode(accessPackages, subAccessTargetRegex) { i =>
 			if (i.isObject) {
 				println(s"Replacing ${ i.name } companion object")
@@ -75,7 +75,7 @@ object UpgradeVault
 		val companionsResults = replaceAccessCompanions(sourceRoot)
 		
 		// Also replaces the other filter function implementations
-		val manyAccessRegex = (Regex("Many") || "Unique").withinParenthesis + Regex.word + "Access"
+		val manyAccessRegex = (Regex("Many") || "Unique").withinParentheses + Regex.word + "Access"
 		val replaceFilters = ReplaceCode(accessPackages, Regex("trait ") + manyAccessRegex) { i =>
 			if (i.isTrait && manyAccessRegex(i.name) && oldFilterIdentifiers.exists(i.contains)) {
 				println(s"Replacing ${ i.name } filter method")

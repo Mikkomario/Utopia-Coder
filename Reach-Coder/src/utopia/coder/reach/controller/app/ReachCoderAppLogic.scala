@@ -3,16 +3,16 @@ package utopia.coder.reach.controller.app
 import utopia.coder.controller.app.CoderAppLogic
 import utopia.coder.model.data.{Filter, LazyProjectPaths, NamingRules, ProjectSetup}
 import utopia.coder.model.enumeration.NameContext.FileName
-import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.time.Today
-import utopia.flow.util.console.CommandArguments
-import utopia.flow.util.logging.Logger
-import utopia.flow.view.immutable.caching.Lazy
 import utopia.coder.reach.controller.reader.ComponentFactoryReader
 import utopia.coder.reach.controller.writer.ComponentFactoryWriter
 import utopia.coder.reach.util.Common
+import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.time.Today
+import utopia.flow.util.TryExtensions._
+import utopia.flow.util.console.CommandArguments
+import utopia.flow.util.logging.Logger
 import utopia.flow.view.immutable.View
+import utopia.flow.view.immutable.caching.Lazy
 
 import java.nio.file.Path
 import scala.concurrent.ExecutionContext
@@ -48,12 +48,12 @@ object ReachCoderAppLogic extends CoderAppLogic
 				// Moves out the previous build files, if possible
 				(output / "last-build").asExistingDirectory.flatMap { lastBuildDir =>
 					// Deletes the previous backup
-					lastBuildDir.deleteContents().logFailureWithMessage("Failed to delete last build")
+					lastBuildDir.deleteContents().logWithMessage("Failed to delete last build")
 					// Moves the last build files to the backup directory, if possible
 					output.iterateChildren {
 						_.filterNot { _ == lastBuildDir }.map { _.moveTo(lastBuildDir) }.toTryCatch.logToTry
 					}.flatten
-				}.logFailureWithMessage("Failed to move the previous build")
+				}.logWithMessage("Failed to move the previous build")
 				
 				// Processes the input file/files
 				val mergeRoot = paths.srcView.mapValue { _.headOption }

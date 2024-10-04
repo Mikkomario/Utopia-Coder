@@ -4,6 +4,7 @@ import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.file.FileConflictResolution.Fail
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.logging.Logger
+import utopia.flow.util.TryExtensions._
 
 import java.nio.file.Path
 import scala.collection.mutable
@@ -27,7 +28,7 @@ class Backup(sourceRoots: Iterable[Path], backupRoot: Path)(implicit log: Logger
 	 * Backs up a file
 	 * @param file File path to back up
 	 */
-	def apply(file: Path) = {
+	def apply(file: Path): Unit = {
 		// /home/mikko/Workspace/IDEA/Fuel/Fuel-Server-Core/src/aac/scala/fuel/core/server/database/FuelTables.scala
 		// Only backs up each file once
 		if (!backedUpFiles.contains(file) && file.isRegularFile) {
@@ -38,7 +39,7 @@ class Backup(sourceRoots: Iterable[Path], backupRoot: Path)(implicit log: Logger
 						sourceRoots.mkString(", ") }")
 					backupRoot/s"other/${ file.fileName }"
 			}
-			destination.createDirectories().map { file.copyAs(_, Fail) }.logFailure
+			destination.createDirectories().map { file.copyAs(_, Fail) }.log
 		}
 	}
 }

@@ -2,7 +2,7 @@ package utopia.coder.controller.parsing.scala
 
 import utopia.bunnymunch.jawn.JsonBunny
 import utopia.coder.model.scala.Visibility.{Private, Protected, Public}
-import utopia.coder.model.scala.code.{Code, CodeBuilder, CodeLine, CodePiece, ReadCodeBlock}
+import utopia.coder.model.scala.code._
 import utopia.coder.model.scala.datatype.ScalaTypeCategory.{CallByName, Standard}
 import utopia.coder.model.scala.datatype.TypeVariance.Invariance
 import utopia.coder.model.scala.datatype._
@@ -17,11 +17,11 @@ import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.Empty
 import utopia.flow.collection.mutable.builder.MultiMapBuilder
 import utopia.flow.collection.mutable.iterator.PollingIterator
-import utopia.flow.parse.string.{IterateLines, Regex}
 import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.parse.string.{IterateLines, Regex}
+import utopia.flow.util.RangeExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.flow.view.immutable.MutatingOnce
-import utopia.coder.model.scala.declaration.TypeDeclaration
 
 import java.nio.file.Path
 import scala.collection.immutable.VectorBuilder
@@ -45,20 +45,20 @@ object ScalaParser
 	lazy val importRegex = Regex("import ") + Regex.any
 	
 	private lazy val annotationStartRegex = Regex.escape('@')
-	private lazy val visibilityRegex = (Regex("protected ") || Regex("private ")).withinParenthesis
+	private lazy val visibilityRegex = (Regex("protected ") || Regex("private ")).withinParentheses
 	private lazy val declarationPrefixRegex = DeclarationPrefix.values.map { p => Regex(s"${ p.keyword } ") }
-		.reduceLeft { _ || _ }.withinParenthesis
-	private lazy val declarationModifierRegex = (visibilityRegex || declarationPrefixRegex).withinParenthesis
+		.reduceLeft { _ || _ }.withinParentheses
+	private lazy val declarationModifierRegex = (visibilityRegex || declarationPrefixRegex).withinParentheses
 	private lazy val declarationKeywordRegex = DeclarationType.values.map { d => Regex(s"${ d.keyword } ") }
-		.reduceLeft { _ || _ }.withinParenthesis
+		.reduceLeft { _ || _ }.withinParentheses
 	private lazy val declarationStartRegex = declarationModifierRegex.anyTimes + declarationKeywordRegex
 	private val namedDeclarationStartRegex = {
-		val operatorRegex = Regex.anyOf("!+-=/*&%?:<>|").oneOrMoreTimes.withinParenthesis
-		val nameRegex = (((Regex.escape('_') + Regex.nonWhiteSpace).withinParenthesis || Regex.letter).withinParenthesis +
-			(Regex.wordCharacter.anyTimes + Regex.letterOrDigit).withinParenthesis.noneOrOnce +
-			(Regex.escape('_') + operatorRegex).withinParenthesis.noneOrOnce).withinParenthesis
+		val operatorRegex = Regex.anyOf("!+-=/*&%?:<>|").oneOrMoreTimes.withinParentheses
+		val nameRegex = (((Regex.escape('_') + Regex.nonWhiteSpace).withinParentheses || Regex.letter).withinParentheses +
+			(Regex.wordCharacter.anyTimes + Regex.letterOrDigit).withinParentheses.noneOrOnce +
+			(Regex.escape('_') + operatorRegex).withinParentheses.noneOrOnce).withinParentheses
 		
-		declarationStartRegex + (operatorRegex || nameRegex).withinParenthesis
+		declarationStartRegex + (operatorRegex || nameRegex).withinParentheses
 	}
 	
 	private lazy val extendsRegex = Regex(" extends ")
@@ -72,9 +72,9 @@ object ScalaParser
 	private lazy val commentStartRegex = Regex("\\/\\*")
 	private lazy val commentEndRegex = Regex("\\*\\/")
 	private lazy val emptyScalaDocLineRegex = (Regex.newLine || Regex.whiteSpace || Regex.escape('\t') ||
-		Regex.escape('*')).withinParenthesis.anyTimes
+		Regex.escape('*')).withinParentheses.anyTimes
 	private lazy val segmentSeparatorRegex = Regex.upperCaseLetter.oneOrMoreTimes +
-		(Regex.escape('\t') || Regex.whiteSpace).withinParenthesis.oneOrMoreTimes +
+		(Regex.escape('\t') || Regex.whiteSpace).withinParentheses.oneOrMoreTimes +
 		Regex.escape('-').oneOrMoreTimes
 	
 	

@@ -60,6 +60,6 @@ object TableDescriptionsWriter
 		}
 		prop.description.ifNotEmpty.foreach { desc => propsBuilder += ("description" -> desc) }
 		
-		Model(propsBuilder.result)
+		Model(propsBuilder.result())
 	}
 }
