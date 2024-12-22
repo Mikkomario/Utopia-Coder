@@ -3,7 +3,7 @@ package utopia.coder.vault.controller.writer.database
 import utopia.coder.model.data.NamingRules
 import utopia.coder.model.scala.DeclarationDate
 import utopia.coder.model.scala.datatype.{Extension, Reference}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue}
 import utopia.coder.model.scala.declaration.{File, ObjectDeclaration}
 import utopia.coder.vault.model.data.{CombinationData, CombinationReferences, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
@@ -35,7 +35,7 @@ object CombinedFactoryWriter
 		// Some factory implementations require the isAlwaysLinked -property
 		val linkingProperty = {
 			if (data.combinationType.shouldSpecifyWhetherAlwaysLinked)
-				Some(ComputedProperty("isAlwaysLinked", isOverridden = true)(data.isAlwaysLinked.toString))
+				Some(ImmutableValue("isAlwaysLinked", isOverridden = true)(data.isAlwaysLinked.toString))
 			else
 				None
 		}
@@ -78,9 +78,9 @@ object CombinedFactoryWriter
 				Single(data.combinationType.extensionWith(references)) ++
 					creation.map { _._1 } ++ deprecation.map { _._1 },
 				properties = Vector(
-					ComputedProperty("parentFactory", Set(parentFactoryRef), isOverridden = true)(
+					ImmutableValue("parentFactory", Set(parentFactoryRef), isOverridden = true)(
 						parentFactoryRef.target),
-					ComputedProperty("childFactory", Set(childFactoryRef), isOverridden = true)(childFactoryRef.target)
+					ImmutableValue("childFactory", Set(childFactoryRef), isOverridden = true)(childFactoryRef.target)
 				) ++ linkingProperty ++ creation.map { _._2 } ++ deprecation.map { _._2 },
 				methods = Set(data.combinationType.factoryApplyMethodWith(data.parentName, data.childName, references)),
 				description = s"Used for reading ${data.name.pluralDoc} from the database", author = data.author,

@@ -115,7 +115,7 @@ object ClassMethodFactory
 		val initialIndentCount = {
 			if (modelIsTry) {
 				val validateMapMethod = if (tryProperties.isEmpty) ".map" else ".flatMap"
-				builder += validatedModelCode + validateMapMethod + " { valid => "
+				builder += validatedModelCode + validateMapMethod + s" { valid => "
 				builder.indent()
 				1
 			}
@@ -136,8 +136,8 @@ object ClassMethodFactory
 				CodePiece(prop.originalName.prop)
 			// Case: Normal property / value => reads the value from the model
 			else
-				propFromValidModelCode(prop, validatedModelCode.text, dbPropAccessor = dbPropsAccessor,
-					isFromJson = isFromJson)
+				propFromValidModelCode(prop, if (modelIsTry) "valid" else validatedModelCode.text,
+					dbPropAccessor = dbPropsAccessor, isFromJson = isFromJson)
 		}.reduceLeft { _.append(_, ", ") }
 		builder += wrapAssignments(assignments)
 		

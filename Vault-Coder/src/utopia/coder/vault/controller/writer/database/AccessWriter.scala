@@ -8,7 +8,7 @@ import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, DbProperty, Property, VaultProjectSetup}
@@ -504,7 +504,7 @@ object AccessWriter
 				if (classToWrite.useLongId) {
 					val idValueCode = classToWrite.idType.toValueCode("id")
 					Extension(singleIdModelAccess(modelRef)) -> Vector(
-						ComputedProperty("idValue", idValueCode.references, isOverridden = true)(idValueCode.text))
+						ImmutableValue("idValue", idValueCode.references, isOverridden = true)(idValueCode.text))
 				}
 				else
 					Extension(singleIntIdModelAccess(modelRef)) -> Empty

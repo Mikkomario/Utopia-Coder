@@ -6,7 +6,7 @@ import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.model.data.{Class, ClassModelReferences, ClassReferences, VaultProjectSetup}
@@ -34,7 +34,7 @@ object DbFactoryWriter
 	
 	private val likeSuffix = Name("Like", "Likes", CamelCase.capitalized)
 	
-	private lazy val defaultOrderingProp = ComputedProperty("defaultOrdering",
+	private lazy val defaultOrderingProp = LazyValue("defaultOrdering",
 		explicitOutputType = Some(ScalaType.option(orderBy)), isOverridden = true, isLowMergePriority = true)("None")
 	
 	
@@ -238,7 +238,7 @@ object DbFactoryWriter
 		// All objects define a model property, which is used in other functions
 		// (when inheriting, this is called dbProps instead)
 		val modelName = if (classToWrite.isExtension) "dbProps" else "model"
-		builder += ComputedProperty(modelName, Set(dbModelRef),
+		builder += ImmutableValue(modelName, Set(dbModelRef),
 			description = "Model that specifies how the data is read", isOverridden = classToWrite.isExtension)(
 			dbModelRef.target)
 		
@@ -278,7 +278,7 @@ object DbFactoryWriter
 				// Case: Some properties must be parsed separately => Can't use fromValidatedModel(...)
 				if (classToWrite.fromDbModelConversionMayFail)
 					ClassMethodFactory
-						.classFromModel(classToWrite, "table.validate(model)")(fromAssignments)
+						.classFromModel(classToWrite, "valid")(fromAssignments)
 				// Case: Default => Uses fromValidatedModel(...)
 				else
 					ClassMethodFactory

@@ -1,6 +1,12 @@
 # Utopia Vault Coder
 
-# v1.12 - 4.10.2024
+## v1.12.1 (in development)
+### Bugfixes
+- Previous model validation was not correct in cases where enumeration value parsing was used
+### Other changes
+- Some of the generated properties are now labeled as `val` or `lazy val` instead of `def`
+
+## v1.12 - 4.10.2024
 A major upgrade introducing multiple new features:
 1. Support for generic traits and inheritance
 2. Automated code refactoring

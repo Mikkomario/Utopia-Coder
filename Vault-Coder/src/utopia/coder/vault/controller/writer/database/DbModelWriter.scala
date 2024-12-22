@@ -636,8 +636,8 @@ object DbModelWriter
 				}
 			}
 			
-			Some(ComputedProperty("valueProperties", implementation.references, isOverridden = true)(
-				implementation.text))
+			Some(PropertyDeclaration(if (classToWrite.isGeneric) ComputedProperty else LazyValue, "valueProperties",
+				implementation, isOverridden = true))
 		}
 	}
 	
