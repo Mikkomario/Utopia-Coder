@@ -46,7 +46,6 @@ case class ScalaDoc(parts: Seq[ScalaDocPart]) extends CodeConvertible with Maybe
 	// IMPLEMENTED  ------------------------------
 	
 	override def self = this
-	
 	override def isEmpty = parts.isEmpty
 	
 	override def toCode = {
@@ -73,4 +72,6 @@ case class ScalaDoc(parts: Seq[ScalaDocPart]) extends CodeConvertible with Maybe
 	  * @return Description of that parameter
 	  */
 	def param(paramName: String) = apply(Param(paramName))
+	
+	def ++(other: ScalaDoc) = ScalaDoc(parts ++ other.parts)
 }

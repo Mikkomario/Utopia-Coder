@@ -4,7 +4,7 @@ import utopia.coder.model.merging.{MergeConflict, Mergeable}
 import utopia.coder.model.scala.code.{Code, CodeBuilder}
 import utopia.coder.model.scala.datatype.{GenericType, ScalaType}
 import utopia.coder.model.scala.doc.ScalaDocKeyword.Return
-import utopia.coder.model.scala.doc.ScalaDocPart
+import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocPart}
 import utopia.coder.model.scala.{Annotation, Parameters, Visibility}
 import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.flow.util.StringExtensions._
@@ -103,23 +103,23 @@ trait FunctionDeclaration[+Repr]
 	
 	// IMPLEMENTED  --------------------------
 	
-	override def documentation = {
+	override def scalaDoc = {
 		val desc = description
 		val returnDesc = returnDescription
 		val resultBuilder = new VectorBuilder[ScalaDocPart]()
 		if (desc.nonEmpty)
 			resultBuilder += ScalaDocPart.description(desc)
-		params.foreach { resultBuilder ++= _.documentation }
+		params.foreach { resultBuilder ++= _.scalaDocLines }
 		if (returnDesc.nonEmpty)
 			resultBuilder += ScalaDocPart(Return, returnDesc)
-		genericTypes.foreach { resultBuilder ++= _.documentation }
-		resultBuilder.result()
+		genericTypes.foreach { resultBuilder ++= _.scalaDocLine }
+		ScalaDoc(resultBuilder.result())
 	}
 	
 	override def toCode = {
 		val builder = new CodeBuilder()
 		// Adds the documentation first
-		builder ++= scalaDoc
+		builder ++= scalaDoc.toCode
 		// Then possible header comments
 		headerComments.foreach { c => builder += s"// $c" }
 		// Then possible annotations

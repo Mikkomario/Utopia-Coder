@@ -4,9 +4,10 @@ import utopia.coder.model.scala.doc.ScalaDocKeyword.Param
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.ScalaType
 import utopia.coder.model.scala.declaration.DeclarationStart
-import utopia.coder.model.scala.doc.ScalaDocPart
+import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocPart}
 import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
 import utopia.flow.collection.immutable.{Empty, Single}
+import utopia.flow.collection.CollectionExtensions._
 
 /**
   * Represents a scala method parameter
@@ -29,6 +30,16 @@ case class Parameter(name: String, dataType: ScalaType, default: CodePiece = Cod
 	def hasNoDefault = !hasDefault
 	
 	/**
+	 * @return Scaladoc entry matching this parameter
+	 */
+	def scalaDocLine = {
+		if (description.nonEmpty)
+			Single(ScalaDocPart(Param(name), description.linesIterator.toOptimizedSeq))
+		else
+			Empty
+	}
+	
+	/**
 	  * @return A copy of this parameter without a default value
 	  */
 	def withoutDefault = if (hasDefault) copy(default = CodePiece.empty) else this
@@ -36,8 +47,7 @@ case class Parameter(name: String, dataType: ScalaType, default: CodePiece = Cod
 	
 	// IMPLEMENTED  ---------------------------
 	
-	override def toScala =
-	{
+	override def toScala = {
 		val defaultPart = if (default.isEmpty) default else default.withPrefix(" = ")
 		val mainPart = dataType.toScala.withPrefix(name + ": ") + defaultPart
 		prefix match {
@@ -46,8 +56,7 @@ case class Parameter(name: String, dataType: ScalaType, default: CodePiece = Cod
 		}
 	}
 	
-	override def documentation =
-		if (description.nonEmpty) Vector(ScalaDocPart(Param(name), description.linesIterator.toVector)) else Empty
+	override def scalaDoc = ScalaDoc(scalaDocLine)
 	
 	
 	// OTHER    ------------------------------

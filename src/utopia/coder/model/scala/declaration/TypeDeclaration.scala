@@ -5,8 +5,8 @@ import utopia.coder.model.scala.Visibility.Public
 import utopia.coder.model.scala.{Annotation, Visibility}
 import utopia.coder.model.scala.code.{Code, CodeBuilder, CodePiece}
 import utopia.coder.model.scala.datatype.GenericType
-import utopia.coder.model.scala.doc.ScalaDocPart
-import utopia.flow.collection.immutable.{Empty, Pair}
+import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocPart}
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.util.StringExtensions._
 
 import scala.collection.immutable.VectorBuilder
@@ -29,13 +29,18 @@ case class TypeDeclaration(name: String, code: CodePiece, genericTypes: Seq[Gene
 {
 	override def keyword: CodePiece = TypeDeclaration.keyword
 	
-	override def documentation: Vector[ScalaDocPart] = description.ifNotEmpty.map(ScalaDocPart.description).toVector
+	override def scalaDoc = {
+		if (description.isEmpty)
+			ScalaDoc.empty
+		else
+			ScalaDoc(Single(ScalaDocPart.description(description)))
+	}
 	
 	// WET WET: Contains copy code from InstanceDeclaration
 	override def toCode: Code = {
 		val builder = new CodeBuilder()
 		// Writes the scaladoc
-		builder ++= scalaDoc
+		builder ++= scalaDoc.toCode
 		// Writes possible comments
 		headerComments.foreach { c => builder += s"// $c" }
 		// Writes possible annotations

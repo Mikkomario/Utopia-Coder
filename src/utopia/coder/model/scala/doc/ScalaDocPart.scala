@@ -83,7 +83,7 @@ case class ScalaDocPart(content: Seq[String], keyword: Option[ScalaDocKeyword]) 
 				case Some(kw) => s"$kw "
 				case None => ""
 			}
-			val lines = content.flatMap { _.grouped(CodeLine.maxLineLength) }
+			val lines = content.flatMap { _.grouped(CodeLine.maxLineLength - padding - 3) }
 			s"  * $keywordPart${ " " * (padding - keywordPart.length) }${ lines.head }" +:
 				lines.tail.map { line => s"  * ${ " " * padding }$line" }
 		}

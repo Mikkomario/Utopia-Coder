@@ -9,7 +9,7 @@ import utopia.coder.model.merging.{MergeConflict, Mergeable}
 import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.datatype.{Extension, GenericType, ScalaType}
 import utopia.coder.model.scala.declaration.InstanceDeclarationType.{ClassD, ObjectD, TraitD}
-import utopia.coder.model.scala.doc.ScalaDocPart
+import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocPart}
 import utopia.coder.model.scala.{Annotation, DeclarationDate, Parameters, Visibility}
 import utopia.coder.model.scala.template.CodeConvertible
 import utopia.flow.operator.ordering.CombinedOrdering
@@ -124,13 +124,13 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 	
 	// IMPLEMENTED  --------------------------
 	
-	override def documentation = {
+	override def scalaDoc = {
 		val builder = new VectorBuilder[ScalaDocPart]()
 		val desc = description
 		if (desc.nonEmpty)
 			builder += ScalaDocPart.description(desc)
-		constructorParams.foreach { builder ++= _.documentation }
-		genericTypes.foreach { builder ++= _.documentation }
+		constructorParams.foreach { builder ++= _.scalaDocLines }
+		genericTypes.foreach { builder ++= _.scalaDocLine }
 		// If there are other scaladocs, adds author and since -tags
 		val since = this.since
 		if (description.nonEmpty) {
@@ -138,14 +138,14 @@ trait InstanceDeclaration extends Declaration with Mergeable[InstanceDeclaration
 				builder += ScalaDocPart(Author, author)
 			builder += ScalaDocPart(Since, since.toString)
 		}
-		builder.result()
+		ScalaDoc(builder.result())
 	}
 	
 	override def toCode = {
 		val builder = new CodeBuilder()
 		
 		// Writes the scaladoc
-		builder ++= scalaDoc
+		builder ++= scalaDoc.toCode
 		// Writes possible comments
 		headerComments.foreach { c => builder += s"// $c" }
 		// Writes possible annotations

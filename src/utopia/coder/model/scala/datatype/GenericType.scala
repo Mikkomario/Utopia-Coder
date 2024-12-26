@@ -3,7 +3,7 @@ package utopia.coder.model.scala.datatype
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.TypeVariance.{Contravariance, Covariance, Invariance}
 import utopia.coder.model.scala.doc.ScalaDocKeyword.TypeParam
-import utopia.coder.model.scala.doc.ScalaDocPart
+import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocPart}
 import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
 import utopia.flow.collection.immutable.{Empty, Single}
 
@@ -69,6 +69,9 @@ case class GenericType(name: String, requirement: Option[TypeRequirement] = None
 	  */
 	def toScalaType = ScalaType.basic(name)
 	
+	def scalaDocLine =
+		if (description.isEmpty) Empty else Single(ScalaDocPart(TypeParam(name), description))
+	
 	
 	// IMPLEMENTED  ------------------------------
 	
@@ -80,6 +83,5 @@ case class GenericType(name: String, requirement: Option[TypeRequirement] = None
 		}
 	}
 	
-	override def documentation =
-		if (description.isEmpty) Empty else Single(ScalaDocPart(TypeParam(name), description))
+	override def scalaDoc = ScalaDoc(scalaDocLine)
 }

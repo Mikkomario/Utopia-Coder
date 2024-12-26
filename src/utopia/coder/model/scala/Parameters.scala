@@ -3,6 +3,7 @@ package utopia.coder.model.scala
 import utopia.coder.model.merging.MergeConflict
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.ScalaType
+import utopia.coder.model.scala.doc.ScalaDoc
 import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Single}
@@ -81,6 +82,8 @@ case class Parameters(lists: Seq[Seq[Parameter]] = Empty, implicits: Seq[Paramet
 	  */
 	def isImplicitOnly = lists.isEmpty && implicits.nonEmpty
 	
+	def scalaDocLines = (lists.flatten ++ implicits).flatMap { _.scalaDocLine }
+	
 	
 	// IMPLEMENTED  -------------------------------
 	
@@ -100,7 +103,7 @@ case class Parameters(lists: Seq[Seq[Parameter]] = Empty, implicits: Seq[Paramet
 	 */
 	override def head = apply(0)
 	
-	override def documentation = (lists.flatten ++ implicits).flatMap { _.documentation }
+	override def scalaDoc = ScalaDoc(scalaDocLines)
 	
 	override def toScala = {
 		if (isEmpty)
