@@ -1,5 +1,9 @@
 # Utopia Coder - list of changes
 
+## v1.1.2 (in development)
+### Other changes
+- Added better line-splitting to scaladocs
+
 ## v1.1.1 - 4.10.2024
 This update adds a couple of important bugfixes to v1.1, as well as some new commands and refactoring tools.
 ### Bugfixes

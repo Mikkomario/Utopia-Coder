@@ -1,9 +1,10 @@
 package utopia.coder.model.scala.doc
 
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.string.Regex
-import utopia.coder.model.scala.code.Code
+import utopia.coder.model.scala.code.{Code, CodeLine}
 import utopia.coder.model.scala.template.CodeConvertible
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair}
 
 object ScalaDocPart
 {
@@ -45,7 +46,7 @@ object ScalaDocPart
 	def description(content: String) = apply(contentToLines(content), None)
 	
 	private def contentToLines(content: String) =
-		content.linesIterator.map(Regex.newLine.filterNot).filterNot { _.forall { _ == ' ' } }.toVector
+		content.linesIterator.map(Regex.newLine.filterNot).filterNot { _.forall { _ == ' ' } }.toOptimizedSeq
 }
 
 /**
@@ -55,6 +56,8 @@ object ScalaDocPart
   */
 case class ScalaDocPart(content: Seq[String], keyword: Option[ScalaDocKeyword]) extends CodeConvertible
 {
+	// IMPLEMENTED  -------------------------
+	
 	override def toCode = {
 		if (content.isEmpty)
 			Code.empty
@@ -63,5 +66,26 @@ case class ScalaDocPart(content: Seq[String], keyword: Option[ScalaDocKeyword]) 
 				case Some(keyword) => Code.from(s"$keyword ${content.head}" +: content.tail)
 				case None => Code.from(content)
 			}
+	}
+	
+	
+	// OTHER    ----------------------------
+	
+	/**
+	 * @param padding Amount of empty spaces to add before the text part begins (on each line)
+	 * @return Lines that contains this scaladoc's code. Each line starts with "  * "
+	 */
+	def toCodeLines(padding: Int) = {
+		if (content.isEmpty)
+			Empty
+		else {
+			val keywordPart = keyword match {
+				case Some(kw) => s"$kw "
+				case None => ""
+			}
+			val lines = content.flatMap { _.grouped(CodeLine.maxLineLength) }
+			s"  * $keywordPart${ " " * (padding - keywordPart.length) }${ lines.head }" +:
+				lines.tail.map { line => s"  * ${ " " * padding }$line" }
+		}
 	}
 }

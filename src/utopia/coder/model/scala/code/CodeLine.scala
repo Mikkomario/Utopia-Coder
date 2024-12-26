@@ -1,6 +1,6 @@
 package utopia.coder.model.scala.code
 
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Pair, Single}
 import utopia.flow.operator.MaybeEmpty
 import utopia.flow.parse.string.Regex
 import utopia.flow.collection.CollectionExtensions._
@@ -93,7 +93,7 @@ case class CodeLine(indentation: Int, code: String) extends Combinable[String, C
 		else {
 			// Case: Already of the correct length
 			if (length <= maxLineLength)
-				Vector(this)
+				Single(this)
 			// Case: Would benefit from splitting
 			else {
 				// Attempts to use repeatable splitters first
@@ -105,12 +105,12 @@ case class CodeLine(indentation: Int, code: String) extends Combinable[String, C
 						oneTimeRegexes.findMap { _.startIndexIteratorIn(code).nextOption() } match {
 							// Case: Splitter found => splits with that one
 							case Some(splitIndex) =>
-								Vector(
+								Pair(
 									copy(code = code.substring(0, splitIndex)),
 									CodeLine(indentation + 1, code.substring(splitIndex))
 								)
 							// Case: No splitter found => Keeps as is
-							case None => Vector(this)
+							case None => Single(this)
 						}
 				}
 			}
@@ -182,12 +182,12 @@ case class CodeLine(indentation: Int, code: String) extends Combinable[String, C
 		copy(code = firstLine) +: moreLines.map { code => CodeLine(indentation + 1, code) }
 	}
 	
-	private def _split(remainingSplitIndices: Vector[Int], lastSplitIndex: Int, maxLineLength: Int,
-	                   totalLength: Int): Vector[Int] =
+	private def _split(remainingSplitIndices: Seq[Int], lastSplitIndex: Int, maxLineLength: Int,
+	                   totalLength: Int): Seq[Int] =
 	{
 		// Checks whether should terminate
 		if (remainingSplitIndices.isEmpty || totalLength - lastSplitIndex <= maxLineLength)
-			Vector(totalLength)
+			Single(totalLength)
 		else {
 			// Finds the last split index which fits to the line
 			val nextSplitIndexIndex = remainingSplitIndices

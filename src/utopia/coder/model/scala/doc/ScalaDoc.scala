@@ -2,7 +2,7 @@ package utopia.coder.model.scala.doc
 
 import utopia.flow.operator.MaybeEmpty
 import utopia.coder.model.scala.DeclarationDate
-import utopia.coder.model.scala.code.Code
+import utopia.coder.model.scala.code.{Code, CodeLine}
 import utopia.coder.model.scala.doc.ScalaDocKeyword.{Author, Param, Return, Since}
 import utopia.coder.model.scala.template.CodeConvertible
 import utopia.flow.collection.immutable.Empty
@@ -53,8 +53,8 @@ case class ScalaDoc(parts: Seq[ScalaDocPart]) extends CodeConvertible with Maybe
 		if (parts.isEmpty)
 			Code.empty
 		else {
-			val partsCode = parts.map { _.toCode }.reduceLeft { _ ++ _ }
-			"/**" +: partsCode.prependAll("  * ") :+ "  */"
+			val commonPadding = parts.view.flatMap { _.keyword }.map { _.toString.length }.maxOption.getOrElse(0)
+			Code(("/**" +: parts.flatMap { _.toCodeLines(commonPadding) } :+ "  */").map(CodeLine.apply))
 		}
 	}
 	
