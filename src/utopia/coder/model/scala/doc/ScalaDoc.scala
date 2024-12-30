@@ -52,7 +52,8 @@ case class ScalaDoc(parts: Seq[ScalaDocPart]) extends CodeConvertible with Maybe
 		if (parts.isEmpty)
 			Code.empty
 		else {
-			val commonPadding = parts.view.flatMap { _.keyword }.map { _.toString.length }.maxOption.getOrElse(0)
+			val commonPadding = parts.view.flatMap { _.keyword }.filter { _.padsToSameLength }
+				.map { _.toString.length + 1 }.maxOption.getOrElse(0)
 			Code(("/**" +: parts.flatMap { _.toCodeLines(commonPadding) } :+ "  */").map(CodeLine.apply))
 		}
 	}

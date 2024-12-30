@@ -27,9 +27,9 @@ object CodeLine
 		(Regex.escape(',') + Regex.whiteSpace.noneOrOnce).withinParentheses.ignoringQuotations -> true,
 		(Regex("s").noneOrOnce + Regex.escape('\"') + (!Regex.escape('\"')).anyTimes + Regex.escape('\"')) -> false,
 		(Regex.whiteSpace + Regex.escape('=') + Regex.whiteSpace) -> true,
-		(Regex.anyOf("+-*/").oneOrMoreTimes + Regex.whiteSpace) -> true,
 		((Regex.whiteSpace + Regex.word + Regex.whiteSpace) +
-			!(Regex.escape('=') + Regex.escape('>')).withinParentheses) -> false
+			!(Regex.escape('=') + Regex.escape('>')).withinParentheses) -> false,
+		(Regex.anyOf("+-*/").oneOrMoreTimes + Regex.whiteSpace) -> true
 	)
 	private lazy val oneTimeRegexes = Vector(
 		Regex.escape('.') + Regex.letter.oneOrMoreTimes + Regex.whiteSpace.noneOrOnce + Regex.escape('{'),

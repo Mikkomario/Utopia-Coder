@@ -15,11 +15,15 @@ sealed trait ScalaDocKeyword extends SelfComparable[ScalaDocKeyword]
 	  * @return String of the keyword part (e.g. "param")
 	  */
 	protected def keywordString: String
-	
 	/**
 	  * @return Priority used when ordering this keyword. Higher values come last.
 	  */
 	protected def orderIndex: Int
+	
+	/**
+	 * @return Whether this keyword pads its description to the same starting point with other keywords
+	 */
+	def padsToSameLength: Boolean
 	
 	
 	// IMPLEMENTED  -------------------------
@@ -60,8 +64,9 @@ object ScalaDocKeyword
 	  */
 	case object Return extends ScalaDocKeyword
 	{
-		override protected def keywordString = "return"
-		override protected def orderIndex = 10
+		override protected val keywordString = "return"
+		override protected val orderIndex = 10
+		override val padsToSameLength: Boolean = false
 	}
 	
 	/**
@@ -69,8 +74,9 @@ object ScalaDocKeyword
 	  */
 	case object Author extends ScalaDocKeyword
 	{
-		override protected def keywordString = "author"
-		override protected def orderIndex = 12
+		override protected val keywordString = "author"
+		override protected val orderIndex = 12
+		override val padsToSameLength: Boolean = false
 	}
 	
 	/**
@@ -78,8 +84,9 @@ object ScalaDocKeyword
 	  */
 	case object Since extends ScalaDocKeyword
 	{
-		override protected def keywordString = "since"
-		override protected def orderIndex = 13
+		override protected val keywordString = "since"
+		override protected val orderIndex = 13
+		override val padsToSameLength: Boolean = false
 	}
 	
 	/**
@@ -87,8 +94,9 @@ object ScalaDocKeyword
 	  */
 	case class Param(paramName: String) extends ScalaDocKeyword
 	{
-		override protected def keywordString = "param"
-		override protected def orderIndex = 7
+		override protected val keywordString = "param"
+		override protected val orderIndex = 7
+		override val padsToSameLength: Boolean = true
 		
 		override def toString = s"${super.toString} $paramName"
 	}
@@ -98,8 +106,9 @@ object ScalaDocKeyword
 	  */
 	case class TypeParam(paramName: String) extends ScalaDocKeyword
 	{
-		override protected def keywordString = "tparam"
-		override protected def orderIndex = 8
+		override protected val keywordString = "tparam"
+		override protected val orderIndex = 8
+		override val padsToSameLength: Boolean = false
 		
 		override def toString = s"${super.toString} $paramName"
 	}

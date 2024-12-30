@@ -2,6 +2,7 @@ package utopia.coder.model.scala.doc
 
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.string.Regex
+import utopia.flow.util.StringExtensions._
 import utopia.coder.model.scala.code.{Code, CodeLine}
 import utopia.coder.model.scala.template.CodeConvertible
 import utopia.flow.collection.immutable.{Empty, Pair}
@@ -79,13 +80,13 @@ case class ScalaDocPart(content: Seq[String], keyword: Option[ScalaDocKeyword]) 
 		if (content.isEmpty)
 			Empty
 		else {
-			val keywordPart = keyword match {
-				case Some(kw) => s"$kw "
-				case None => ""
+			val (keywordPart, appliedPadding) = keyword match {
+				case Some(kw) => s"$kw " -> (if (kw.padsToSameLength) padding else 0)
+				case None => "" -> 0
 			}
-			val lines = content.flatMap { _.grouped(CodeLine.maxLineLength - padding - 3) }
-			s"  * $keywordPart${ " " * (padding - keywordPart.length) }${ lines.head }" +:
-				lines.tail.map { line => s"  * ${ " " * padding }$line" }
+			val lines = content.flatMap { _.splitToLinesIterator(CodeLine.maxLineLength - appliedPadding - 16) }
+			s"  * $keywordPart${ " " * (appliedPadding - keywordPart.length) }${ lines.head }" +:
+				lines.tail.map { line => s"  * ${ " " * appliedPadding }$line" }
 		}
 	}
 }
