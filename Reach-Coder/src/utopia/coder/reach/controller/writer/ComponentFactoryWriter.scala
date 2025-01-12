@@ -300,8 +300,8 @@ object ComponentFactoryWriter
 				// Case: Container
 				case Some(containerType) =>
 					val parent = containerType.contextualFactoryTrait(genericContextType, context.reference,
-						componentType, componentLike, factoryType)
-					val parameter = Parameter("context", genericContextType)
+						componentType, componentLike, ScalaType.basic(name))
+					val parameter = Parameter("context", ScalaType.basic("N2"))
 					val method = MethodDeclaration("withContext",
 						genericTypes = Vector(GenericType("N2", Some(TypeRequirement.childOf(context.reference)))),
 						isOverridden = true)(parameter)("copy(context = context)")
