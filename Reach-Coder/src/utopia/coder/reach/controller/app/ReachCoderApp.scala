@@ -1,7 +1,8 @@
 package utopia.coder.reach.controller.app
 
-import utopia.coder.controller.app.{AppLogic, CoderApp}
+import utopia.coder.controller.app.{AppLogic, CoderApp, ListProjectsAppLogic, ShowProjectAppLogic}
 import utopia.coder.reach.util.Common.jsonParser
+import utopia.coder.reach.util.Common._
 
 /**
   * The main application class for this project / module
@@ -10,7 +11,10 @@ import utopia.coder.reach.util.Common.jsonParser
   */
 object ReachCoderApp extends App with CoderApp
 {
-	override protected val logicOptions: Iterable[AppLogic] = Some(ReachCoderAppLogic)
+	override protected val logicOptions: Iterable[AppLogic] = Vector(
+		ReachCoderAppLogic,
+		new ListProjectsAppLogic(projectsPath),
+		new ShowProjectAppLogic(projectsPath))
 	
 	run(args.toIndexedSeq)
 }

@@ -31,7 +31,7 @@ object ReachCoderAppLogic extends CoderAppLogic
 	override protected implicit def log: Logger = Common.log
 	
 	override def name: String = "main"
-	override protected def projectsStoreLocation: Path = "projects.json"
+	override protected def projectsStoreLocation: Path = Common.projectsPath
 	override protected def supportsAlternativeMergeRoots: Boolean = false
 	
 	override protected def run(args: CommandArguments, paths: LazyProjectPaths, filter: Lazy[Option[Filter]],

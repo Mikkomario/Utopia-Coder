@@ -1,5 +1,9 @@
 # Reach Coder - List of changes
 
+## v1.0.3 (in development)
+### New features
+- Added `list` and `show <project>` commands / modes
+
 ## v1.0.2 - 28.7.2024
 A minor update following mostly general **Utopia Coder** changes.
 ### New features
