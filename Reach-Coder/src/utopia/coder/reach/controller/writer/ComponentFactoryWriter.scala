@@ -8,9 +8,10 @@ import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedPro
 import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, PropertyDeclaration, TraitDeclaration}
 import utopia.coder.model.scala.{DeclarationDate, Parameter}
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.{Empty, Pair}
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.coder.reach.model.data.{ComponentFactory, Property}
 import utopia.coder.reach.model.enumeration.ContextType
+import utopia.coder.reach.util.ReachReferences._
 import utopia.coder.reach.util.ReachReferences.Reach._
 
 /**
@@ -239,12 +240,6 @@ object ComponentFactoryWriter
 					s"$contextual(parentHierarchy, context, settings)")
 				(parent, method)
 			}
-			else if (factory.useVariableContext) {
-				val method = MethodDeclaration("withContextPointer", isOverridden = true)(
-					Parameter("p", flow.changing(context.reference)))(
-					s"$contextual(parentHierarchy, p, settings)")
-				fromVariableContextFactory(context.reference, contextual) -> method
-			}
 			else {
 				val withContextMethod = MethodDeclaration("withContext", isOverridden = true)(
 					Parameter("context", context.reference))(
@@ -287,19 +282,23 @@ object ComponentFactoryWriter
 	}
 	
 	// Creates the contextual factory variant
-	// TODO: In container classes, the "Repr" contains [N]
 	private def contextualFactory(factory: ComponentFactory, name: String, context: ContextType,
 	                              componentType: ScalaType, settingsType: ScalaType, factoryLikeType: ScalaType)
 	                             (implicit naming: NamingRules, setup: ProjectSetup) =
 	{
-		val factoryType = ScalaType.basic(name)
-		// If variable contexts are used, extends a different factory class,
-		// different constructor parameter and different withContext -function
-		// These properties are also different for containers
+		// This type used as Repr. For (generic) containers, this contains the [N] specification
+		lazy val genericContextType = ScalaType.basic("N")
+		val factoryType = {
+			if (factory.isContainer)
+				ScalaType.generic(name, genericContextType)
+			else
+				ScalaType.basic(name)
+		}
+		// For containers, uses a different parent, context and withContext function
 		val (contextualParent, contextParameter, withContextMethod) = {
 			factory.containerType match {
+				// Case: Container
 				case Some(containerType) =>
-					val genericContextType = ScalaType.basic("N")
 					val parent = containerType.contextualFactoryTrait(genericContextType, context.reference,
 						componentType, componentLike, factoryType)
 					val parameter = Parameter("context", genericContextType)
@@ -307,21 +306,17 @@ object ComponentFactoryWriter
 						genericTypes = Vector(GenericType("N2", Some(TypeRequirement.childOf(context.reference)))),
 						isOverridden = true)(parameter)("copy(context = context)")
 					(parent, parameter, method)
+					
+				// Case: Regular component
 				case None =>
-					if (factory.useVariableContext) {
-						val parentTrait = variableContextualFactory(context.reference, factoryType)
-						val parameter = Parameter("contextPointer", flow.changing(context.reference))
-						val withContextMethod = MethodDeclaration("withContextPointer", isOverridden = true)(parameter)(
-							"copy(contextPointer = contextPointer)")
-						(parentTrait, parameter, withContextMethod)
+					val parentTrait = context.factory match {
+						case Some(parentFactoryType) => parentFactoryType(factoryType)
+						case None => reach.contextualFactory(context.reference, factoryType)
 					}
-					else {
-						val parentTrait = context.factory(factoryType)
-						val parameter = Parameter("context", context.reference)
-						val withContextMethod = MethodDeclaration("withContext", isOverridden = true)(parameter)(
-							"copy(context = context)")
-						(parentTrait, parameter, withContextMethod)
-					}
+					val parameter = Parameter("context", context.reference)
+					val withContextMethod = MethodDeclaration("withContext", isOverridden = true)(parameter)(
+						"copy(context = context)")
+					(parentTrait, parameter, withContextMethod)
 			}
 		}
 		// Factories use generic context
@@ -372,7 +367,6 @@ object ComponentFactoryWriter
 	}
 	
 	// Creates the outside-hierarchy setup class
-	// TODO: Containers need different parents and methods
 	private def setupFactory(factory: ComponentFactory, settingsType: ScalaType, settingsWrapperType: ScalaType,
 	                         nonContextualFactoryType: Option[ScalaType],
 	                         contextualFactoryType: Option[(ScalaType, ContextType)])
@@ -388,16 +382,17 @@ object ComponentFactoryWriter
 				hierarchyParam)(s"$nonContextual(hierarchy, settings)")
 		}
 		val contextualParentAndMethod = contextualFactoryType.map { case (contextual, context) =>
-			// Variable context specifies a different method and parent
-			if (factory.useVariableContext) {
-				val method = MethodDeclaration("withContextPointer", isOverridden = true)(
-					Vector(hierarchyParam, Parameter("p", flow.changing(context.reference))))(
-					s"$contextual(hierarchy, p, settings)")
-				vccff(context.reference, contextual) -> method
+			// Containers use different parent & method
+			if (factory.isContainer) {
+				val method = MethodDeclaration("withContext",
+					genericTypes = Single(GenericType.childOf("N", context.reference)), isOverridden = true)(
+					Pair(hierarchyParam, Parameter("context", ScalaType.basic("N"))))(
+					s"$contextual(hierarchy, context, settings)")
+				gccff(context.reference, contextual) -> method
 			}
 			else {
 				val method = MethodDeclaration("withContext", isOverridden = true)(
-					Vector(hierarchyParam, Parameter("context", context.reference)))(
+					Pair(hierarchyParam, Parameter("context", context.reference)))(
 					s"$contextual(hierarchy, context, settings)")
 				ccff(context.reference, contextual) -> method
 			}
@@ -414,7 +409,7 @@ object ComponentFactoryWriter
 				Parameter("settings", settingsType))("copy(settings = settings)")) ++
 				nonContextualParentAndMethod.map { _._2 } ++ contextualParentAndMethod.map { _._2 },
 			description = s"Used for defining ${
-				factory.componentName} creation settings outside of the component building process",
+				factory.componentName} creation settings outside the component building process",
 			author = factory.author,
 			since = DeclarationDate.versionedToday,
 			isCaseClass = true

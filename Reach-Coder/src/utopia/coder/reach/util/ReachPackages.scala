@@ -31,6 +31,10 @@ object ReachPackages
 		
 		lazy val stackModels = base/"model.stack"
 		lazy val context = base/"context"
+		lazy val baseContext = context/"base"
+		lazy val colorContext = context/"color"
+		lazy val textContext = context/"text"
+		lazy val windowContext = context/"window"
 		lazy val templateDrawers = base/"drawing.template"
 	}
 	

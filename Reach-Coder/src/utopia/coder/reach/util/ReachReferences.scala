@@ -30,9 +30,15 @@ object ReachReferences
 		import ReachPackages.Firmament._
 		
 		lazy val stackInsets = Reference(stackModels, "StackInsets")
-		lazy val baseContext = Reference(context, "BaseContext")
-		lazy val colorContext = Reference(context, "ColorContext")
-		lazy val textContext = Reference(context, "TextContext")
+		lazy val baseContextProps = Reference(baseContext, "BaseContextPropsView")
+		lazy val staticBaseContext = Reference(baseContext, "StaticBaseContext")
+		lazy val variableBaseContext = Reference(baseContext, "VariableBaseContext")
+		lazy val colorContextProps = Reference(colorContext, "ColorContextPropsView")
+		lazy val staticColorContext = Reference(colorContext, "StaticColorContext")
+		lazy val variableColorContext = Reference(colorContext, "VariableColorContext")
+		lazy val textContextProps = Reference(textContext, "TextContextPropsView")
+		lazy val staticTextContext = Reference(textContext, "StaticTextContext")
+		lazy val variableTextContext = Reference(textContext, "VariableTextContext")
 		lazy val customDrawer = Reference(templateDrawers, "CustomDrawer")
 	}
 	
@@ -40,7 +46,8 @@ object ReachReferences
 	{
 		import ReachPackages.Reach._
 		
-		lazy val contentWindowContext = Reference(context, "ReachContentWindowContext")
+		lazy val staticContentWindowContext = Reference(context, "StaticReachContentWindowContext")
+		lazy val variableContentWindowContext = Reference(context, "VariableReachContentWindowContext")
 		
 		lazy val componentLike = Reference(template, "ReachComponentLike")
 		lazy val partOfHierarchy = Reference(template, "PartOfComponentHierarchy")
@@ -48,20 +55,19 @@ object ReachReferences
 		
 		lazy val cff = Reference(factories, "ComponentFactoryFactory")
 		lazy val ccff = Reference(factories, "FromContextComponentFactoryFactory")
-		lazy val vccff = Reference(factories, "FromVariableContextComponentFactoryFactory")
+		lazy val gccff = Reference(factories, "FromGenericContextComponentFactoryFactory")
 		lazy val fromContextFactory = Reference(factories, "FromContextFactory")
-		lazy val fromVariableContextFactory = Reference(factories, "FromVariableContextFactory")
 		lazy val fromGenericContextFactory = Reference(factories, "FromGenericContextFactory")
 		lazy val framedFactory = Reference(factories, "FramedFactory")
 		lazy val focusListenableFactory = Reference(factories, "FocusListenableFactory")
 		lazy val fromAlignmentFactory = Reference(factories, "FromAlignmentFactory")
 		lazy val customDrawableFactory = Reference(factories, "CustomDrawableFactory")
 		
+		lazy val contextualFactory = Reference(contextualFactories, "ContextualFactory")
 		lazy val baseContextualFactory = Reference(contextualFactories, "BaseContextualFactory")
 		lazy val colorContextualFactory = Reference(contextualFactories, "ColorContextualFactory")
 		lazy val textContextualFactory = Reference(contextualFactories, "TextContextualFactory")
 		lazy val contentWindowContextualFactory = Reference(contextualFactories, "ReachContentWindowContextualFactory")
-		lazy val variableContextualFactory = Reference(contextualFactories, "VariableContextualFactory")
 		
 		lazy val wrapperContainerFactory = Reference(wrapperContainers, "WrapperContainerFactory")
 		lazy val contextualWrapperContainerFactory = Reference(wrapperContainers, "ContextualWrapperContainerFactory")

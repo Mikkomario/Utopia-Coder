@@ -22,8 +22,6 @@ import utopia.flow.collection.immutable.Empty
   * @param contextualProperties Properties that only appear in contextual factory variants
   * @param author Author of this component (may be empty)
   * @param onlyContextual Whether only the contextual factories are used (default = false)
-  * @param useVariableContext Whether the component creation context should be specified as a pointer instead of a
-  *                           fixed value (default = false)
   */
 case class ComponentFactory(pck: Package, componentName: Name, contextType: Option[ContextType] = None,
                             parentTraits: Seq[ReachFactoryTrait] = Empty,
@@ -31,7 +29,7 @@ case class ComponentFactory(pck: Package, componentName: Name, contextType: Opti
                             properties: Seq[Property] = Empty,
                             nonContextualProperties: Seq[Property] = Empty,
                             contextualProperties: Seq[Property] = Empty,
-                            author: String = "", onlyContextual: Boolean = false, useVariableContext: Boolean = false)
+                            author: String = "", onlyContextual: Boolean = false)
 {
 	/**
 	  * @return Whether this factory creates containers

@@ -21,16 +21,18 @@ sealed trait ContextType
 	  */
 	def reference: Reference
 	/**
-	  * @return Reference to the associated component factory trait
+	  * @return Reference to the associated component factory trait.
+	  *         None if no specific component factory trait is supported with this context type.
 	  */
-	def factory: Reference
+	def factory: Option[Reference]
 }
 
 object ContextType
 {
 	// ATTRIBUTES   ------------------------
 	
-	val values = Vector[ContextType](Base, Color, Text, Window)
+	val values = Vector[ContextType](Base, StaticBase, VariableBase, Color, StaticColor, VariableColor,
+		Text, StaticText, VariableText, StaticWindow, VariableWindow)
 	
 	
 	// OTHER    ----------------------------
@@ -45,43 +47,104 @@ object ContextType
 	// VALUES   ----------------------------
 	
 	/**
-	  * Represents the BaseContext class from Firmament
+	  * Represents the BaseContextPropsView class from Firmament
 	  */
 	case object Base extends ContextType
 	{
 		override val keyword: String = "base"
-		
-		override def reference: Reference = firmament.baseContext
-		override def factory: Reference = baseContextualFactory
+		override lazy val reference: Reference = firmament.baseContextProps
+		override val factory = None
 	}
 	/**
-	  * Represents the ColorContext class from Firmament
+	 * Represents the StaticBaseContext class from Firmament
+	 */
+	case object StaticBase extends ContextType
+	{
+		override val keyword: String = "base-static"
+		override lazy val reference: Reference = firmament.staticBaseContext
+		override val factory = Some(baseContextualFactory)
+	}
+	/**
+	 * Represents the VariableBaseContext class from Firmament
+	 */
+	case object VariableBase extends ContextType
+	{
+		override val keyword: String = "base-variable"
+		override lazy val reference: Reference = firmament.variableBaseContext
+		override val factory = None
+	}
+	/**
+	  * Represents the ColorContextPropsView class from Firmament
 	  */
 	case object Color extends ContextType
 	{
 		override val keyword: String = "color"
-		
-		override def reference: Reference = firmament.colorContext
-		override def factory: Reference = colorContextualFactory
+		override lazy val reference: Reference = firmament.colorContextProps
+		override val factory = None
 	}
 	/**
-	  * Represents the TextContext class from Firmament
+	 * Represents the StaticColorContext class from Firmament
+	 */
+	case object StaticColor extends ContextType
+	{
+		override val keyword: String = "color-static"
+		override lazy val reference: Reference = firmament.staticColorContext
+		override val factory = Some(colorContextualFactory)
+	}
+	/**
+	 * Represents the VariableColorContext class from Firmament
+	 */
+	case object VariableColor extends ContextType
+	{
+		override val keyword: String = "color-variable"
+		override lazy val reference: Reference = firmament.variableColorContext
+		override val factory = None
+	}
+	/**
+	  * Represents the TextContextPropsView class from Firmament
 	  */
 	case object Text extends ContextType
 	{
 		override val keyword: String = "text"
-		
-		override def reference: Reference = firmament.textContext
-		override def factory: Reference = textContextualFactory
+		override lazy val reference: Reference = firmament.textContextProps
+		override val factory = None
 	}
 	/**
-	  * Represents the ReachContentWindowContext class
-	  */
-	case object Window extends ContextType
+	 * Represents the StaticTextContext class from Firmament
+	 */
+	case object StaticText extends ContextType
 	{
-		override val keyword: String = "window"
+		override val keyword: String = "text-static"
+		override lazy val reference: Reference = firmament.staticTextContext
+		override val factory = Some(textContextualFactory)
+	}
+	/**
+	 * Represents the VariableTextContext class from Firmament
+	 */
+	case object VariableText extends ContextType
+	{
+		override val keyword: String = "text-variable"
+		override lazy val reference: Reference = firmament.variableTextContext
+		override val factory = None
+	}
+	/**
+	  * Represents the StaticReachContentWindowContext class
+	  */
+	case object StaticWindow extends ContextType
+	{
+		override val keyword: String = "window-static"
 		
-		override def reference: Reference = contentWindowContext
-		override def factory: Reference = contentWindowContextualFactory
+		override def reference: Reference = staticContentWindowContext
+		override def factory = Some(contentWindowContextualFactory)
+	}
+	/**
+	 * Represents the VariableReachContentWindowContext class
+	 */
+	case object VariableWindow extends ContextType
+	{
+		override val keyword: String = "window-variable"
+		
+		override def reference: Reference = variableContentWindowContext
+		override def factory = None
 	}
 }

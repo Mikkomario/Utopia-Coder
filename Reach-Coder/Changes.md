@@ -1,8 +1,12 @@
 # Reach Coder - List of changes
 
 ## v1.0.3 (in development)
+### Bugfixes
+- Fixed some smaller container code-generation bugs
 ### New features
 - Added `list` and `show <project>` commands / modes
+### Other changes
+- Supports the new context classes introduced in **Firmament** v1.4
 
 ## v1.0.2 - 28.7.2024
 A minor update following mostly general **Utopia Coder** changes.

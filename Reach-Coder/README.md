@@ -5,6 +5,9 @@ saving you a lot of programming time when developing custom components.
 
 This application works with the same foundation and principles as the **Vault Coder** utility application.
 
+// TODO: Document container creation
+// TODO: Document list & show commands
+
 ## App command syntax
 First, you need to prepare a .json file describing the component structure you want to create / use.
 See the required document structure below.
@@ -106,7 +109,6 @@ The supported properties are:
 - `non_contextual_props: [Object]` - Lists component creation properties that 
   only apply to non-contextual component factories
 - `only_contextual: Boolean (optional)` - Set to true if you want to omit the non-contextual factory variant
-- `variable_context: Boolean (optional)` - Set to true if you want the contextual factory to use context pointers
 
 Please see the [property object syntax](#component-property-syntax) below, 
 concerning `props`, `contextual_props` and `non_contextual_props`.

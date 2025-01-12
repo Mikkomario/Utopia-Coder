@@ -181,8 +181,7 @@ object ComponentFactoryReader
 							nonContextualProperties = nonContextualProps,
 							contextualProperties = contextualProps,
 							author = model("author").stringOr(projectAuthor),
-							onlyContextual = model("onlyContextual", "only_contextual").getBoolean,
-							useVariableContext = model("variable_context", "variableContext", "view", "variable").getBoolean
+							onlyContextual = model("onlyContextual", "only_contextual").getBoolean
 						)
 					}
 				}
