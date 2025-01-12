@@ -4,6 +4,7 @@ import utopia.coder.controller.app.CoderAppLogic
 import utopia.coder.controller.parsing.file.InputFiles
 import utopia.coder.model.data._
 import utopia.coder.model.enumeration.NameContext.FileName
+import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.vault.controller.reader.ClassReader
@@ -455,8 +456,14 @@ object MainAppLogic extends CoderAppLogic
 	                       commonComboTraitRef: Option[Reference])
 	                      (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val parentRefs = classRefsMap(combination.parentClass)
-		val childRefs = classRefsMap(combination.childClass)
+		// Provides alternative mapping in case of certain inheriting combo-classes, where classes are transformed
+		// (Not the most beautiful code...)
+		lazy val simplifiedRefs = classRefsMap.mapKeys { _.name.singularIn(CamelCase.capitalized) }
+		val parentRefs = classRefsMap.getOrElse(combination.parentClass,
+			simplifiedRefs(combination.parentClass.name.singularIn(CamelCase.capitalized)))
+		val childRefs = classRefsMap.getOrElse(combination.childClass,
+			simplifiedRefs(combination.childClass.name.singularIn(CamelCase.capitalized)))
+		
 		CombinedModelWriter(combination, parentRefs.model, childRefs.stored, commonComboTraitRef)
 			.flatMap { combinedRefs =>
 				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory)

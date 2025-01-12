@@ -3,6 +3,8 @@
 ## v1.12.1 (in development)
 ### Bugfixes
 - Previous model validation was not correct in cases where enumeration value parsing was used
+  - The current implementation isn't correct, either, but it's easier to fix manually
+- Fixed a bug that caused certain inheritance-based combo classes to not get generated / connected correctly
 ### Other changes
 - Some of the generated properties are now labeled as `val` or `lazy val` instead of `def`
 
