@@ -1,6 +1,7 @@
 # Utopia Vault Coder
 
-## v1.12.1 (in development)
+## v1.12.1 - 23.1.2025
+A small update fixing some bugs
 ### Bugfixes
 - Previous model validation was not correct in cases where enumeration value parsing was used
   - The current implementation isn't correct, either, but it's easier to fix manually
