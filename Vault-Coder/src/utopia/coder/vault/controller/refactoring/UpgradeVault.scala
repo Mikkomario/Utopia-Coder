@@ -64,7 +64,7 @@ object UpgradeVault
 		val replaceAccessCompanions = ReplaceCode(accessPackages, subAccessTargetRegex) { i =>
 			if (i.isObject) {
 				println(s"Replacing ${ i.name } companion object")
-				AccessWriter.accessCompanionObject(ScalaType.basic(i.name))
+				AccessWriter.accessCompanionObject(ScalaType.basic(i.name), isMultiAccess = i.name.contains("Many"))
 			}
 			else {
 				// Also replaces the filter function with apply
