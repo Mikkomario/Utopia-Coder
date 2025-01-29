@@ -193,7 +193,7 @@ object AccessWriter
 					returnDescription = "An access point that applies the specified filter condition (only)",
 					isOverridden = true)(
 					Parameter("condition", condition, description = "Condition to apply to all requests"))(
-					s"$subViewName(Some(condition))")
+					s"$subViewName(${ if (isMultiAccess) "Some(condition)" else "condition" })")
 			),
 			nested = Set(subViewDeclaration(accessTraitType, subViewName, isMultiAccess))
 		)
@@ -638,6 +638,8 @@ object AccessWriter
 	}
 	
 	// Writes a trait common for the many model access points
+	// FIXME: When writing a generic trait extending another generic trait, the parent trait name is not correctly pluralized.
+	//  E.g. extends ManyTextPlacementAccessLike instead of ManyTextPlacementsAccessLike
 	private def writeManyAccessTrait(classToWrite: Class, parentClassReferences: Seq[ClassReferences],
 	                                 modelRef: Reference,
 	                                 descriptionReferences: Option[(Reference, Reference, Reference)],

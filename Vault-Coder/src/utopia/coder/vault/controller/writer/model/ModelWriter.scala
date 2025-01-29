@@ -291,6 +291,17 @@ object ModelWriter
 		)).write()
 	}
 	
+	/*
+		FIXME: When extending another generic trait, the copy function implementation doesn't account for renames
+		E.g.
+		override def copyTextPlacement(parentId: Int, placedId: Int, orderIndex: Int) =
+			copyStatementPlacement(parentId = parentId, placedId = placedId, orderIndex = orderIndex)
+			
+		-- Should be statementId = placedId
+		
+		Also, there are unnecessary overrides for with functions when extending another trait
+	 */
+	
 	// XDataLike for generic traits
 	private def writeDataLikeTrait(classToWrite: Class, dataPackage: Package,
 	                               parentClassReferences: Seq[ClassReferences],

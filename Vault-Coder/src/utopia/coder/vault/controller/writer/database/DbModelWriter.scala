@@ -282,6 +282,8 @@ object DbModelWriter
 		File(storablePackage, factoryLike).write()
 	}
 	
+	// FIXME: When writing a generic factory trait XDbFactory that extends another generic trait, one must NOT extend YDbFactory, only YDbFactoryLike
+	
 	// Writes the XModelFactory trait + object
 	// Used only with generic traits
 	// (for concrete implementations, the XModel companion object acts as this kind of factory)

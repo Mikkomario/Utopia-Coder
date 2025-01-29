@@ -40,6 +40,28 @@ object DbFactoryWriter
 	
 	// OTHER    -------------------------
 	
+	/*
+	FIXME: when inheriting a 2 level deep generic trait, the apply implementation is based on the top trait, not implementing renames.
+	E.g.
+	override protected def apply(model: AnyModel, id: Int, parentId: Int, statementId: Int, orderIndex: Int) =
+		ActionRequestStatementPlacement(id, ActionRequestStatementPlacementData(parentId, placedId, orderIndex))
+	 */
+	
+	// TODO: When writing a generic factory trait for a class utilizing timestamps, should generate the override def timestamp = dbProps.<timestampPropName> -property
+	
+	/*
+	FIXME: When generating the apply function, the code is broken if enumerations (without default values) are used:
+	override def apply(model: ModelLike[Property]) = {
+		valid.flatMap { valid =>
+			LlmUseCase.fromValue(valid(this.model.task.name)).map { task =>
+				LlmAssignment(valid(this.model.id.name).getInt, LlmAssignmentData(task,
+					valid(this.model.llmId.name).getInt, valid(this.model.created.name).getInstant,
+					valid(this.model.deprecatedAfter.name).instant))
+			}
+		}
+	}
+	 */
+	
 	/**
 	  * Writes a factory used for processing database object data
 	  * @param classToWrite Class data based on which the factory is created
