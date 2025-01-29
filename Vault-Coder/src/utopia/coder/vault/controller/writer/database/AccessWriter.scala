@@ -183,7 +183,7 @@ object AccessWriter
 	 * @param accessTraitType Type of the access trait for which this object is added
 	 * @return Declaration of the companion object
 	 */
-	def accessCompanionObject(accessTraitType: ScalaType) = {
+	def accessCompanionObject(accessTraitType: ScalaType, isMultiAccess: Boolean) = {
 		val subViewName = s"_$accessTraitType"
 		ObjectDeclaration(
 			name = accessTraitType.toString,
@@ -195,7 +195,7 @@ object AccessWriter
 					Parameter("condition", condition, description = "Condition to apply to all requests"))(
 					s"$subViewName(Some(condition))")
 			),
-			nested = Set(subViewDeclaration(accessTraitType, subViewName))
+			nested = Set(subViewDeclaration(accessTraitType, subViewName, isMultiAccess))
 		)
 	}
 	
@@ -295,7 +295,7 @@ object AccessWriter
 		}
 		
 		val traitWriteResult = File(singleAccessPackage,
-			accessCompanionObject(uniqueAccessType),
+			accessCompanionObject(uniqueAccessType, isMultiAccess = false),
 			TraitDeclaration(uniqueAccessName,
 				extensions = uniqueTraitParents,
 				properties = Vector(self, factoryProp, childModelProp) ++ childGetters,
@@ -394,12 +394,7 @@ object AccessWriter
 							.flatMap[Extension] { _.genericUniqueAccessTrait.map { _(itemType, reprType) } }
 					// Extends SingleModelAccess instead of SingleRowModelAccess because sub-traits may vary
 					else
-						Vector[Extension](
-							singleModelAccess(itemType),
-							distinctModelAccess(itemType, ScalaType.option(itemType), flow.value),
-							filterableView(reprType),
-							indexed
-						)
+						Vector[Extension](uniqueModelAccess(itemType), filterableView(reprType), indexed)
 				}
 				
 				File(singleAccessPackage,
@@ -427,7 +422,7 @@ object AccessWriter
 				val traitNameString = uniqueAccessTraitName.className
 				val traitType = ScalaType.basic(traitNameString)
 				
-				// The parent types depend from 4 factors:
+				// The parent types depend on 4 factors:
 				//      1) Whether generic type is used,
 				//      2) Whether other traits are extended,
 				//      3) Whether row creation time is recorded, and
@@ -454,7 +449,7 @@ object AccessWriter
 						else
 							Vector[Extension](
 								rowAccessParent,
-								distinctModelAccess(modelRef, ScalaType.option(modelRef), flow.value),
+								uniqueModelAccess(modelRef),
 								deprecationParentRef.getOrElse(filterableView)(traitType),
 								indexed
 							)
@@ -465,7 +460,7 @@ object AccessWriter
 				val methods = if (parentRef.isDefined) Set(filterM) else highestTraitMethods + filterM
 				
 				File(singleAccessPackage,
-					accessCompanionObject(traitType),
+					accessCompanionObject(traitType, isMultiAccess = false),
 					TraitDeclaration(traitNameString,
 						extensions = parents, properties = properties, methods = methods,
 						description = s"A common trait for access points that return individual and distinct ${
@@ -613,7 +608,7 @@ object AccessWriter
 		
 		val traitWriteResult = File(packageName,
 			// Writes a private subAccess trait for filter(...) implementation
-			accessCompanionObject(traitType),
+			accessCompanionObject(traitType, isMultiAccess = true),
 			// Writes the common trait for all many combined access points
 			TraitDeclaration(traitName,
 				extensions = extensions,
@@ -785,7 +780,7 @@ object AccessWriter
 				
 				File(manyAccessPackage,
 					// The companion object contains a sub-view implementation
-					accessCompanionObject(traitType),
+					accessCompanionObject(traitType, isMultiAccess = true),
 					TraitDeclaration(traitName,
 						extensions = parents,
 						// Contains computed properties to access class properties
@@ -884,11 +879,16 @@ object AccessWriter
 		).write()
 	}
 	
-	private def subViewDeclaration(accessTraitType: ScalaType, subViewName: String) = {
+	private def subViewDeclaration(accessTraitType: ScalaType, subViewName: String, isMultiAccess: Boolean) = {
+		val parameter = {
+			if (isMultiAccess)
+				Parameter("accessCondition", ScalaType.option(condition), prefix = Some(DeclarationStart.overrideVal))
+			else
+				Parameter("condition", condition, prefix = Some(DeclarationStart.overrideVal))
+		}
 		ClassDeclaration(subViewName,
-			constructionParams =
-				Parameter("accessCondition", ScalaType.option(condition), prefix = Some(DeclarationStart.overrideVal)),
-			extensions = Vector(accessTraitType),
+			constructionParams = parameter,
+			extensions = Single(accessTraitType),
 			visibility = Private,
 			isCaseClass = true
 		)

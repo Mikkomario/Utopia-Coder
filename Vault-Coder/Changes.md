@@ -1,5 +1,10 @@
 # Utopia Vault Coder
 
+## v1.13 (in development)
+### Breaking changes
+- Generated **UniqueXAccess** & **UniqueXAccessLike** traits now extend **UniqueModelAccess**, 
+  which means that the abstract property is now `condition: Condition` instead of `accessCondition: Option[Condition]`
+
 ## v1.12.1 - 23.1.2025
 A small update fixing some bugs
 ### Bugfixes
