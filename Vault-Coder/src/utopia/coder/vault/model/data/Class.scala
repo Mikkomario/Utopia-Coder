@@ -270,17 +270,19 @@ case class Class(name: Name, customTableName: Option[String], storedPrefix: Stri
 			this
 		else {
 			// Adds referred extensions to defined properties and adds missing properties
-			val resolvedPropertyReferences = propertyReferences.map { case (child, parentRefs) =>
-				// Finds the referred properties. Logs a warning if all were not found.
-				val (missingReferences, parentProps) = parentRefs.divideWith { ref =>
-					newExtensions.findMap { parent => parent.properties.find { _.name ~== ref } }.toRight(ref)
+			val resolvedPropertyReferences = propertyReferences
+				.map { case (child, parentRefs) =>
+					// Finds the referred properties. Logs a warning if all were not found.
+					val (missingReferences, parentProps) = parentRefs.divideWith { ref =>
+						newExtensions.findMap { parent => parent.properties.find { _.name ~== ref } }.toRight(ref)
+					}
+					if (missingReferences.nonEmpty)
+						println(s"Warning: ${ missingReferences.size } references from ${
+							child.name } of $name (${ missingReferences.mkString(", ") }) could not be resolved")
+							
+					child -> parentProps
 				}
-				if (missingReferences.nonEmpty)
-					println(s"Warning: ${ missingReferences.size } references from ${
-						child.name } of $name (${ missingReferences.mkString(", ") }) could not be resolved")
-						
-				child -> parentProps
-			}
+				.filter { _._2.nonEmpty }
 			// Keys are parent properties, values are child properties that have their inheritance resolved
 			val parentToChildMap = resolvedPropertyReferences.flatMap { case (inheritingProp, parentProps) =>
 				val resolvedChildProp = inheritingProp.extending(parentProps)

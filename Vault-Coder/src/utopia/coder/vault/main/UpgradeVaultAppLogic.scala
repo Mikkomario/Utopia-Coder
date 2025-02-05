@@ -23,6 +23,7 @@ import scala.concurrent.ExecutionContext
  * @author Mikko Hilpinen
  * @since 30.07.2024, v1.11.1
  */
+// FIXME: referenced classes are still being written
 object UpgradeVaultAppLogic extends CoderAppLogic
 {
 	override protected implicit def exc: ExecutionContext = Common.exc

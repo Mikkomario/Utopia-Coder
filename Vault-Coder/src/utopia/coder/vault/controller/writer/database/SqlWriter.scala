@@ -49,6 +49,7 @@ object SqlWriter
 			// (referenced tables are written before referencing tables)
 			val allClasses = classes ++ classes.flatMap { _.descriptionLinkClass }
 			val classesByTableName = allClasses.map { c => c.tableName -> c }.toMap
+			
 			val references = classesByTableName.map { case (tableName, c) =>
 				val refs = c.properties.flatMap { _.dataType match {
 					case ClassReference(referencedTableName, _, _) =>
@@ -58,6 +59,15 @@ object SqlWriter
 				} }
 				c.tableName -> refs.toSet
 			}
+			// Removes double-references, where both classes refer to each other
+			val doubleReferences = references.map { case (tableName, referredTables) =>
+				val doubleReferenced = referredTables.filter { references.get(_).exists { _.contains(tableName) } }
+				tableName -> doubleReferenced
+			}
+			val cleanedReferences = references.map { case (tableName, referencedTables) =>
+				tableName -> (referencedTables -- doubleReferences(tableName))
+			}
+			
 			// Forms the table initials, also
 			val initials = initialsFrom(references.flatMap { case (tableName, refs) => refs + tableName }.toSet)
 			targetPath.writeUsing { writer =>
@@ -78,7 +88,7 @@ object SqlWriter
 				}
 				
 				// Groups the classes by package and writes them
-				writeClasses(writer, initials, classesByTableName.groupBy { _._2.packageName }, references,
+				writeClasses(writer, initials, classesByTableName.groupBy { _._2.packageName }, cleanedReferences,
 					prefixColumnNames)
 			}
 		}

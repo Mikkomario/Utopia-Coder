@@ -62,6 +62,8 @@ object DbFactoryWriter
 	}
 	 */
 	
+	// FIXME: Generated code fails when an inheriting class attempts enumeration-parsing (there's no way to return Try)
+	
 	/**
 	  * Writes a factory used for processing database object data
 	  * @param classToWrite Class data based on which the factory is created

@@ -28,8 +28,7 @@ object TablesWriter
 	  * @param setup   Target project -specific settings (implicit)
 	  * @return Reference to the written object. Failure if writing failed.
 	  */
-	def apply(classes: Iterable[Class])(implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
-	{
+	def apply(classes: Iterable[Class])(implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) = {
 		val objectName = (setup.dbModuleName + "Tables").objectName
 		// If there are no classes to write, omits this document (e.g. when only writing enumerations or something)
 		if (classes.isEmpty)
