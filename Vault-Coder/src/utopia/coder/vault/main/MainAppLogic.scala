@@ -15,6 +15,7 @@ import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, G
 import utopia.coder.vault.util.Common
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.Single
+import utopia.flow.collection.template.MapAccess
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.time.Today
 import utopia.flow.util.EitherExtensions._
@@ -323,16 +324,23 @@ object MainAppLogic extends CoderAppLogic
 					writeClassesInOrder(data.classes, Map(), tablesRef, descriptionLinkObjects).flatMap { classRefs =>
 						// Finally writes the combined models
 						data.combinations.groupBy { _.parentClass }.tryForeach { case (parent, combos) =>
+							// Provides alternative mapping in case of certain inheriting combo-classes,
+							// where classes are transformed
+							lazy val simplifiedRefs = classRefs.mapKeys { _.name.singularIn(CamelCase.capitalized) }
+							val safeClassRefMap = MapAccess { c: Class =>
+								classRefs.getOrElse(c, simplifiedRefs(c.name.singularIn(CamelCase.capitalized)))
+							}
+							
 							// May write a generic combination trait first
 							val commonComboTrait = {
 								if (parent.writeCommonComboTrait)
-									CombinedModelWriter.writeGeneralCombinationTrait(parent, classRefs(parent))
+									CombinedModelWriter.writeGeneralCombinationTrait(parent, safeClassRefMap(parent))
 										.map { Some(_) }
 								else
 									Success(None)
 							}
 							commonComboTrait.flatMap { commonComboTrait =>
-								combos.tryForeach { writeCombo(_, classRefs, commonComboTrait) }
+								combos.tryForeach { writeCombo(_, safeClassRefMap, commonComboTrait) }
 							}
 						}
 					}
@@ -452,17 +460,12 @@ object MainAppLogic extends CoderAppLogic
 		}
 	}
 	
-	private def writeCombo(combination: CombinationData, classRefsMap: Map[Class, ClassReferences],
+	private def writeCombo(combination: CombinationData, classRefsMap: MapAccess[Class, ClassReferences],
 	                       commonComboTraitRef: Option[Reference])
 	                      (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// Provides alternative mapping in case of certain inheriting combo-classes, where classes are transformed
-		// (Not the most beautiful code...)
-		lazy val simplifiedRefs = classRefsMap.mapKeys { _.name.singularIn(CamelCase.capitalized) }
-		val parentRefs = classRefsMap.getOrElse(combination.parentClass,
-			simplifiedRefs(combination.parentClass.name.singularIn(CamelCase.capitalized)))
-		val childRefs = classRefsMap.getOrElse(combination.childClass,
-			simplifiedRefs(combination.childClass.name.singularIn(CamelCase.capitalized)))
+		val parentRefs = classRefsMap(combination.parentClass)
+		val childRefs = classRefsMap(combination.childClass)
 		
 		CombinedModelWriter(combination, parentRefs.model, childRefs.stored, commonComboTraitRef)
 			.flatMap { combinedRefs =>

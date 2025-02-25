@@ -4,6 +4,9 @@
 ### Breaking changes
 - Generated **UniqueXAccess** & **UniqueXAccessLike** traits now extend **UniqueModelAccess**, 
   which means that the abstract property is now `condition: Condition` instead of `accessCondition: Option[Condition]`
+### Bugfixes
+- Fixed a bug that would cause an infinite loop when two classes directly reference each other
+- Fixed a bug that would cause certain inheritance-based combo classes to interrupt the code-generation process
 
 ## v1.12.1 - 23.1.2025
 A small update fixing some bugs

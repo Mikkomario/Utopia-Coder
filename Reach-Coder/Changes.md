@@ -1,5 +1,10 @@
 # Reach Coder - List of changes
 
+## v1.0.4 (in development)
+### Bugfixes
+- Fixed bugged context property parsing
+  - Previously the parsing would not recognize the static and variable variants
+
 ## v1.0.3 - 23.1.2025
 This update adds support for the new context classes introduced in **Firmament v1.4**. 
 Basic project commands are also added, and some bugfixes included.

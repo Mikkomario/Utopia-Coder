@@ -1,6 +1,7 @@
 package utopia.coder.reach.model.enumeration
 
 import utopia.coder.model.scala.datatype.Reference
+import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.reach.util.ReachReferences.Reach._
 import utopia.coder.reach.util.ReachReferences._
@@ -41,7 +42,8 @@ object ContextType
 	  * @param input User input
 	  * @return The context type mentioned in that input. None if no context type was mentioned.
 	  */
-	def apply(input: String) = values.find { c => input.containsIgnoreCase(c.keyword) }
+	def apply(input: String) =
+		values.find { _.keyword ~== input }.orElse { values.find { c => input.containsIgnoreCase(c.keyword) } }
 	
 	
 	// VALUES   ----------------------------
