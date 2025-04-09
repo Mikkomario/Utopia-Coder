@@ -237,13 +237,13 @@ object ComponentFactoryWriter
 						GenericType("N", Some(TypeRequirement.childOf(context.reference)))
 					), isOverridden = true)(
 					Parameter("context", ScalaType.basic("N")))(
-					s"$contextual(parentHierarchy, context, settings)")
+					s"$contextual(hierarchy, context, settings)")
 				(parent, method)
 			}
 			else {
 				val withContextMethod = MethodDeclaration("withContext", isOverridden = true)(
 					Parameter("context", context.reference))(
-					s"$contextual(parentHierarchy, context, settings)")
+					s"$contextual(hierarchy, context, settings)")
 				fromContextFactory(context.reference, contextual) -> withContextMethod
 			}
 		}
@@ -251,7 +251,7 @@ object ComponentFactoryWriter
 			name = name,
 			// Contains the standard (implemented) properties + non-context -specific properties
 			constructionParams = Vector(
-				Parameter("parentHierarchy", componentHierarchy),
+				Parameter("hierarchy", componentHierarchy),
 				Parameter("settings", settingsType, s"$settingsType.default")
 			) ++ factory.nonContextualProperties.map { prop =>
 				Parameter(prop.name.prop, prop.dataType, prop.defaultValue, description = prop.description)
@@ -332,10 +332,10 @@ object ComponentFactoryWriter
 		ClassDeclaration(
 			name = name,
 			genericTypes = genericTypes,
-			// Contains the default parameters (parentHierarchy, context, settings),
+			// Contains the default parameters (hierarchy, context, settings),
 			// plus possible custom properties
 			constructionParams = Vector(
-				Parameter("parentHierarchy", componentHierarchy),
+				Parameter("hierarchy", componentHierarchy),
 				contextParameter,
 				Parameter("settings", settingsType, s"$settingsType.default")
 			) ++ factory.contextualProperties.map { prop =>

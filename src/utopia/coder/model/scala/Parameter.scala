@@ -3,7 +3,9 @@ package utopia.coder.model.scala
 import utopia.coder.model.scala.doc.ScalaDocKeyword.Param
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.ScalaType
+import utopia.coder.model.scala.declaration.DeclarationPrefix.Override
 import utopia.coder.model.scala.declaration.DeclarationStart
+import utopia.coder.model.scala.declaration.FunctionDeclarationType.ValueD
 import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocPart}
 import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
 import utopia.flow.collection.immutable.{Empty, Single}
@@ -43,6 +45,16 @@ case class Parameter(name: String, dataType: ScalaType, default: CodePiece = Cod
 	  * @return A copy of this parameter without a default value
 	  */
 	def withoutDefault = if (hasDefault) copy(default = CodePiece.empty) else this
+	
+	/**
+	 * @return A copy of this parameter that contains the "override val" -prefix
+	 */
+	def overrideVal = copy(prefix = Some(prefix match {
+		case Some(existing) =>
+			existing.copy(declarationType = ValueD,
+				prefixes = if (existing.prefixes.contains(Override)) existing.prefixes else Override +: existing.prefixes)
+		case None => DeclarationStart.overrideVal
+	}))
 	
 	
 	// IMPLEMENTED  ---------------------------
