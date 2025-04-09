@@ -211,7 +211,7 @@ object ComponentFactoryWriter
 			name = (factory.componentName + "FactoryLike").className,
 			genericTypes = Vector(repr),
 			extensions = (settingsWrapperType(reprType): Extension) +:
-				factory.containerType.map[Extension] { _.factoryTrait(componentType, componentLike) }.toVector :+
+				factory.containerType.map[Extension] { _.factoryTrait(componentType, component) }.toVector :+
 				partOfHierarchy,
 			description = s"Common trait for factories that are used for constructing ${factory.componentName.pluralDoc}",
 			author = factory.author,
@@ -259,7 +259,7 @@ object ComponentFactoryWriter
 			extensions = ((factoryLikeType(factoryType): Extension) +:
 				// Enables context-appending, if specified
 				contextualParentAndMethod.map[Extension] { _._1 }.toVector) ++
-				factory.containerType.map[Extension] { _.nonContextualFactoryTrait(componentType, componentLike) },
+				factory.containerType.map[Extension] { _.nonContextualFactoryTrait(componentType, component) },
 			methods = Set(
 				// Settings setter -function
 				MethodDeclaration("withSettings", isOverridden = true)(
@@ -300,7 +300,7 @@ object ComponentFactoryWriter
 				// Case: Container
 				case Some(containerType) =>
 					val parent = containerType.contextualFactoryTrait(genericContextType, context.reference,
-						componentType, componentLike, ScalaType.basic(name))
+						componentType, component, ScalaType.basic(name))
 					val parameter = Parameter("context", ScalaType.basic("N2"))
 					val method = MethodDeclaration("withContext",
 						genericTypes = Vector(GenericType("N2", Some(TypeRequirement.childOf(context.reference)))),

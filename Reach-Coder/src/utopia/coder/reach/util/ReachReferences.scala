@@ -49,7 +49,7 @@ object ReachReferences
 		lazy val staticContentWindowContext = Reference(context, "StaticReachContentWindowContext")
 		lazy val variableContentWindowContext = Reference(context, "VariableReachContentWindowContext")
 		
-		lazy val componentLike = Reference(template, "ReachComponentLike")
+		lazy val component = Reference(template, "ReachComponent")
 		lazy val partOfHierarchy = Reference(template, "PartOfComponentHierarchy")
 		lazy val componentHierarchy = Reference(hierarchies, "ComponentHierarchy")
 		
