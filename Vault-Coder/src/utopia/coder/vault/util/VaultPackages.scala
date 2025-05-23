@@ -42,6 +42,11 @@ object VaultPackages
 		lazy val singleModelAccess = access / "single.model"
 		lazy val manyModelAccess = access / "many.model"
 		lazy val modelTemplateAccess = access/"template.model"
+		
+		lazy val targeting = noSql/"targeting"
+		lazy val targetColumns = targeting/"columns"
+		lazy val targetMany = targeting/"many"
+		lazy val targetOne = targeting/"one"
 	}
 	object BunnyMunch
 	{

@@ -1,15 +1,15 @@
-package utopia.coder.vault.controller.writer.database
+package utopia.coder.vault.controller.writer.database.sql
 
 import utopia.coder.model.data.{Name, NamingRules}
-import utopia.flow.generic.model.immutable.Value
-import utopia.flow.generic.model.mutable.DataType.{BooleanType, DoubleType, FloatType, IntType, LongType}
-import utopia.flow.time.Today
-import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.parse.file.FileExtensions._
-import utopia.coder.vault.model.data.{Class, Instance, VaultProjectSetup}
 import utopia.coder.model.enumeration.NameContext.DatabaseName
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, Text}
+import utopia.coder.vault.model.data.{Class, Instance}
+import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.generic.model.immutable.Value
+import utopia.flow.generic.model.mutable.DataType._
 import utopia.flow.operator.ordering.CombinedOrdering
+import utopia.flow.parse.file.FileExtensions._
+import utopia.flow.time.Today
 import utopia.flow.util.Version
 
 import java.io.PrintWriter

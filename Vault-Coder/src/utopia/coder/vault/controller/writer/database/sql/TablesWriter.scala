@@ -1,15 +1,15 @@
-package utopia.coder.vault.controller.writer.database
+package utopia.coder.vault.controller.writer.database.sql
 
 import utopia.coder.model.data.NamingRules
-import utopia.flow.collection.immutable.{Pair, Single}
-import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.model.scala.Visibility.Private
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.LazyValue
 import utopia.coder.model.scala.declaration.{File, MethodDeclaration, ObjectDeclaration}
 import utopia.coder.model.scala.{DeclarationDate, Parameter}
+import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences._
+import utopia.flow.collection.immutable.{Pair, Single}
+import utopia.flow.util.StringExtensions._
 
 import scala.io.Codec
 import scala.util.Success

@@ -78,6 +78,15 @@ object VaultReferences
 		lazy val uniqueModelAccess = Reference(pck.singleModelAccess / "distinct", "UniqueModelAccess")
 		lazy val singleIdModelAccess = Reference(pck.singleModelAccess / "distinct", "SingleIdModelAccess")
 		lazy val singleIntIdModelAccess = Reference(pck.singleModelAccess / "distinct", "SingleIntIdModelAccess")
+		
+		lazy val accessColumn = Reference(targetColumns/"AccessColumns", "AccessColumn")
+		lazy val accessManyColumns = Reference(targetColumns/"AccessColumns", "AccessManyColumns")
+		lazy val accessValue = Reference(targetColumns, "AccessValue")
+		lazy val accessValues = Reference(targetColumns, "AccessValues")
+		lazy val targetingOne = Reference(targetOne, "TargetingOne")
+		lazy val targetingMany = Reference(targetMany, "TargetingMany")
+		lazy val accessWrapper = Reference(targetMany, "AccessWrapper")
+		lazy val accessOneWrapper = Reference(targetOne, "AccessOneWrapper")
 	}
 	
 	object BunnyMunch

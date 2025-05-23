@@ -1,16 +1,16 @@
-package utopia.coder.vault.controller.writer.database
+package utopia.coder.vault.controller.writer.database.sql
 
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NameContext.{DatabaseName, TableName}
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, Text}
+import utopia.coder.vault.model.data.{Class, DbProperty}
+import utopia.coder.vault.model.datatype.PropertyType
+import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, EnumValue}
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.parse.string.Regex
 import utopia.flow.time.Today
 import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.model.data.{Class, DbProperty, VaultProjectSetup}
-import utopia.coder.vault.model.datatype.PropertyType
-import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, EnumValue}
 import utopia.flow.util.Version
 
 import java.io.PrintWriter
