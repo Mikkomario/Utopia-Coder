@@ -1,5 +1,6 @@
 package utopia.coder.reach.model.enumeration
 
+import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.datatype.Reference
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.util.StringExtensions._
@@ -32,7 +33,7 @@ object ContextType
 {
 	// ATTRIBUTES   ------------------------
 	
-	val values = Vector[ContextType](Base, StaticBase, VariableBase, Color, StaticColor, VariableColor,
+	val values = Vector[ContextType](Anything, Base, StaticBase, VariableBase, Color, StaticColor, VariableColor,
 		Text, StaticText, VariableText, StaticWindow, VariableWindow)
 	
 	
@@ -48,6 +49,12 @@ object ContextType
 	
 	// VALUES   ----------------------------
 	
+	case object Anything extends ContextType
+	{
+		override val keyword: String = "any"
+		override lazy val reference: Reference = Reference(Package.empty, "Any")
+		override val factory: Option[Reference] = None
+	}
 	/**
 	  * Represents the BaseContextPropsView class from Firmament
 	  */

@@ -4,6 +4,8 @@
 ### Bugfixes
 - Fixed bugged context property parsing
   - Previously the parsing would not recognize the static and variable variants
+### New features
+- Added context type: `"any"`
 ### Other changes
 - Output is now compatible with **Reach v1.6**
 
