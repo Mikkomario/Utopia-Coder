@@ -30,6 +30,7 @@ object Reference
 	// Other Scala
 	
 	lazy val success = apply("scala.util", "Success")
+	lazy val implicitConversions = apply("scala.language", "implicitConversions")
 	
 	// Other Java
 	

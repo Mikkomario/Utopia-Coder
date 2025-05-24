@@ -28,7 +28,7 @@ class VaultProjectSetup(val dbModuleName: Name, val modelPackage: Package, val d
                         override val mergeSourceRoots: Seq[Path], override val mergeConflictsFilePath: Path,
                         override val version: Option[Version], val defaultMutability: Mutability,
                         val modelCanReferToDB: Boolean, val prefixSqlProperties: Boolean)
-                       (implicit log: Logger)
+                       (implicit val log: Logger)
 	extends ProjectSetup
 {
 	// ATTRIBUTES   ------------------------

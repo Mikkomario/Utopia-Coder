@@ -9,12 +9,13 @@ import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.vault.controller.reader.ClassReader
 import utopia.coder.vault.controller.writer.database._
+import utopia.coder.vault.controller.writer.database.sql.{ColumnLengthRulesWriter, InsertsWriter, SqlWriter, TablesWriter}
 import utopia.coder.vault.controller.writer.documentation.{DocumentationWriter, TableDescriptionsWriter}
 import utopia.coder.vault.controller.writer.model.{CombinedModelWriter, DescribedModelWriter, EnumerationWriter, ModelWriter}
 import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, GenericClassReferences, ModuleData, VaultProjectSetup}
 import utopia.coder.vault.util.Common
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.Single
+import utopia.flow.collection.immutable.{Pair, Single}
 import utopia.flow.collection.template.MapAccess
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.time.Today
@@ -60,15 +61,20 @@ object MainAppLogic extends CoderAppLogic
 	override protected def projectsStoreLocation: Path = Common.projectsPath
 	override protected def supportsAlternativeMergeRoots: Boolean = true
 	
-	// Adds the "no combos" -argument and the "module" argument
+	// Adds the following arguments:
+	//      1. "no combos" -argument
+	//      2. "module" argument
+	//      3. Targeting -flag
 	override def argumentSchema = {
 		val original = super.argumentSchema
 		val firstFlagIndex = original.findIndexWhere { _.isFlag }.getOrElse { original.size }
 		
 		val module = ArgumentSchema("module", help = "Name of the targeted project module (default = all)")
 		val noCombos = ArgumentSchema.flag("no-combos", "NC", help = "Whether combo-class writing should be disabled")
+		val targeting = ArgumentSchema.flag("targeting", "T",
+			help = "Whether targeting access classes should be generated instead of the older access implementations")
 		
-		((original.take(firstFlagIndex) :+ module) ++ original.drop(firstFlagIndex)) :+ noCombos
+		((original.take(firstFlagIndex) :+ module) ++ original.drop(firstFlagIndex)) ++ Pair(noCombos, targeting)
 	}
 	
 	override protected def run(args: CommandArguments, paths: LazyProjectPaths, filter: Lazy[Option[Filter]],
@@ -234,6 +240,7 @@ object MainAppLogic extends CoderAppLogic
 		}
 		
 		// Handles one module at a time
+		val targetingByDefault = arguments("targeting").getBoolean
 		val writeResults = filteredData.filter { _._1.nonEmpty }.map { case (module, paths) =>
 			println(s"Writing class and enumeration data to ${paths.output.toAbsolutePath}...")
 			paths.output.asExistingDirectory.flatMap { directory =>
@@ -257,7 +264,7 @@ object MainAppLogic extends CoderAppLogic
 					paths.sources, directory/mergeFileName, module.version, module.defaultMutability,
 					module.modelCanReferToDB, module.prefixColumnNames)
 				
-				writeModuleFiles(module, paths.output)
+				writeModuleFiles(module, paths.output, targetingByDefault)
 			}
 		}
 		val writeFailures = writeResults.flatMap { _.failure }
@@ -300,7 +307,7 @@ object MainAppLogic extends CoderAppLogic
 		}
 	}
 	
-	private def writeModuleFiles(data: ModuleData, outputRoot: Path)
+	private def writeModuleFiles(data: ModuleData, outputRoot: Path, targetingByDefault: Boolean)
 	                            (implicit setup: VaultProjectSetup, naming: NamingRules): Try[Unit] =
 	{
 		def path(fileType: String, parts: String*) = {
@@ -321,36 +328,38 @@ object MainAppLogic extends CoderAppLogic
 			.flatMap { tablesRef =>
 				DescriptionLinkInterfaceWriter(data.classes, tablesRef).flatMap { descriptionLinkObjects =>
 					// Next writes all required documents for each class in order
-					writeClassesInOrder(data.classes, Map(), tablesRef, descriptionLinkObjects).flatMap { classRefs =>
-						// Finally writes the combined models
-						data.combinations.groupBy { _.parentClass }.tryForeach { case (parent, combos) =>
-							// Provides alternative mapping in case of certain inheriting combo-classes,
-							// where classes are transformed
-							lazy val simplifiedRefs = classRefs.mapKeys { _.name.singularIn(CamelCase.capitalized) }
-							val safeClassRefMap = MapAccess { c: Class =>
-								classRefs.getOrElse(c, simplifiedRefs(c.name.singularIn(CamelCase.capitalized)))
-							}
-							
-							// May write a generic combination trait first
-							val commonComboTrait = {
-								if (parent.writeCommonComboTrait)
-									CombinedModelWriter.writeGeneralCombinationTrait(parent, safeClassRefMap(parent))
-										.map { Some(_) }
-								else
-									Success(None)
-							}
-							commonComboTrait.flatMap { commonComboTrait =>
-								combos.tryForeach { writeCombo(_, safeClassRefMap, commonComboTrait) }
+					writeClassesInOrder(data.classes, Map(), tablesRef, descriptionLinkObjects, targetingByDefault)
+						.flatMap { classRefs =>
+							// Finally writes the combined models
+							data.combinations.groupBy { _.parentClass }.tryForeach { case (parent, combos) =>
+								// Provides alternative mapping in case of certain inheriting combo-classes,
+								// where classes are transformed
+								lazy val simplifiedRefs = classRefs.mapKeys { _.name.singularIn(CamelCase.capitalized) }
+								val safeClassRefMap = MapAccess { c: Class =>
+									classRefs.getOrElse(c, simplifiedRefs(c.name.singularIn(CamelCase.capitalized)))
+								}
+								
+								// May write a generic combination trait first
+								val commonComboTrait = {
+									if (parent.writeCommonComboTrait)
+										CombinedModelWriter.writeGeneralCombinationTrait(parent, safeClassRefMap(parent))
+											.map { Some(_) }
+									else
+										Success(None)
+								}
+								commonComboTrait.flatMap { commonComboTrait =>
+									combos.tryForeach { writeCombo(_, safeClassRefMap, commonComboTrait) }
+								}
 							}
 						}
-					}
 				}
 			}
 	}
 	
 	private def writeClassesInOrder(classesToWrite: Seq[Class], classReferenceMap: Map[Class, ClassReferences],
 	                                tablesRef: Reference,
-	                                descriptionLinkObjects: Option[(Reference, Reference, Reference)])
+	                                descriptionLinkObjects: Option[(Reference, Reference, Reference)],
+	                                targetingByDefault: Boolean)
 	                               (implicit setup: VaultProjectSetup, naming: NamingRules): Try[Map[Class, ClassReferences]] =
 	{
 		// Checks which classes may be written immediately
@@ -363,10 +372,11 @@ object MainAppLogic extends CoderAppLogic
 			case Some(externalPackage) =>
 				val refs = generateReferencesForClass(classToWrite, externalPackage)
 				Success(classToWrite -> refs)
+				
 			// Case: Normal class => Proceeds to write the class files
 			case None =>
 				writeClass(classToWrite, tablesRef, descriptionLinkObjects,
-					classToWrite.parents.flatMap(classReferenceMap.get))
+					classToWrite.parents.flatMap(classReferenceMap.get), targetingByDefault)
 		}
 		
 		// Case: All remaining classes may be written => Writes and returns
@@ -384,13 +394,14 @@ object MainAppLogic extends CoderAppLogic
 		//       => Writes the immediately available classes and uses recursion to write the rest
 		else
 			readyClasses.tryMap(write).flatMap { newRefs =>
-				writeClassesInOrder(pendingClasses, classReferenceMap ++ newRefs, tablesRef, descriptionLinkObjects)
+				writeClassesInOrder(pendingClasses, classReferenceMap ++ newRefs, tablesRef, descriptionLinkObjects,
+					targetingByDefault)
 			}
 	}
 	
 	private def writeClass(classToWrite: Class, tablesRef: Reference,
 	                       descriptionLinkObjects: Option[(Reference, Reference, Reference)],
-	                       parentClassReferences: Seq[ClassReferences])
+	                       parentClassReferences: Seq[ClassReferences], targetingByDefault: Boolean)
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
 	{
 		if (!parentClassReferences.hasSize.of(classToWrite.parents))
@@ -433,26 +444,38 @@ object MainAppLogic extends CoderAppLogic
 										}
 									// Case: No classes use descriptions => automatically succeeds
 									case None => Success(None)
+									
 								}).flatMap { descriptionReferences =>
 									// Finally writes the access points
-									AccessWriter(classToWrite, parentClassReferences, modelRefs.stored, dbFactoryRef,
-										dbPropsOrModelRef, descriptionReferences)
-										.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
-											val genericReferences = modelRefs.generic.flatMap { modelRefs =>
-												dbPropsRefs.flatMap { case (dbPropsRefs, _) =>
-													dbModelRefs.leftOption.flatMap { dbModelRefs =>
-														dbFactoryLikeRef.map { factoryLikeRef =>
-															GenericClassReferences(modelRefs, dbPropsRefs.first,
-																dbPropsRefs.second, dbModelRefs, factoryLikeRef)
-														}
+									// May generate new Targeting -based files instead of the older Access-based files
+									val useTargeting = targetingByDefault && !classToWrite.isExtension &&
+										!classToWrite.isGeneric && descriptionReferences.isEmpty
+									val genericAccessRefs = {
+										if (useTargeting)
+											TargetingWriter(classToWrite, modelRefs.stored, dbPropsOrModelRef,
+												dbFactoryRef)
+												.map { _ => None -> None }
+										else
+											AccessWriter(classToWrite, parentClassReferences, modelRefs.stored, dbFactoryRef,
+												dbPropsOrModelRef, descriptionReferences)
+									}
+									genericAccessRefs.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
+										val genericReferences = modelRefs.generic.flatMap { modelRefs =>
+											dbPropsRefs.flatMap { case (dbPropsRefs, _) =>
+												dbModelRefs.leftOption.flatMap { dbModelRefs =>
+													dbFactoryLikeRef.map { factoryLikeRef =>
+														GenericClassReferences(modelRefs, dbPropsRefs.first,
+															dbPropsRefs.second, dbModelRefs, factoryLikeRef)
 													}
 												}
 											}
-											val classRefs = ClassReferences(classToWrite, modelRefs, dbFactoryRef,
-												dbPropsOrModelRef, genericUniqueAccessRef, genericManyAccessRef,
-												genericReferences)
-											classToWrite -> classRefs
 										}
+										val classRefs = ClassReferences(classToWrite, modelRefs, dbFactoryRef,
+											dbPropsOrModelRef, genericUniqueAccessRef, genericManyAccessRef,
+											genericReferences)
+										
+										classToWrite -> classRefs
+									}
 								}
 							}
 					}

@@ -86,7 +86,10 @@ object VaultReferences
 		lazy val targetingOne = Reference(targetOne, "TargetingOne")
 		lazy val targetingMany = Reference(targetMany, "TargetingMany")
 		lazy val accessWrapper = Reference(targetMany, "AccessWrapper")
+		lazy val accessRowsWrapper = Reference(targetMany, "AccessRowsWrapper")
 		lazy val accessOneWrapper = Reference(targetOne, "AccessOneWrapper")
+		lazy val accessOneRoot = Reference(targetOne, "AccessOneRoot")
+		lazy val accessManyRoot = Reference(targetMany, "AccessManyRoot")
 	}
 	
 	object BunnyMunch

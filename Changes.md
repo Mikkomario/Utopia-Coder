@@ -2,6 +2,9 @@
 
 ## v1.1.2 - 23.1.2025
 This is a small code-styling update
+### New features
+- Added preliminary (beta) support for the **Targeting**-based access interface.
+  - This is enabled by passing the `-T` flag when starting the software
 ### Other changes
 - Added better line-splitting to scaladocs
 

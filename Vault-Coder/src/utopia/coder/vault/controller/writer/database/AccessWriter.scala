@@ -53,6 +53,38 @@ object AccessWriter
 	// OTHER    ------------------------------
 	
 	/**
+	 * Determines the package where to store access classes
+	 * @param accessPackage Package that holds all generated access classes (whether singular or plural)
+	 * @param c Class for which files will be generated
+	 * @return Package for storing that class' access files
+	 */
+	def packageFor(accessPackage: Package, c: Class) = {
+		// Won't include the general package name part twice
+		val pckName = c.packageName
+		val base = accessPackage/pckName
+		c.customAccessSubPackageName.notEmpty match {
+			case Some(custom) =>
+				// Case: "-" defined as a custom package name => Indicates that no sub-packaging should be used
+				if (custom == "-")
+					base
+				else
+					base/custom
+			case None =>
+				val end = {
+					val full = c.name.singularIn(UnderScore).split('_').toVector
+					(full.findIndexWhere { _ ~== pckName } match {
+						case Some(idx) => full.drop(idx + 1)
+						case None => full
+					}).mkString("_")
+				}
+				if (end.isEmpty)
+					base
+				else
+					base / end
+		}
+	}
+	
+	/**
 	 * Generates access point references for a class, as if files were written normally
 	 * @param accessPackage Package where many & single access packages are placed
 	 * @param classToWrite Class for which these references are generated
@@ -1132,32 +1164,6 @@ object AccessWriter
 			className + accessTraitSuffix
 		else
 			(manyPrefix +: className) + accessTraitSuffix
-	}
-	
-	private def packageFor(accessPackage: Package, c: Class) = {
-		// Won't include the general package name part twice
-		val pckName = c.packageName
-		val base = accessPackage/pckName
-		c.customAccessSubPackageName.notEmpty match {
-			case Some(custom) =>
-				// Case: "-" defined as a custom package name => Indicates that no sub-packaging should be used
-				if (custom == "-")
-					base
-				else
-					base/custom
-			case None =>
-				val end = {
-					val full = c.name.singularIn(UnderScore).split('_').toVector
-					(full.findIndexWhere { _ ~== pckName } match {
-						case Some(idx) => full.drop(idx + 1)
-						case None => full
-					}).mkString("_")
-				}
-				if (end.isEmpty)
-					base
-				else
-					base / end
-		}
 	}
 	
 	/**

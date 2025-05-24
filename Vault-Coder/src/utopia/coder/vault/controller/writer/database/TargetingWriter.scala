@@ -6,12 +6,13 @@ import utopia.coder.model.scala.Visibility.Protected
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
-import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, TraitDeclaration}
+import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, TraitDeclaration}
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Pair, Single}
+import utopia.flow.util.TryExtensions._
 
 import scala.io.Codec
 
@@ -34,14 +35,48 @@ object TargetingWriter
 	
 	// OTHER    ---------------------
 	
+	/**
+	 * Writes targeting access point classes for the specified class
+	 * @param classToWrite Class for which these files are generated
+	 * @param modelRef A reference to the stored model class
+	 * @param dbModelRef A reference to the database model or database properties class/trait
+	 * @param dbFactoryRef A reference to the database factory object
+	 * @param codec Implicit encoding applied
+	 * @param setup Implicit project setup
+	 * @param naming Implicit naming rules applied
+	 * @return Success or a failure. A success yields 4 references:
+	 *              1. Single access class
+	 *              1. Many access class
+	 *              1. Single value access class
+	 *              1. Many values access class
+	 */
 	def apply(classToWrite: Class, modelRef: Reference, dbModelRef: Reference, dbFactoryRef: Reference)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// TODO: Implement
+		val targetPackage = AccessWriter.packageFor(setup.accessPackage, classToWrite)
+		
+		// Writes the filter trait, if appropriate
+		val filterRef = writeFilter(targetPackage, classToWrite, dbModelRef)
+			.flatMap { _.logWithMessage(s"Failed to generate the filter trait for ${ classToWrite.name }")(setup.log) }
+		
+		// Writes the single & plural access classes
+		Pair(false, true)
+			.tryMap { accessMany =>
+				writeAccessValue(classToWrite, targetPackage, dbModelRef, accessMany).flatMap { accessValueRef =>
+					writeAccess(targetPackage, classToWrite, modelRef, dbFactoryRef, accessValueRef, filterRef,
+						accessMany)
+						.map { _ -> accessValueRef }
+				}
+			}
+			.map { references =>
+				val (singularAccess, singularValue) = references.head
+				val (manyAccess, manyValue) = references(1)
+				
+				(singularAccess, manyAccess, singularValue, manyValue)
+			}
 	}
 	
-	private def writeAccessValue(classToWrite: Class, targetPackage: Package, dbModelRef: Reference,
-	                              accessMany: Boolean = false)
+	private def writeAccessValue(classToWrite: Class, targetPackage: Package, dbModelRef: Reference, accessMany: Boolean)
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Prepares the class properties
@@ -99,13 +134,14 @@ object TargetingWriter
 		}
 	}
 	
-	private def writeAccess(targetPackage: Package, classToWrite: Class, modelRef: Reference, valuesRef: Reference,
-	                        filterRef: Option[Reference], accessMany: Boolean)
+	private def writeAccess(targetPackage: Package, classToWrite: Class, modelRef: Reference, dbFactoryRef: Reference,
+	                        valuesRef: Reference, filterRef: Option[Reference], accessMany: Boolean)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val rawAccessName = accessPrefix + classToWrite.name
 		val singleAccessName = rawAccessName.className
-		val accessName = if (accessMany) rawAccessName.pluralClassName else singleAccessName
+		val manyAccessName = rawAccessName.pluralClassName
+		val accessName = if (accessMany) manyAccessName else singleAccessName
 		val accessType = ScalaType.basic(s"$accessName[A]")
 		
 		val genericOutput = GenericType("A")
@@ -115,7 +151,7 @@ object TargetingWriter
 		
 		val parentType: Extension = {
 			if (accessMany)
-				accessWrapper(genericOutputType, accessType, ScalaType.basic(s"$singleAccessName[A]"))
+				accessRowsWrapper(genericOutputType, accessType, ScalaType.basic(s"$singleAccessName[A]"))
 			else
 				accessOneWrapper(ScalaType.option(genericOutputType), accessType)
 		}
@@ -154,29 +190,21 @@ object TargetingWriter
 			isCaseClass = true
 		)
 		
-		// TODO: Continue by writing the companion object
+		// Prepares the companion object, also
+		val companionParentRef = if (accessMany) accessManyRoot else accessOneRoot
+		val companion = ObjectDeclaration(
+			name = accessName,
+			extensions = Single(companionParentRef(ScalaType.basic(accessName)(modelRef))),
+			properties = Single(LazyValue("root", if (accessMany) Set(dbFactoryRef) else Set(), isOverridden = true)(
+				if (accessMany) s"apply(AccessManyRows($dbFactoryRef))" else s"$manyAccessName.root.head")),
+			methods = Set(
+				MethodDeclaration("accessValues", Set(implicitConversions), isImplicit = true,
+					description = "Provides implicit access to an access point's .values property")(
+					Parameter("access", ScalaType.basic(accessName)(ScalaType.basic("_")),
+						description = "Access point whose values are accessed"))(
+					"access.values"))
+		)
+		
+		File(targetPackage, companion, accessClass).write()
 	}
-	 
-	/*
-	object AccessIssue extends AccessOneRoot[AccessIssue[Issue]]
-	{
-		override lazy val root: AccessIssue[Issue] = AccessIssues.root.head
-	}
-	 */
-	/*
-	object AccessIssues extends AccessManyRoot[AccessIssues[Issue]]
-	{
-		// ATTRIBUTES   -----------------------
-		
-		/**
-		  * Root issue access point
-		  */
-		override lazy val root = apply(AccessManyRows(IssueFactory))
-		
-		
-		// IMPLICIT ------------------------------
-		
-		implicit def accessValues(access: AccessIssues[_]): AccessIssueValues = access.values
-	}
-	 */
 }

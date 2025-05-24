@@ -1,7 +1,7 @@
 package utopia.coder.vault.test
 
 import utopia.coder.model.data.NamingRules
-import utopia.coder.vault.controller.writer.database.SqlWriter
+import utopia.coder.vault.controller.writer.database.sql.SqlWriter
 
 /**
  * Tests unique table initials -creation
