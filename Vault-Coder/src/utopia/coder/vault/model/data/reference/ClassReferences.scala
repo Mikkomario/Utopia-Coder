@@ -1,6 +1,7 @@
-package utopia.coder.vault.model.data
+package utopia.coder.vault.model.data.reference
 
 import utopia.coder.model.scala.datatype.Reference
+import utopia.coder.vault.model.data.Class
 import utopia.flow.view.template.Extender
 
 /**
@@ -10,7 +11,7 @@ import utopia.flow.view.template.Extender
   */
 case class ClassReferences(targetClass: Class, model: ClassModelReferences, dbFactory: Reference, dbModel: Reference,
                            genericUniqueAccessTrait: Option[Reference], genericManyAccessTrait: Option[Reference],
-                           generic: Option[GenericClassReferences])
+                           targeting: Option[TargetingReferences], generic: Option[GenericClassReferences])
 	extends Extender[ClassModelReferences]
 {
 	override def wrapped: ClassModelReferences = model

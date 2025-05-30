@@ -7,7 +7,8 @@ import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
-import utopia.coder.vault.model.data.{Class, ClassReferences, VaultProjectSetup}
+import utopia.coder.vault.model.data.reference.ClassReferences
+import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.CollectionExtensions.RichIterable
 import utopia.flow.collection.immutable.{Pair, Single}

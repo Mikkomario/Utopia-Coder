@@ -5,7 +5,8 @@ import utopia.coder.model.scala.DeclarationDate
 import utopia.coder.model.scala.datatype.{Extension, Reference}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue}
 import utopia.coder.model.scala.declaration.{File, ObjectDeclaration}
-import utopia.coder.vault.model.data.{CombinationData, CombinationReferences, VaultProjectSetup}
+import utopia.coder.vault.model.data.reference.CombinationReferences
+import utopia.coder.vault.model.data.{CombinationData, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.flow.collection.immutable.Single
 

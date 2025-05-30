@@ -11,7 +11,8 @@ import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedPro
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.controller.writer.database.AccessWriter
-import utopia.coder.vault.model.data.{Class, ClassModelReferences, ClassReferences, GenericClassModelReferences, Property, VaultProjectSetup}
+import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences, GenericClassModelReferences}
+import utopia.coder.vault.model.data.{Class, Property, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.CollectionExtensions.{RichIterable, _}

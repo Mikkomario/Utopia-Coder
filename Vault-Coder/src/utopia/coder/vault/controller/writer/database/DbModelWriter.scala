@@ -10,8 +10,9 @@ import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, Sca
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
+import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences, GenericDbModelRefs}
 import utopia.flow.collection.CollectionExtensions._
-import utopia.coder.vault.model.data.{Class, ClassModelReferences, ClassReferences, DbProperty, GenericDbModelRefs, Property, VaultProjectSetup}
+import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}

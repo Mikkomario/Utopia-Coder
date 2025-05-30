@@ -11,7 +11,8 @@ import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, Sca
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
-import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, DbProperty, Property, VaultProjectSetup}
+import utopia.coder.vault.model.data.reference.ClassReferences
+import utopia.coder.vault.model.data.{Class, CombinationData, DbProperty, Property, VaultProjectSetup}
 import utopia.coder.vault.model.datatype.PropertyType
 import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.IntNumber
 import utopia.coder.vault.model.datatype.StandardPropertyType.ClassReference

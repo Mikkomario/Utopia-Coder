@@ -1,4 +1,4 @@
-package utopia.coder.vault.model.data
+package utopia.coder.vault.model.data.reference
 
 import utopia.coder.model.scala.datatype.Reference
 import utopia.flow.view.template.Extender

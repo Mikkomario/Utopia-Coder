@@ -12,7 +12,8 @@ import utopia.coder.vault.controller.writer.database._
 import utopia.coder.vault.controller.writer.database.sql.{ColumnLengthRulesWriter, InsertsWriter, SqlWriter, TablesWriter}
 import utopia.coder.vault.controller.writer.documentation.{DocumentationWriter, TableDescriptionsWriter}
 import utopia.coder.vault.controller.writer.model.{CombinedModelWriter, DescribedModelWriter, EnumerationWriter, ModelWriter}
-import utopia.coder.vault.model.data.{Class, ClassReferences, CombinationData, GenericClassReferences, ModuleData, VaultProjectSetup}
+import utopia.coder.vault.model.data.reference.{ClassReferences, GenericClassReferences}
+import utopia.coder.vault.model.data.{Class, CombinationData, ModuleData, VaultProjectSetup}
 import utopia.coder.vault.util.Common
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Pair, Single}
@@ -348,7 +349,9 @@ object MainAppLogic extends CoderAppLogic
 										Success(None)
 								}
 								commonComboTrait.flatMap { commonComboTrait =>
-									combos.tryForeach { writeCombo(_, safeClassRefMap, commonComboTrait) }
+									combos.tryForeach {
+										writeCombo(_, safeClassRefMap, commonComboTrait, targetingByDefault)
+									}
 								}
 							}
 						}
@@ -448,18 +451,18 @@ object MainAppLogic extends CoderAppLogic
 								}).flatMap { descriptionReferences =>
 									// Finally writes the access points
 									// May generate new Targeting -based files instead of the older Access-based files
-									val useTargeting = targetingByDefault && !classToWrite.isExtension &&
-										!classToWrite.isGeneric && descriptionReferences.isEmpty
-									val genericAccessRefs = {
+									val useTargeting = targetingByDefault && descriptionReferences.isEmpty
+									val accessRefs = {
 										if (useTargeting)
-											TargetingWriter(classToWrite, modelRefs.stored, dbPropsOrModelRef,
-												dbFactoryRef)
-												.map { _ => None -> None }
+											TargetingWriter(classToWrite, parentClassReferences, modelRefs.stored,
+												dbPropsOrModelRef, dbFactoryRef)
+												.map { refs => (None, None, Some(refs)) }
 										else
 											AccessWriter(classToWrite, parentClassReferences, modelRefs.stored, dbFactoryRef,
 												dbPropsOrModelRef, descriptionReferences)
+												.map { case (single, many) => (single, many, None) }
 									}
-									genericAccessRefs.map { case (genericUniqueAccessRef, genericManyAccessRef) =>
+									accessRefs.map { case (genericUniqueAccessRef, genericManyAccessRef, targetingRefs) =>
 										val genericReferences = modelRefs.generic.flatMap { modelRefs =>
 											dbPropsRefs.flatMap { case (dbPropsRefs, _) =>
 												dbModelRefs.leftOption.flatMap { dbModelRefs =>
@@ -472,7 +475,7 @@ object MainAppLogic extends CoderAppLogic
 										}
 										val classRefs = ClassReferences(classToWrite, modelRefs, dbFactoryRef,
 											dbPropsOrModelRef, genericUniqueAccessRef, genericManyAccessRef,
-											genericReferences)
+											targetingRefs, genericReferences)
 										
 										classToWrite -> classRefs
 									}
@@ -484,29 +487,46 @@ object MainAppLogic extends CoderAppLogic
 	}
 	
 	private def writeCombo(combination: CombinationData, classRefsMap: MapAccess[Class, ClassReferences],
-	                       commonComboTraitRef: Option[Reference])
+	                       commonComboTraitRef: Option[Reference], targetingByDefault: Boolean)
 	                      (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val parentRefs = classRefsMap(combination.parentClass)
 		val childRefs = classRefsMap(combination.childClass)
 		
+		// Writes the combo class / trait
 		CombinedModelWriter(combination, parentRefs.model, childRefs.stored, commonComboTraitRef)
 			.flatMap { combinedRefs =>
+				// Writes the DB factory class
 				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory)
 					.flatMap { comboFactoryRef =>
-						parentRefs.genericUniqueAccessTrait
-							.toTry { new IllegalStateException(
-								"No generic unique access trait exists for a combined class") }
-							.flatMap { genericUniqueAccessTraitRef =>
-								parentRefs.genericManyAccessTrait
-									.toTry { new IllegalStateException(
-										"No generic access trait exists for a combined class") }
-									.flatMap { genericManyAccessTraitRef =>
-										AccessWriter.writeComboAccessPoints(combination, genericUniqueAccessTraitRef,
-											genericManyAccessTraitRef, combinedRefs.combined, comboFactoryRef,
-											parentRefs.dbModel, childRefs.dbModel)
-									}
-							}
+						// Writes either a regular or a targeting access interface
+						if (targetingByDefault)
+							parentRefs.targeting
+								.toTry { new IllegalStateException(s"The combo parent class (${
+									combination.parentClass.name }) is missing targeting references") }
+								.flatMap { parentTargetingRefs =>
+									childRefs.targeting
+										.toTry { new IllegalStateException(s"The combo child class (${
+											combination.childClass.name }) is missing targeting references") }
+										.flatMap { childTargetingRefs =>
+											TargetingWriter.writeForCombo(combination, combinedRefs.combined,
+												comboFactoryRef, parentTargetingRefs, childTargetingRefs)
+										}
+								}
+						else
+							parentRefs.genericUniqueAccessTrait
+								.toTry { new IllegalStateException(
+									"No generic unique access trait exists for a combined class") }
+								.flatMap { genericUniqueAccessTraitRef =>
+									parentRefs.genericManyAccessTrait
+										.toTry { new IllegalStateException(
+											"No generic access trait exists for a combined class") }
+										.flatMap { genericManyAccessTraitRef =>
+											AccessWriter.writeComboAccessPoints(combination, genericUniqueAccessTraitRef,
+												genericManyAccessTraitRef, combinedRefs.combined, comboFactoryRef,
+												parentRefs.dbModel, childRefs.dbModel)
+										}
+								}
 					}
 			}
 	}
@@ -514,11 +534,12 @@ object MainAppLogic extends CoderAppLogic
 	// Generates references as if class files had been written
 	private def generateReferencesForClass(classToWrite: Class, rootPackage: Package)(implicit naming: NamingRules) = {
 		val dbPackage = rootPackage/"database"
+		val accessPackage = dbPackage/"access"
 		
 		val modelRefs = ModelWriter.generateReferences(rootPackage/"model", classToWrite)
 		val dbModelRefs = DbModelWriter.generateReferences(dbPackage/"storable", classToWrite)
 		val (dbFactory, dbFactoryLike) = DbFactoryWriter.generateReferences(dbPackage/"factory", classToWrite)
-		val accessRefs = AccessWriter.generateReferences(dbPackage/"access", classToWrite)
+		val accessRefs = AccessWriter.generateReferences(accessPackage, classToWrite)
 		
 		val (dbModel, dbPropsRefs) = dbModelRefs match {
 			case Left(_) =>
@@ -537,6 +558,7 @@ object MainAppLogic extends CoderAppLogic
 		}
 		
 		ClassReferences(classToWrite, modelRefs, dbFactory, dbModel,
-			accessRefs.map { _.first }, accessRefs.map { _.second }, generic)
+			accessRefs.map { _.first }, accessRefs.map { _.second },
+			Some(TargetingWriter.generateReferencesFor(accessPackage, classToWrite)), generic)
 	}
 }

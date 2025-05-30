@@ -5,12 +5,13 @@ import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.model.data.{ClassModelReferences, CombinationData, CombinationReferences, VaultProjectSetup}
+import utopia.coder.vault.model.data.{CombinationData, VaultProjectSetup}
 import utopia.coder.model.scala.{DeclarationDate, Parameter}
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
 import utopia.coder.model.scala.declaration.{ClassDeclaration, File, MethodDeclaration, ObjectDeclaration, TraitDeclaration}
 import utopia.coder.vault.model.data
+import utopia.coder.vault.model.data.reference.{ClassModelReferences, CombinationReferences}
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 

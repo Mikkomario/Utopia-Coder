@@ -1,11 +1,11 @@
 package utopia.coder.vault.model.enumeration
 
 import utopia.coder.model.data.{Name, NamingRules}
-import utopia.coder.vault.model.data.CombinationReferences
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.MethodDeclaration
 import utopia.coder.model.scala.{Parameter, Parameters}
+import utopia.coder.vault.model.data.reference.CombinationReferences
 import utopia.coder.vault.util.VaultReferences.Vault._
 
 /**
