@@ -72,7 +72,7 @@ object TargetingWriter
 		val targetPackage = AccessWriter.packageFor(setup.accessPackage, classToWrite)
 		
 		// Writes the filter trait, if appropriate
-		val filterRef = writeFilter(targetPackage, classToWrite, dbModelRef)
+		val filterRef = writeFilter(targetPackage, classToWrite, parentClassRefs, dbModelRef)
 			.flatMap { _.logWithMessage(s"Failed to generate the filter trait for ${ classToWrite.name }")(setup.log) }
 		
 		// Writes the single & plural value access classes, and the primary access classes
@@ -86,10 +86,8 @@ object TargetingWriter
 								Success(None)
 							else
 								writeAccess(targetPackage, classToWrite, modelRef, dbFactoryRef, accessValueRef,
-									filterRef.emptyOrSingle.map { classToWrite.name -> _ } ++
-										parentClassRefs.iterator.flatMap { c =>
-											c.targeting.flatMap { _.filtering.map { c.targetClass.name -> _ } }
-										},
+									filterRef.orElse { parentClassRefs.findMap { _.targeting.flatMap { _.filtering } } }
+										.emptyOrSingle.map { classToWrite.name -> _ },
 									accessMany = accessMany)
 									.map { Some(_) }
 						}
@@ -207,21 +205,38 @@ object TargetingWriter
 		File(targetPackage, accessValueClass).write()
 	}
 	
-	private def writeFilter(targetPackage: Package, classToWrite: Class, dbModelRef: Reference)
+	private def writeFilter(targetPackage: Package, classToWrite: Class, parentClassRefs: Seq[ClassReferences],
+	                        dbModelRef: Reference)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val modelName = (classToWrite.name + modelSuffix).prop
 		// Won't generate a file if there are no "with" or "in" -methods
-		AccessWriter.filterMethodsFor(classToWrite, modelName).notEmpty.map { filterMethods =>
+		// (except for classes that extend more than 1 other class)
+		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, modelName)
+		if (filterMethods.nonEmpty || parentClassRefs.existsCount(2) { _.targeting.exists { _.filtering.isDefined } }) {
+			// Extends filter traits of parents, or FilterableView[+Repr]
 			val reprType = ScalaType.basic("Repr")
-			val modelProp = ComputedProperty(modelName, Set(dbModelRef),
-				description = s"Model that defines ${ classToWrite.name } database properties")(dbModelRef.target)
+			val parentTraits = parentClassRefs.flatMap { _.targeting.flatMap { _.filtering } }
+			val extensions = parentTraits.notEmpty match {
+				case Some(parents) => parents.map[Extension] { _(reprType) }
+				case None => Single[Extension](filterableView(reprType))
+			}
 			
-			File(targetPackage,
+			// The model declaration is abstract for generic classes
+			val modelProp = {
+				val desc = s"Model that defines ${ classToWrite.name } database properties"
+				if (classToWrite.isGeneric)
+					ComputedProperty.newAbstract(modelName, dbModelRef, description = desc)
+				else
+					ComputedProperty(modelName, Set(dbModelRef), description = desc,
+						isOverridden = parentTraits.nonEmpty)(dbModelRef.target)
+			}
+			
+			Some(File(targetPackage,
 				TraitDeclaration(
 					name = filterTraitNameFor(classToWrite),
 					genericTypes = Single(GenericType.covariant("Repr")),
-					extensions = Single(filterableView(reprType)),
+					extensions = extensions,
 					properties = Single(modelProp),
 					methods = filterMethods.toSet,
 					description = s"Common trait for access points which may be filtered based on ${
@@ -229,8 +244,10 @@ object TargetingWriter
 					author = classToWrite.author,
 					since = DeclarationDate.versionedToday
 				)
-			).write()
+			).write())
 		}
+		else
+			None
 	}
 	
 	private def writeAccess(targetPackage: Package, classToWrite: Class,
