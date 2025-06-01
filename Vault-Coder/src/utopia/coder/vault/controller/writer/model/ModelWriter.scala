@@ -10,7 +10,7 @@ import utopia.coder.model.scala.datatype._
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
-import utopia.coder.vault.controller.writer.database.AccessWriter
+import utopia.coder.vault.controller.writer.database.{AccessWriter, TargetingWriter}
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences, GenericClassModelReferences}
 import utopia.coder.vault.model.data.{Class, Property, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
@@ -27,6 +27,7 @@ import scala.util.Success
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
+// TODO: Make companion object schema & apply high merge priority
 object ModelWriter
 {
 	// ATTRIBUTES   -------------------------
@@ -57,11 +58,13 @@ object ModelWriter
 	  * Writes stored and partial model classes for a class template
 	  * @param classToWrite class being written
 	  * @param parentClassReferences References to class & trait files generated for this class' parents
+	 * @param targeted Whether to utilize targeted database access points
+	 *                 (default = false = utilize older access traits)
 	 * @param codec        Implicit codec used when writing files (implicit)
 	  * @param setup        Target project -specific settings (implicit)
 	  * @return References to generated classes
 	  */
-	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences])
+	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences], targeted: Boolean = false)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Writes the factory traits
@@ -102,7 +105,7 @@ object ModelWriter
 							genericRefs.map { _.dataLike }, buildCopyName)
 							.flatMap { dataRef =>
 								writeStored(classToWrite, storePackage, parentClassReferences, factoryWrapperRef,
-									dataRef, genericRefs.map { _.storedLike })
+									dataRef, genericRefs.map { _.storedLike }, targeted)
 									.map { storedRef =>
 										// Returns references to generated classes
 										ClassModelReferences(dataRef, storedRef, factoryRef, factoryWrapperRef,
@@ -586,7 +589,8 @@ object ModelWriter
 	// Writes the stored model version
 	// Returns a reference
 	private def writeStored(classToWrite: Class, storedPackage: Package, parentClassReferences: Seq[ClassReferences],
-	                        factoryWrapperRef: Reference, dataClassRef: Reference, storedLikeRef: Option[Reference])
+	                        factoryWrapperRef: Reference, dataClassRef: Reference, storedLikeRef: Option[Reference],
+	                        targeted: Boolean)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Prepares common data
@@ -626,7 +630,7 @@ object ModelWriter
 						// Case: Extending another StoredY trait => No need to define the properties again,
 						// except for an accessor property and the withX function
 						if (classToWrite.isExtension)
-							(Empty, if (setup.modelCanReferToDB) Single(accessorFor(classToWrite)) else Empty,
+							(Empty, if (setup.modelCanReferToDB) Single(accessorFor(classToWrite, targeted)) else Empty,
 								Some(withIdFor(classToWrite)))
 						else {
 							val wrappedFactory = ComputedProperty("wrappedFactory", visibility = Protected,
@@ -648,7 +652,7 @@ object ModelWriter
 									else
 										Single[Extension](vault.storedModelConvertible(dataClassRef)) -> None
 								}
-								val accessor = accessorFor(classToWrite)
+								val accessor = accessorFor(classToWrite, targeted)
 								val withId = withIdFor(classToWrite)
 								
 								(stored :+[Extension] fromIdFactory,
@@ -786,11 +790,19 @@ object ModelWriter
 		}
 	}
 	
-	private def accessorFor(classToWrite: Class)(implicit naming: NamingRules, setup: VaultProjectSetup) = {
-		val singleAccessRef = AccessWriter.singleIdReferenceFor(classToWrite)
-		ComputedProperty("access", Set(singleAccessRef),
-			description = s"An access point to this ${ classToWrite.name.doc } in the database")(
-			s"${ singleAccessRef.target }(id)")
+	private def accessorFor(classToWrite: Class, targeted: Boolean)
+	                       (implicit naming: NamingRules, setup: VaultProjectSetup) =
+	{
+		val code = {
+			if (targeted)
+				TargetingWriter.singleAccessCodeFor(classToWrite, "id")
+			else {
+				val singleAccessRef = AccessWriter.singleIdReferenceFor(classToWrite)
+				CodePiece(s"${ singleAccessRef.target }(id)", Set(singleAccessRef))
+			}
+		}
+		ComputedProperty("access", code.references,
+			description = s"An access point to this ${ classToWrite.name.doc } in the database")(code.text)
 	}
 	
 	// Defines the withX methods in data class context

@@ -640,7 +640,8 @@ object DbModelWriter
 			}
 			
 			Some(PropertyDeclaration(if (classToWrite.isGeneric) ComputedProperty else LazyValue, "valueProperties",
-				implementation, isOverridden = true))
+				implementation, explicitOutputType = Some(ScalaType.basic("Seq[(String, Value)]")),
+				isOverridden = true))
 		}
 	}
 	

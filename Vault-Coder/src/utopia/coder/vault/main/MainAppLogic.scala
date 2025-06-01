@@ -411,7 +411,7 @@ object MainAppLogic extends CoderAppLogic
 			println(s"Warning: ${ classToWrite.parents.size - parentClassReferences.size } of the ${
 				classToWrite.parents.size } parent references are missing for ${ classToWrite.name.className }")
 		
-		ModelWriter(classToWrite, parentClassReferences).flatMap { modelRefs =>
+		ModelWriter(classToWrite, parentClassReferences, targetingByDefault).flatMap { modelRefs =>
 			// dbPropsRefs is stored as: Try[Option[(Pair(DbPropsRef, DbPropsWrapperRef), wrapperPropName)]]
 			val dbPropsRefs = {
 				if (classToWrite.isGeneric)
@@ -509,8 +509,9 @@ object MainAppLogic extends CoderAppLogic
 										.toTry { new IllegalStateException(s"The combo child class (${
 											combination.childClass.name }) is missing targeting references") }
 										.flatMap { childTargetingRefs =>
-											TargetingWriter.writeForCombo(combination, combinedRefs.combined,
-												comboFactoryRef, parentTargetingRefs, childTargetingRefs)
+											TargetingWriter.writeForCombo(combination, parentRefs.dbModel,
+												combinedRefs.combined, comboFactoryRef, parentTargetingRefs,
+												childTargetingRefs)
 										}
 								}
 						else

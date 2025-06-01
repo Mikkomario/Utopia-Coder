@@ -51,7 +51,7 @@ object DbFactoryWriter
 	// TODO: When writing a generic factory trait for a class utilizing timestamps, should generate the override def timestamp = dbProps.<timestampPropName> -property
 	
 	/*
-	FIXME: When generating the apply function, the code is broken if enumerations (without default values) are used:
+	FIXME: When generating the apply function, the code is broken if enumerations (without default values) are used (because the parent extends fromValidatedRowModelFactory):
 	override def apply(model: ModelLike[Property]) = {
 		valid.flatMap { valid =>
 			LlmUseCase.fromValue(valid(this.model.task.name)).map { task =>

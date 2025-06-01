@@ -3,6 +3,7 @@ package utopia.coder.vault.controller.writer.database
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.Protected
+import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
@@ -10,10 +11,12 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
+import utopia.coder.vault.util.VaultReferences
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.util.TryExtensions._
+import utopia.flow.util.StringExtensions._
 
 import scala.io.Codec
 import scala.util.Success
@@ -69,7 +72,7 @@ object TargetingWriter
 	          dbModelRef: Reference, dbFactoryRef: Reference)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val targetPackage = AccessWriter.packageFor(setup.accessPackage, classToWrite)
+		val targetPackage = packageFor(classToWrite)
 		
 		// Writes the filter trait, if appropriate
 		val filterRef = writeFilter(targetPackage, classToWrite, parentClassRefs, dbModelRef)
@@ -84,12 +87,21 @@ object TargetingWriter
 						val accessRef = {
 							if (classToWrite.isGeneric)
 								Success(None)
-							else
-								writeAccess(targetPackage, classToWrite, modelRef, dbFactoryRef, accessValueRef,
-									filterRef.orElse { parentClassRefs.findMap { _.targeting.flatMap { _.filtering } } }
-										.emptyOrSingle.map { classToWrite.name -> _ },
+							else {
+								val appliedFilter = filterRef.orElse {
+									parentClassRefs.findMap { _.targeting.flatMap { refs =>
+										refs.filtering.map { _ -> refs.filteringModelPropName }
+									} }
+								}
+								writeAccess(targetPackage, classToWrite.name, modelRef, dbModelRef, dbFactoryRef,
+									accessValueRef,
+									appliedFilter.emptyOrSingle.map { case (ref, modelPropName) =>
+										(classToWrite.name, ref, modelPropName)
+									},
+									author = classToWrite.author,
 									accessMany = accessMany)
 									.map { Some(_) }
+							}
 						}
 						accessRef.map { _ -> accessValueRef }
 					}
@@ -97,13 +109,18 @@ object TargetingWriter
 			.map { references =>
 				val (_, singularValue) = references.head
 				val (_, manyValue) = references(1)
+				val (filter, abstractModelPropName) = filterRef match {
+					case Some((filter, prop)) => Some(filter) -> prop
+					case None => None -> ""
+				}
 				
-				TargetingReferences(singularValue, manyValue, filterRef)
+				TargetingReferences(singularValue, manyValue, filter, abstractModelPropName)
 			}
 	}
 	/**
 	 * Writes the access classes for a combo class
 	 * @param combo Combo to write
+	 * @param parentDbModelRef Reference to the parent class' database model class
 	 * @param comboRef Reference to the combo trait / class
 	 * @param comboDbFactoryRef Reference to the combo-specific database factory
 	 * @param parentRefs Targeting references concerning the parent class
@@ -113,26 +130,40 @@ object TargetingWriter
 	 * @param naming Implicit naming rules applied
 	 * @return Success or a failure
 	 */
-	def writeForCombo(combo: CombinationData, comboRef: Reference, comboDbFactoryRef: Reference,
-	                  parentRefs: TargetingReferences, childRefs: TargetingReferences)
+	def writeForCombo(combo: CombinationData, parentDbModelRef: Reference, comboRef: Reference,
+	                  comboDbFactoryRef: Reference, parentRefs: TargetingReferences, childRefs: TargetingReferences)
 	                 (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val childClassName = combo.childClass.name
 		Pair(false, true).tryMap { accessMany =>
-			val childValuesPropName = if (accessMany) childClassName.props else childClassName.prop
+			val childValuesPropName = if (accessMany) combo.childName.props else combo.childName.prop
 			val childValuesRef = childRefs.valueFor(accessMany)
 			writeAccess(
 				targetPackage = AccessWriter.packageFor(setup.accessPackage, combo.parentClass),
-				classToWrite = combo.parentClass,
-				modelRef = comboRef, dbFactoryRef = comboDbFactoryRef, valuesRef = parentRefs.valueFor(accessMany),
-				filterRefs = Pair(combo.parentClass -> parentRefs, combo.childClass -> childRefs)
-					.flatMap { case (c, refs) => refs.filtering.map { c.name -> _ } },
+				className = combo.name,
+				modelRef = comboRef, dbModelRef = parentDbModelRef, dbFactoryRef = comboDbFactoryRef,
+				valuesRef = parentRefs.valueFor(accessMany),
+				filterRefs = Pair((combo.parentName, parentRefs), (combo.childName, childRefs))
+					.flatMap { case (name, refs) => refs.filtering.map { (name, _, refs.filteringModelPropName) } },
+				author = combo.author,
 				extraProps = Single(
 					LazyValue(childValuesPropName, Set(childValuesRef),
-						description = s"Access to $childClassName -specific values")(
+						description = s"Access to ${ combo.childClass.name } -specific values")(
 						s"${ childValuesRef.target }(wrapped)")),
-				accessMany = accessMany)
+				accessMany = accessMany,
+				allowRowAccess = !combo.combinationType.isOneToMany)
 		}
+	}
+	
+	/**
+	 * @param c Targeted class
+	 * @param idCode Code that yields an id value
+	 * @param setup Implicit project setup
+	 * @param naming Implicit naming rules
+	 * @return Code that accesses that class by that id in the database
+	 */
+	def singleAccessCodeFor(c: Class, idCode: CodePiece)(implicit setup: VaultProjectSetup, naming: NamingRules) = {
+		val singleAccessRef = Reference(packageFor(c), (accessPrefix +: c.name).className)
+		idCode.flatMapText { id => CodePiece(s"${ singleAccessRef.target }($id)", Set(singleAccessRef)) }
 	}
 	
 	private def writeAccessValue(targetPackage: Package, classToWrite: Class, parentClassRefs: Seq[ClassReferences],
@@ -162,14 +193,24 @@ object TargetingWriter
 			if (classToWrite.isExtension)
 				None
 			else
-				Some(LazyValue(if (accessMany) "id" else "ids", Set(flow.valueConversions))(
+				Some(LazyValue(if (accessMany) "ids" else "id", Set(flow.valueConversions))(
 					"apply(model.index) { _.getInt }"))
 		}
 		val columnProps = classToWrite.properties.filterNot { _.isExtension }.map { prop =>
 			val name = if (accessMany) prop.name.props else prop.name.prop
 			val fromValue = prop.dataType.fromValueCode(Single("v"))
-			LazyValue(name, fromValue.references + flow.valueConversions, description = prop.description,
-				isLowMergePriority = true)(s"apply(model.$name) { v => $fromValue }")
+			// When from value yields a try, requires a custom to-value conversion
+			val (factoryMethodCall, toValue) = {
+				if (prop.dataType.yieldsTryFromValue)
+					".customInput" -> prop.dataType.toValueCode("v")
+						.mapText { toValue => s" { v: ${ prop.dataType.toScala } => $toValue }" }
+				else
+					"" -> CodePiece.empty
+			}
+			
+			LazyValue(name, fromValue.references ++ toValue.references + flow.valueConversions,
+				description = prop.description, isLowMergePriority = true)(
+				s"apply(model.${ prop.name.prop })$factoryMethodCall { v => $fromValue }${ toValue.text }")
 		}
 		val props = Single(modelProp) ++ idProp ++ columnProps
 		
@@ -213,12 +254,13 @@ object TargetingWriter
 		// Won't generate a file if there are no "with" or "in" -methods
 		// (except for classes that extend more than 1 other class)
 		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, modelName)
-		if (filterMethods.nonEmpty || parentClassRefs.existsCount(2) { _.targeting.exists { _.filtering.isDefined } }) {
+		val parents = parentClassRefs
+			.flatMap { _.targeting.flatMap { refs => refs.filtering.map { _ -> refs.filteringModelPropName } } }
+		if (filterMethods.nonEmpty || parents.hasSize >= 2) {
 			// Extends filter traits of parents, or FilterableView[+Repr]
 			val reprType = ScalaType.basic("Repr")
-			val parentTraits = parentClassRefs.flatMap { _.targeting.flatMap { _.filtering } }
-			val extensions = parentTraits.notEmpty match {
-				case Some(parents) => parents.map[Extension] { _(reprType) }
+			val extensions = parents.notEmpty match {
+				case Some(parents) => parents.map[Extension] { _._1(reprType) }
 				case None => Single[Extension](filterableView(reprType))
 			}
 			
@@ -228,35 +270,42 @@ object TargetingWriter
 				if (classToWrite.isGeneric)
 					ComputedProperty.newAbstract(modelName, dbModelRef, description = desc)
 				else
-					ComputedProperty(modelName, Set(dbModelRef), description = desc,
-						isOverridden = parentTraits.nonEmpty)(dbModelRef.target)
+					ComputedProperty(modelName, Set(dbModelRef), description = desc)(dbModelRef.target)
 			}
+			// When inheriting, implements those abstract properties
+			val extendedModelImplementations = parents.view.map { _._2 }.filter { _.nonEmpty }
+				.map { propName => ComputedProperty(propName, isOverridden = true)(modelProp.name) }
+				.toOptimizedSeq
 			
-			Some(File(targetPackage,
+			val writeResult = File(targetPackage,
 				TraitDeclaration(
 					name = filterTraitNameFor(classToWrite),
 					genericTypes = Single(GenericType.covariant("Repr")),
 					extensions = extensions,
-					properties = Single(modelProp),
+					properties = modelProp +: extendedModelImplementations,
 					methods = filterMethods.toSet,
 					description = s"Common trait for access points which may be filtered based on ${
 						classToWrite.name } properties",
 					author = classToWrite.author,
 					since = DeclarationDate.versionedToday
 				)
-			).write())
+			).write()
+			
+			Some(writeResult.map { _ -> (if (classToWrite.isGeneric) modelName else "") })
 		}
+		// Case: Shouldn't write a separate filter trait => Refers to a parent filter trait, if applicable
 		else
-			None
+			parents.headOption.map { Success(_) }
 	}
 	
-	private def writeAccess(targetPackage: Package, classToWrite: Class,
-	                        modelRef: Reference, dbFactoryRef: Reference, valuesRef: Reference,
-	                        filterRefs: Seq[(Name, Reference)], extraProps: Iterable[PropertyDeclaration] = Empty,
-	                        accessMany: Boolean)
+	private def writeAccess(targetPackage: Package, className: Name, modelRef: Reference, dbModelRef: Reference,
+	                        dbFactoryRef: Reference, valuesRef: Reference,
+	                        filterRefs: Seq[(Name, Reference, String)], author: String,
+	                        extraProps: Iterable[PropertyDeclaration] = Empty, accessMany: Boolean,
+	                        allowRowAccess: Boolean = true)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val rawAccessName = accessPrefix + classToWrite.name
+		val rawAccessName = accessPrefix + className
 		val singleAccessName = rawAccessName.className
 		val manyAccessName = rawAccessName.pluralClassName
 		val accessName = if (accessMany) manyAccessName else singleAccessName
@@ -265,13 +314,32 @@ object TargetingWriter
 		val genericOutput = GenericType("A")
 		val genericOutputType = genericOutput.toScalaType
 		val targetingOneType = targetingOne(ScalaType.option(genericOutputType))
-		val wrappedAccessType = if (accessMany) targetingMany(genericOutputType) else targetingOneType
+		val wrappedAccessType = {
+			if (accessMany) {
+				if (allowRowAccess)
+					targetingManyRows(genericOutputType)
+				else
+					targetingMany(genericOutputType)
+			}
+			else
+				targetingOneType
+		}
 		
 		val parentType: Extension = {
-			if (accessMany)
-				accessRowsWrapper(genericOutputType, accessType, ScalaType.basic(s"$singleAccessName[A]"))
+			if (accessMany) {
+				val singleAccessType = ScalaType.basic(s"$singleAccessName[A]")
+				if (allowRowAccess)
+					accessRowsWrapper(genericOutputType, accessType, singleAccessType)
+				else
+					accessWrapper(genericOutputType, accessType, singleAccessType)
+			}
 			else
 				accessOneWrapper(ScalaType.option(genericOutputType), accessType)
+		}
+		
+		// May implement an abstract model property from a filter trait
+		val modelProp = filterRefs.headOption.flatMap { _._3.ifNotEmpty }.map { propName =>
+			ComputedProperty(propName, Set(dbModelRef), isOverridden = true)(dbModelRef.target)
 		}
 		
 		val wrapMethod = MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
@@ -288,21 +356,26 @@ object TargetingWriter
 		// Additional filtering functions are available from nested objects (to avoid naming conflicts)
 		val (filterObjects, filterProps) = {
 			if (filterRefs.hasSize > 1)
-				filterRefs.tail.splitMap { case (className, filterRef) =>
+				filterRefs.tail.splitMap { case (className, filterRef, _) =>
 					val objectName = (filterByPrefix +: className).className
 					val filterObject = ObjectDeclaration(
 						name = objectName,
 						extensions = Single(filterRef(accessType)),
 						properties = Vector(
-							ComputedProperty("table", isOverridden = true)(s"$accessName.this.table"),
-							ComputedProperty("target", isOverridden = true)(s"$accessName.this.target"),
-							ComputedProperty("accessCondition", isOverridden = true)(s"$accessName.this.accessCondition")),
+							ComputedProperty("self", isOverridden = true)(s"$accessName.this"),
+							ComputedProperty("table", isOverridden = true)(s"self.table"),
+							ComputedProperty("target", isOverridden = true)(s"self.target"),
+							ComputedProperty("accessCondition", isOverridden = true)(s"self.accessCondition")),
 						methods = Set(
 							MethodDeclaration("apply", isOverridden = true)(Parameter("condition", condition))(
-								s"$accessName.this(condition)")),
+								s"self(condition)")),
 						description = s"An interface for $className -based filtering"
 					)
-					val filterProp = ComputedProperty((wherePrefix +: className).prop,
+					val filterPropName = {
+						val base = wherePrefix +: className
+						if (accessMany) base.props else base.prop
+					}
+					val filterProp = ComputedProperty(filterPropName,
 						description = s"Access to $className -based filtering functions")(objectName)
 					
 					filterObject -> filterProp
@@ -319,29 +392,41 @@ object TargetingWriter
 			properties = Pair(
 				LazyValue("values", Set(valuesRef),
 					description = s"Access to the values of accessible ${
-						if (accessMany) classToWrite.name.pluralDoc else classToWrite.name.doc }")(
-					s"$valuesRef(wrapped)"),
+						if (accessMany) className.pluralDoc else className.doc }")(
+					s"${ valuesRef.target }(wrapped)"),
 				ComputedProperty("self", visibility = Protected, isOverridden = true)("this")
-			) ++ filterProps ++ extraProps,
+			) ++ modelProp ++ filterProps ++ extraProps,
 			methods = Set(wrapMethod) ++ wrapIndividual,
 			nested = filterObjects.toSet,
 			description = s"Used for accessing ${ if (accessMany) s"multiple" else "individual" } ${
-				classToWrite.name.pluralDoc } from the DB at a time",
-			author = classToWrite.author,
+				className.pluralDoc } from the DB at a time",
+			author = author,
 			since = DeclarationDate.versionedToday,
 			isCaseClass = true
 		)
 		
 		// Prepares the companion object, also
 		val companionParentRef = if (accessMany) accessManyRoot else accessOneRoot
+		val rootCode = {
+			if (accessMany) {
+				val accessRef = {
+					if (allowRowAccess)
+						accessManyRows
+					else
+						VaultReferences.vault.accessMany
+				}
+				CodePiece(s"apply(${ accessRef.target }(${ dbFactoryRef.target }))", Set(accessRef, dbFactoryRef))
+			}
+			else
+				CodePiece(s"$manyAccessName.root.head")
+		}
 		val companion = ObjectDeclaration(
 			name = accessName,
 			extensions = Single(companionParentRef(ScalaType.basic(accessName)(modelRef))),
-			properties = Single(LazyValue("root", if (accessMany) Set(dbFactoryRef) else Set(), isOverridden = true)(
-				if (accessMany) s"apply(AccessManyRows($dbFactoryRef))" else s"$manyAccessName.root.head")),
+			properties = Single(LazyValue("root", rootCode.references, isOverridden = true)(rootCode.text)),
 			methods = Set(
-				MethodDeclaration("accessValues", Set(implicitConversions), isImplicit = true,
-					description = "Provides implicit access to an access point's .values property")(
+				MethodDeclaration("accessValues", Set(implicitConversions), explicitOutputType = Some(valuesRef),
+					isImplicit = true, description = "Provides implicit access to an access point's .values property")(
 					Parameter("access", ScalaType.basic(accessName)(ScalaType.basic("_")),
 						description = "Access point whose values are accessed"))(
 					"access.values"))
@@ -349,6 +434,9 @@ object TargetingWriter
 		
 		File(targetPackage, companion, accessClass).write()
 	}
+	
+	private def packageFor(c: Class)(implicit setup: VaultProjectSetup) =
+		AccessWriter.packageFor(setup.accessPackage, c)
 	
 	private def filterTraitNameFor(classToWrite: Class)(implicit naming: NamingRules) =
 		(filterPrefix + classToWrite.name).pluralClassName
