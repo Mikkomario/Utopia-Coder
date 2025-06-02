@@ -16,7 +16,7 @@ import utopia.coder.vault.model.data.reference.{ClassReferences, GenericClassRef
 import utopia.coder.vault.model.data.{Class, CombinationData, ModuleData, VaultProjectSetup}
 import utopia.coder.vault.util.Common
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.{Pair, Single}
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.collection.template.MapAccess
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.time.Today
@@ -329,10 +329,12 @@ object MainAppLogic extends CoderAppLogic
 			.flatMap { tablesRef =>
 				DescriptionLinkInterfaceWriter(data.classes, tablesRef).flatMap { descriptionLinkObjects =>
 					// Next writes all required documents for each class in order
-					writeClassesInOrder(data.classes, Map(), tablesRef, descriptionLinkObjects, targetingByDefault)
+					val combosByClass = data.combinations.groupBy { _.parentClass }
+					writeClassesInOrder(data.classes, combosByClass, Map(), tablesRef, descriptionLinkObjects,
+						targetingByDefault)
 						.flatMap { classRefs =>
 							// Finally writes the combined models
-							data.combinations.groupBy { _.parentClass }.tryForeach { case (parent, combos) =>
+							combosByClass.tryForeach { case (parent, combos) =>
 								// Provides alternative mapping in case of certain inheriting combo-classes,
 								// where classes are transformed
 								lazy val simplifiedRefs = classRefs.mapKeys { _.name.singularIn(CamelCase.capitalized) }
@@ -359,8 +361,8 @@ object MainAppLogic extends CoderAppLogic
 			}
 	}
 	
-	private def writeClassesInOrder(classesToWrite: Seq[Class], classReferenceMap: Map[Class, ClassReferences],
-	                                tablesRef: Reference,
+	private def writeClassesInOrder(classesToWrite: Seq[Class], combosByClass: Map[Class, Seq[CombinationData]],
+	                                classReferenceMap: Map[Class, ClassReferences], tablesRef: Reference,
 	                                descriptionLinkObjects: Option[(Reference, Reference, Reference)],
 	                                targetingByDefault: Boolean)
 	                               (implicit setup: VaultProjectSetup, naming: NamingRules): Try[Map[Class, ClassReferences]] =
@@ -378,7 +380,7 @@ object MainAppLogic extends CoderAppLogic
 				
 			// Case: Normal class => Proceeds to write the class files
 			case None =>
-				writeClass(classToWrite, tablesRef, descriptionLinkObjects,
+				writeClass(classToWrite, combosByClass, tablesRef, descriptionLinkObjects,
 					classToWrite.parents.flatMap(classReferenceMap.get), targetingByDefault)
 		}
 		
@@ -397,12 +399,12 @@ object MainAppLogic extends CoderAppLogic
 		//       => Writes the immediately available classes and uses recursion to write the rest
 		else
 			readyClasses.tryMap(write).flatMap { newRefs =>
-				writeClassesInOrder(pendingClasses, classReferenceMap ++ newRefs, tablesRef, descriptionLinkObjects,
-					targetingByDefault)
+				writeClassesInOrder(pendingClasses, combosByClass, classReferenceMap ++ newRefs, tablesRef,
+					descriptionLinkObjects, targetingByDefault)
 			}
 	}
 	
-	private def writeClass(classToWrite: Class, tablesRef: Reference,
+	private def writeClass(classToWrite: Class, combosByClass: Map[Class, Seq[CombinationData]], tablesRef: Reference,
 	                       descriptionLinkObjects: Option[(Reference, Reference, Reference)],
 	                       parentClassReferences: Seq[ClassReferences], targetingByDefault: Boolean)
 	         (implicit setup: VaultProjectSetup, naming: NamingRules): Try[(Class, ClassReferences)] =
@@ -454,8 +456,9 @@ object MainAppLogic extends CoderAppLogic
 									val useTargeting = targetingByDefault && descriptionReferences.isEmpty
 									val accessRefs = {
 										if (useTargeting)
-											TargetingWriter(classToWrite, parentClassReferences, modelRefs.stored,
-												dbPropsOrModelRef, dbFactoryRef)
+											TargetingWriter(classToWrite, parentClassReferences,
+												combosByClass.getOrElse(classToWrite, Empty), tablesRef,
+												modelRefs.stored, dbPropsOrModelRef, dbFactoryRef)
 												.map { refs => (None, None, Some(refs)) }
 										else
 											AccessWriter(classToWrite, parentClassReferences, modelRefs.stored, dbFactoryRef,
@@ -499,21 +502,9 @@ object MainAppLogic extends CoderAppLogic
 				// Writes the DB factory class
 				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory)
 					.flatMap { comboFactoryRef =>
-						// Writes either a regular or a targeting access interface
+						// Combo access traits are not written in targeting mode
 						if (targetingByDefault)
-							parentRefs.targeting
-								.toTry { new IllegalStateException(s"The combo parent class (${
-									combination.parentClass.name }) is missing targeting references") }
-								.flatMap { parentTargetingRefs =>
-									childRefs.targeting
-										.toTry { new IllegalStateException(s"The combo child class (${
-											combination.childClass.name }) is missing targeting references") }
-										.flatMap { childTargetingRefs =>
-											TargetingWriter.writeForCombo(combination, parentRefs.dbModel,
-												combinedRefs.combined, comboFactoryRef, parentTargetingRefs,
-												childTargetingRefs)
-										}
-								}
+							Success(())
 						else
 							parentRefs.genericUniqueAccessTrait
 								.toTry { new IllegalStateException(

@@ -268,6 +268,14 @@ case class Name(singular: String, plural: String, style: NamingConvention)
 	  * @return Singular form of this name in appropriate style for the specified context
 	  */
 	def apply(context: NameContext)(implicit naming: NamingRules) = singularInContext(context)
+	/**
+	 * @param context Applicable name context
+	 * @param plural Whether plural form should be given
+	 * @param naming Implicit naming rules
+	 * @return A plural or singular version of this name for the specified context
+	 */
+	def apply(context: NameContext, plural: Boolean)(implicit naming: NamingRules) =
+		if (plural) pluralInContext(context) else singularInContext(context)
 	
 	/**
 	  * @param context Implicit name context

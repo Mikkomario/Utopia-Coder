@@ -27,7 +27,6 @@ import scala.util.Success
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   */
-// TODO: Make companion object schema & apply high merge priority
 object ModelWriter
 {
 	// ATTRIBUTES   -------------------------
@@ -478,10 +477,9 @@ object ModelWriter
 				classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
 					.getOrElse(CodePiece.empty)
 			).withinParenthesis
-		val schema = LazyValue("schema", schemaCode.references,
-			isOverridden = !fromModelMayFail, isLowMergePriority = true)(schemaCode.text)
+		val schema = LazyValue("schema", schemaCode.references, isOverridden = !fromModelMayFail)(schemaCode.text)
 		
-		val fromModel = fromModelFor(classToWrite, dataClassName).copy(isLowMergePriority = true)
+		val fromModel = fromModelFor(classToWrite, dataClassName)
 		
 		// Some of the implementation differs between abstract and concrete classes
 		val (additionalCompanionMethod, nestedInCompanion) = {

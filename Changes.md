@@ -1,5 +1,10 @@
 # Utopia Coder - list of changes
 
+## v1.1.3 (in development)
+### New methods
+- **Name**
+  - Added `.apply(NameContext, Boolean)` for conditional pluralization
+
 ## v1.1.2 - 23.1.2025
 This is a small code-styling update
 ### New features
