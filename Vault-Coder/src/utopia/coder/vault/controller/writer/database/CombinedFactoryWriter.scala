@@ -8,7 +8,7 @@ import utopia.coder.model.scala.declaration.{File, ObjectDeclaration}
 import utopia.coder.vault.model.data.reference.CombinationReferences
 import utopia.coder.vault.model.data.{CombinationData, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
-import utopia.flow.collection.immutable.Single
+import utopia.flow.collection.immutable.{Pair, Single}
 
 import scala.io.Codec
 
@@ -19,6 +19,9 @@ import scala.io.Codec
   */
 object CombinedFactoryWriter
 {
+	def generateReference(combo: CombinationData)(implicit setup: VaultProjectSetup, naming: NamingRules) =
+		Reference(packageFor(combo), factoryNameFor(combo))
+	
 	/**
 	  * Writes a combined model factory object file
 	  * @param data Combination instructions / data
@@ -74,11 +77,12 @@ object CombinedFactoryWriter
 				None
 		}
 		
-		File(setup.factoryPackage/data.packageName,
-			ObjectDeclaration((data.name + DbFactoryWriter.factorySuffix).className,
-				Single(data.combinationType.extensionWith(references)) ++
+		File(packageFor(data),
+			ObjectDeclaration(
+				name = factoryNameFor(data),
+				extensions = Single(data.combinationType.extensionWith(references)) ++
 					creation.map { _._1 } ++ deprecation.map { _._1 },
-				properties = Vector(
+				properties = Pair(
 					ImmutableValue("parentFactory", Set(parentFactoryRef), isOverridden = true)(
 						parentFactoryRef.target),
 					ImmutableValue("childFactory", Set(childFactoryRef), isOverridden = true)(childFactoryRef.target)
@@ -89,4 +93,10 @@ object CombinedFactoryWriter
 			)
 		).write()
 	}
+	
+	private def packageFor(data: CombinationData)(implicit setup: VaultProjectSetup) =
+		setup.factoryPackage/data.packageName
+	
+	private def factoryNameFor(data: CombinationData)(implicit naming: NamingRules) =
+		(data.name + DbFactoryWriter.factorySuffix).className
 }

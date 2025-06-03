@@ -1,9 +1,13 @@
 # Utopia Coder - list of changes
 
 ## v1.1.3 (in development)
+### Bugfixes
+- Bugfix to **ScalaType**'s `.withOther(ScalaType)`
 ### New methods
 - **Name**
   - Added `.apply(NameContext, Boolean)` for conditional pluralization
+### Other changes
+- Classes can now be explicitly declared abstract
 
 ## v1.1.2 - 23.1.2025
 This is a small code-styling update

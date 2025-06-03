@@ -524,6 +524,7 @@ object ModelWriter
 	}
 	
 	// Writes XLike trait for generic implementations
+	// FIXME: Looks like property  & copy functions are not getting written correctly
 	private def writeStoredLike(classToWrite: Class, storedPackage: Package, parentClassReferences: Seq[ClassReferences],
 	                            dataLikeRef: Reference, factoryWrapperRef: Reference, buildCopyName: String)
 	                           (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =

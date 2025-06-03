@@ -85,6 +85,7 @@ object VaultReferences
 		lazy val accessValue = Reference(targetColumns, "AccessValue")
 		lazy val accessValues = Reference(targetColumns, "AccessValues")
 		lazy val targetingOne = Reference(targetOne, "TargetingOne")
+		lazy val targetingManyLike = Reference(targetMany, "TargetingManyLike")
 		lazy val targetingMany = Reference(targetMany, "TargetingMany")
 		lazy val targetingManyRows = Reference(targetMany, "TargetingManyRows")
 		lazy val accessMany = Reference(targetMany, "AccessMany")

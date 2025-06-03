@@ -18,13 +18,14 @@ case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Empty
                             methods: Set[MethodDeclaration] = Set(), nested: Set[InstanceDeclaration] = Set(),
                             visibility: Visibility = Public, annotations: Seq[Annotation] = Empty,
                             description: String = "", author: String = "", headerComments: Seq[String] = Empty,
-                            since: DeclarationDate = DeclarationDate.today, isCaseClass: Boolean = false)
+                            since: DeclarationDate = DeclarationDate.today, isCaseClass: Boolean = false,
+                            isAbstract: Boolean = false)
 	extends InstanceDeclaration
 {
 	override val keyword = {
 		if (isCaseClass)
 			"case class"
-		else if ((properties ++ methods).exists { _.isAbstract })
+		else if (isAbstract || (properties ++ methods).exists { _.isAbstract })
 			"abstract class"
 		else
 			"class"

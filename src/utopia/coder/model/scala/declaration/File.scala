@@ -27,7 +27,15 @@ object File
 	  */
 	def apply(packagePath: Package, firstDeclaration: InstanceDeclaration,
 	          moreDeclarations: InstanceDeclaration*): File =
-		apply(packagePath, firstDeclaration +: moreDeclarations.toVector, firstDeclaration.name, Set[Reference]())
+		apply(packagePath, firstDeclaration +: moreDeclarations)
+	/**
+	 * Creates a new file
+	 * @param packagePath Package for the contents of this file
+	 * @param declarations Instance declarations to include
+	 * @return A new file containing the specified declarations
+	 */
+	def apply(packagePath: Package, declarations: Seq[InstanceDeclaration]): File =
+		apply(packagePath, declarations, declarations.head.name, Set[Reference]())
 }
 
 /**

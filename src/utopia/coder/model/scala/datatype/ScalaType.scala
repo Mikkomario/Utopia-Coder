@@ -193,7 +193,8 @@ case class ScalaType(code: CodePiece, typeParameters: Seq[ScalaType] = Empty, ca
 	 * @param otherType Another type
 	 * @return A combination of these two types
 	 */
-	def withOther(otherType: ScalaType) = ScalaType(code.append(otherType.code, " with "))
+	def withOther(otherType: ScalaType) =
+		ScalaType(toScala.flatMapText { first => otherType.toScala.mapText { second => s"$first with $second" } })
 	
 	/**
 	  * @param parameterTypes A list of accepted parameter types
