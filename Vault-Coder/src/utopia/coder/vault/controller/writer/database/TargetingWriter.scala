@@ -29,6 +29,7 @@ import scala.util.Success
  * @author Mikko Hilpinen
  * @since 22.05.2025, v1.13
  */
+// FIXME: When merging, AccessXs becomes a duplicate class
 object TargetingWriter
 {
 	// ATTRIBUTES   -----------------

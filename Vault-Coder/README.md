@@ -50,6 +50,7 @@ Once you have created a specification document, run the application using the fo
   - This argument is optional
   - If omitted, all project modules will be generated
 - Additionally, if you specify the `-NC` flag, you may prevent any combo classes from being written
+- Specify the `-T` flag if you want to generate newer, **Targeting** -based database access interfaces
 
 The program will inform you if there were any problems during input file processing or during output write operations.
 
@@ -265,6 +266,7 @@ Each property object should contain following properties:
   - `"Long" / "bigint" / "number"` - Results in **Long** numeric type (default name: `"number"`)
   - `"Double"` - Results in **Double** numeric type (default name: `"amount"`)
   - `"Boolean" / "flag"` - Results in **Boolean** type (true / false) (default name: `"flag"`)
+  - `"Boolean?"` / `"Bool?"` / `"UncertainBoolean"` - Results in **UncertainBoolean** type (true, false or uncertain)
   - `"datetime" / "timestamp" / "Instant"` - Results in **Instant** / Datetime type (default name: `"timestamp"`)
   - `"date" / "LocalDate"` - Results in **LocalDate** / Date type (default name: `"date"`)
   - `"time" / "LocalTime"` - Results in **LocalTime** / Time type (default name: `"time"`)

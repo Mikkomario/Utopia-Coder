@@ -7,10 +7,12 @@
 ### New features
 - Added support for targeting access -writing
   - This feature is enabled by passing `-T` as a console argument
+- Added **UncertainBoolean** data type
 ### Bugfixes
 - Fixed a bug that would cause an infinite loop when two classes directly reference each other
 - Fixed a bug that would cause certain inheritance-based combo classes to interrupt the code-generation process
 ### Other changes
+- Modified how enumeration values are parsed from **Value**s
 - `schema` and `.apply(ModelLike)` in the data classes are no longer low merge priorities
 
 ## v1.12.1 - 23.1.2025

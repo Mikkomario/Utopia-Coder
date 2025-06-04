@@ -99,6 +99,7 @@ object Reference
 		lazy val mutate = apply(utils, "Mutate")
 		lazy val notEmpty = apply(utils, "NotEmpty")
 		lazy val version = apply(utils, "Version")
+		lazy val uncertainBoolean = apply(utils, "UncertainBoolean")
 		
 		lazy val empty = apply(immutableCollection, "Empty")
 		lazy val single = apply(immutableCollection, "Single")

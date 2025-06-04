@@ -14,7 +14,7 @@ import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.controller.writer.model.EnumerationWriter
 import utopia.coder.vault.model.data.{Class, Enum}
-import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.{Date, DateTime, DoubleNumber, IntNumber, LongNumber}
+import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.{Bool, Date, DateTime, DoubleNumber, IntNumber, LongNumber}
 import utopia.coder.vault.model.datatype.StandardPropertyType.TimeDuration.{fromValueReferences, toValueReferences}
 import utopia.coder.vault.model.enumeration.{IntSize, Mutability}
 import utopia.coder.vault.model.enumeration.IntSize.Default
@@ -48,6 +48,7 @@ object StandardPropertyType
 		lowerTypeName.untilFirst("(") match {
 			case "requiredstring" | "nonemptystring" | "stringnotempty" | "textnotempty" =>
 				Some(NonEmptyText(appliedLength))
+			case "boolean?" | "bool?" | "uncertainboolean" | "flag?" => Some(UncertainBool)
 			case "version" => Some(VersionType(appliedLength))
 			case "creation" | "created" => Some(CreationTime)
 			case "updated" | "modification" | "update" => Some(UpdateTime)
@@ -691,6 +692,34 @@ object StandardPropertyType
 		}
 	}
 	
+	case object UncertainBool extends FacadePropertyType
+	{
+		// ATTRIBUTES   ----------------------
+		
+		override protected val delegate: PropertyType = Bool.optional
+		override lazy val scalaType: ScalaType = uncertainBoolean
+		
+		
+		// IMPLEMENTED  ----------------------
+		
+		override def optional = this
+		
+		override def emptyValue: CodePiece = uncertainBoolean.targetCode
+		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
+		override def defaultPropertyName: Name = Name.empty
+		override def defaultPartNames: Seq[Name] = Empty
+		override def defaultMutability: Option[Mutability] = None
+		
+		override def supportsDefaultJsonValues: Boolean = true
+		override protected def yieldsTryFromDelegate: Boolean = false
+		
+		override protected def toDelegateCode(instanceCode: String): CodePiece = s"$instanceCode.exact"
+		override protected def fromDelegateCode(delegateCode: String): CodePiece =
+			uncertainBoolean.targetCode.mapText { b => s"$b($delegateCode)" }
+		
+		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
+	}
+	
 	/**
 	 * Represents a path to a file or a directory
 	 * @param length Maximum number of characters allocated for this path
@@ -970,7 +999,7 @@ object StandardPropertyType
 		override lazy val sqlConversions: Seq[SqlTypeConversion] =
 			enumeration.idType.sqlConversions.map { new EnumIdSqlConversion(_) }
 		
-		private lazy val findForId = s"${ enumeration.name.enumName }.${ EnumerationWriter.findForIdName(enumeration) }"
+		private lazy val findForValue = s"${ enumeration.name.enumName }.findForValue"
 		// private lazy val forIdName = EnumerationWriter.forIdName(enumeration)
 		
 		
@@ -1010,12 +1039,8 @@ object StandardPropertyType
 		override def fromValueCode(valueCodes: Seq[String]) =
 			CodePiece(s"${ enumeration.name.enumName }.fromValue(${ valueCodes.head })", Set(enumeration.reference))
 		override def fromJsonValueCode(valueCode: String): CodePiece = fromValueCode(Single(valueCode))
-		override def fromValuesCode(valuesCode: String) = {
-			val idFromValueCode = enumeration.idType.fromValueCode(Vector("v"))
-			idFromValueCode.mapText { convertToId =>
-				s"$valuesCode.map { v => $convertToId }.flatMap($findForId)"
-			}.referringTo(enumeration.reference)
-		}
+		override def fromValuesCode(valuesCode: String) =
+			CodePiece(s"$valuesCode.flatMap($findForValue)", Set(enumeration.reference))
 		override def fromConcreteCode(concreteCode: String): CodePiece = concreteCode
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) =
@@ -1053,28 +1078,12 @@ object StandardPropertyType
 			override def toJsonValueCode(instanceCode: String): CodePiece = toValueCode(instanceCode)
 			
 			override def fromValueCode(valueCodes: Seq[String]) =
-				idType.fromValueCode(valueCodes)
-					.mapText { id =>
-						// Types which are at the same time concrete and non-concrete, are handled a bit differently
-						def fromConcrete = s"$findForId($id)"
-						
-						idType match {
-							case Text(_) => fromConcrete
-							case NonEmptyText(_) => fromConcrete
-							case GenericValue(_) => fromConcrete
-							case t =>
-								if (t.concrete == t)
-									fromConcrete
-								else
-									s"$id.flatMap($findForId)"
-						}
-					}
-					.referringTo(enumeration.reference)
+				CodePiece(s"$findForValue(${ valueCodes.head })", Set(enumeration.reference))
+			
 			override def fromJsonValueCode(valueCode: String): CodePiece = fromValueCode(Single(valueCode))
 			override def fromValuesCode(valuesCode: String) =
-				idType.fromValuesCode(valuesCode)
-					.mapText { ids => s"$ids.flatMap($findForId)" }
-					.referringTo(enumeration.reference)
+				CodePiece(s"$valuesCode.flatMap($findForValue)", Set(enumeration.reference))
+			
 			override def fromConcreteCode(concreteCode: String): CodePiece = s"Some($concreteCode)"
 			
 			override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) =
