@@ -146,7 +146,7 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	  */
 	def isOptional = emptyValue.nonEmpty
 	/**
-	  * @return Whether this property type doesn't have an "empty" value (ie. must always be specified)
+	  * @return Whether this property type doesn't have an "empty" value (i.e. must always be specified)
 	  */
 	def isConcrete = emptyValue.isEmpty
 	
