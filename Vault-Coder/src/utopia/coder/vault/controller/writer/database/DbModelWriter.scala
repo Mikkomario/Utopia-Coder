@@ -56,8 +56,8 @@ object DbModelWriter
 	 * @param codec        Implicit codec used when writing the file
 	  * @param setup        Target project -specific setup (implicit)
 	  * @return Success or failure containing either:
-	 *              Right) Reference to the generated XModel class, or
-	 *              Left) References to the various traits generated for generic classes
+	 *              - Right: Reference to the generated XModel class, or
+	 *              - Left: References to the various traits generated for generic classes
 	  */
 	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences], modelRefs: ClassModelReferences,
 	          tablesRef: Reference, dbPropsData: Option[(Pair[Reference], String)])
@@ -625,22 +625,24 @@ object DbModelWriter
 				}
 				// Case: Properties must be defined manually
 				else {
-					val propsPart = remainingProperties.view.flatMap { _.dbProperties }
+					val dbProps = remainingProperties.flatMap { _.dbProperties }
+					val propsPart = dbProps.view
 						.map { prop => prop.toValueCode.withPrefix(s"$dbPropsName.${ prop.name.prop }.name -> ") }
 						.reduceLeft { _.append(_, ", ") }
 					
 					// Case: No inheritance applied => Wraps the properties in a collection and includes the id property
 					if (parentValuePropsCode.isEmpty)
-						CodePiece.collection(remainingProperties.size + 1)(s"$quotedId -> id, " +: propsPart)
+						CodePiece.collection(dbProps.size + 1)(s"$quotedId -> id, " +: propsPart)
 					// Case: Inheritance applied => Appends these properties to those defined in parents
 					else
 						parentValuePropsCode
-							.append(CodePiece.collection(remainingProperties.size)(propsPart), " ++ ")
+							.append(CodePiece.collection(dbProps.size)(propsPart), " ++ ")
 				}
 			}
 			
 			Some(PropertyDeclaration(if (classToWrite.isGeneric) ComputedProperty else LazyValue, "valueProperties",
-				implementation, explicitOutputType = Some(ScalaType.basic("Seq[(String, Value)]")),
+				implementation.referringTo(flow.value),
+				explicitOutputType = Some(ScalaType.basic("Seq[(String, Value)]")),
 				isOverridden = true))
 		}
 	}
@@ -663,9 +665,9 @@ object DbModelWriter
 			// variants
 			case Right(dbProps) =>
 				val extraDescription = s", which is part of the property ${ concreteProp.name }"
-				val partMethods = dbProps.map {
+				val partMethods = dbProps.map { dbProp =>
 					// NB: The accepted parameter type may be incorrect
-					withDbPropertyMethod(_, returnDescriptionAppendix = extraDescription,
+					withDbPropertyMethod(dbProp, returnDescriptionAppendix = extraDescription,
 						calledMethodName = calledMethodName, returnDescriptionStart = returnDescriptionStart)
 				}
 				partMethods :+ withMethod(concreteProp, dbProps, concreteProp.dataType.toScala, concreteProp.description,
@@ -679,7 +681,7 @@ object DbModelWriter
 	                                 returnDescriptionStart: String = "A model containing only the specified ",
 	                                 isOverridden: Boolean = false)
 	                                (implicit naming: NamingRules) =
-		withMethod(property, Vector(property), property.conversion.origin, paramDescription, returnDescriptionAppendix,
+		withMethod(property, Single(property), property.conversion.origin, paramDescription, returnDescriptionAppendix,
 			calledMethodName, returnDescriptionStart, isOverridden)
 			
 	private def withMethod(source: Named, properties: Seq[DbProperty], parameterType: ScalaType,

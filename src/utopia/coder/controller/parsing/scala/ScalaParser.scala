@@ -14,7 +14,7 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocKeyword, ScalaDocPart}
 import utopia.coder.model.scala.{Annotation, Package, Parameter, Parameters}
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.Empty
+import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq}
 import utopia.flow.collection.mutable.builder.MultiMapBuilder
 import utopia.flow.collection.mutable.iterator.PollingIterator
 import utopia.flow.parse.file.FileExtensions._
@@ -297,10 +297,10 @@ object ScalaParser
 					// Parses generic types list, if needed
 					val (genericTypes, afterGenericTypes) = {
 						if (declarationType.acceptsGenericTypes && afterDeclarationStart.startsWith("[")) {
-							// TODO: Current version expects the type list to fit within the same line.
-							//  Create a better version if necessary
-							val (typesPart, afterTypes) = readOneLineBrackets(afterDeclarationStart.drop(1))
-							genericTypesFrom(typesPart, refMap)._1 -> afterTypes
+							val (typesPartLines, afterTypes) =
+								readBlockLike(CodeLine(afterDeclarationStart.drop(1)), linesIter, '[', ']')
+							genericTypesFrom(typesPartLines.iterator.map { _.code }.mkString(" "), refMap)._1 ->
+								afterTypes.getOrElse("")
 						}
 						else
 							Empty -> afterDeclarationStart
@@ -916,13 +916,21 @@ object ScalaParser
 		}
 	}
 	
-	// Block start line must have the initiating opening character removed
+	/**
+	 * Extracts lines that form a code block (enclosed within start and end characters).
+	 * @param blockStartLine The line that starts this block.
+	 *                       The block beginning, including the starting character MUST be omitted.
+	 * @param remainingLinesIter An iterator that yields the following lines of code.
+	 * @param openChar Character interpreted as the block opening character.
+	 * @param closeChar Character interpreted as the block closing character.
+	 * @return Lines of code that form the block, plus any code from the last line that was outside the block
+	 */
 	private def readBlockLike(blockStartLine: CodeLine, remainingLinesIter: Iterator[CodeLine],
 	                          openChar: Char, closeChar: Char) =
 	{
 		// println(s"\nLooking for $openChar$closeChar blocks...")
 		// Collects the block lines into a vector
-		val blockLinesBuilder = new VectorBuilder[CodeLine]()
+		val blockLinesBuilder = OptimizedIndexedSeq.newBuilder[CodeLine]
 		// Keeps track of open blocks
 		var openBlocksCount = 1
 		var line = blockStartLine

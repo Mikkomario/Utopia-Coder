@@ -3,6 +3,7 @@
 ## v1.1.3 (in development)
 ### Bugfixes
 - Bugfix to **ScalaType**'s `.withOther(ScalaType)`
+- Scala parsing now supports multi-line generic type declarations
 ### New methods
 - **Name**
   - Added `.apply(NameContext, Boolean)` for conditional pluralization

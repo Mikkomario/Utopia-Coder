@@ -54,11 +54,16 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	def yieldsTryFromJsonValue: Boolean
 	
 	/**
+	 * @return Whether no type conversion is required between optional and concrete types.
+	 *         E.g. String is always both optional and concrete, with the possibility of a "" value.
+	 */
+	def isBothOptionalAndConcrete: Boolean
+	/**
 	  * @return An optional copy of this property type (one that accepts None or other such empty value)
 	  */
 	def optional: PropertyType
 	/**
-	  * @return A non-optional (ie. concrete) version of this data type
+	  * @return A non-optional (i.e. concrete) version of this data type
 	  */
 	def concrete: PropertyType
 	
@@ -144,11 +149,11 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	/**
 	  * @return Whether this property type accepts empty values (is optional)
 	  */
-	def isOptional = emptyValue.nonEmpty
+	def isOptional = isBothOptionalAndConcrete || emptyValue.nonEmpty
 	/**
 	  * @return Whether this property type doesn't have an "empty" value (i.e. must always be specified)
 	  */
-	def isConcrete = emptyValue.isEmpty
+	def isConcrete = isBothOptionalAndConcrete || emptyValue.isEmpty
 	
 	/**
 	  * @return Code that returns a default value that may be used with this property type
@@ -219,7 +224,7 @@ trait DirectlySqlConvertiblePropertyType extends SingleColumnPropertyType
 }
 
 /**
-  * A common trait for property type implementations that are concrete (ie. not null) and can be wrapped in a
+  * A common trait for property type implementations that are concrete (i.e. not null) and can be wrapped in a
   * Scala.Option
   */
 trait ConcreteSingleColumnPropertyType extends SingleColumnPropertyType
@@ -249,6 +254,7 @@ trait ConcreteSingleColumnPropertyType extends SingleColumnPropertyType
 	
 	override def sqlConversion = OptionWrappingSqlConversion
 	
+	override def isBothOptionalAndConcrete: Boolean = false
 	override def optional = OptionWrapped
 	override def concrete = this
 	
@@ -281,6 +287,7 @@ trait ConcreteSingleColumnPropertyType extends SingleColumnPropertyType
 		override def defaultMutability: Option[Mutability] =  ConcreteSingleColumnPropertyType.this.defaultMutability
 		override def defaultPropertyName = ConcreteSingleColumnPropertyType.this.defaultPropertyName
 		
+		override def isBothOptionalAndConcrete: Boolean = ConcreteSingleColumnPropertyType.this.isBothOptionalAndConcrete
 		override def concrete = ConcreteSingleColumnPropertyType.this
 		
 		override def valueDataType = ConcreteSingleColumnPropertyType.this.valueDataType
@@ -401,6 +408,7 @@ trait FacadePropertyType extends PropertyType
 	
 	// IMPLEMENTED  -----------------------
 	
+	override def isBothOptionalAndConcrete: Boolean = false
 	override def optional: PropertyType = OptionWrapper
 	override def concrete: PropertyType = this
 	
@@ -482,6 +490,7 @@ trait FacadePropertyType extends PropertyType
 		override def defaultPropertyName: Name = FacadePropertyType.this.defaultPropertyName
 		override def defaultPartNames: Seq[Name] = FacadePropertyType.this.defaultPartNames
 		
+		override def isBothOptionalAndConcrete: Boolean = false
 		override def optional: PropertyType = this
 		override def concrete: PropertyType = FacadePropertyType.this
 		

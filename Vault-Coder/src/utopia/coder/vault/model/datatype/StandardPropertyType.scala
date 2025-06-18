@@ -474,6 +474,7 @@ object StandardPropertyType
 		
 		override def defaultMutability: Option[Mutability] = Some(Mutable)
 		
+		override def isBothOptionalAndConcrete: Boolean = DateTime.isBothOptionalAndConcrete
 		override def optional = DateTime.optional
 		override def concrete = this
 		
@@ -499,6 +500,7 @@ object StandardPropertyType
 		
 		override def defaultMutability: Option[Mutability] = Some(Mutable)
 		
+		override def isBothOptionalAndConcrete: Boolean = false
 		override def optional = this
 		override def concrete = Expiration
 		
@@ -517,6 +519,7 @@ object StandardPropertyType
 		
 		override def defaultMutability: Option[Mutability] = None
 		
+		override def isBothOptionalAndConcrete: Boolean = false
 		override def optional = Deprecation
 		override def concrete = this
 		
@@ -607,6 +610,7 @@ object StandardPropertyType
 		override def emptyValue = Text.emptyValue
 		override def nonEmptyDefaultValue = CodePiece.empty
 		
+		override def isBothOptionalAndConcrete: Boolean = true
 		override def concrete = this
 		
 		override def defaultMutability: Option[Mutability] = None
@@ -647,6 +651,7 @@ object StandardPropertyType
 		override def emptyValue = CodePiece.empty
 		override def nonEmptyDefaultValue = CodePiece.empty
 		
+		override def isBothOptionalAndConcrete: Boolean = true
 		override def concrete = this
 		override def optional = allowingEmpty
 		
@@ -806,6 +811,7 @@ object StandardPropertyType
 		override def nonEmptyDefaultValue = CodePiece.empty
 		override def emptyValue = CodePiece("Value.empty", Set(value))
 		
+		override def isBothOptionalAndConcrete: Boolean = true
 		override def concrete = this
 		
 		override def defaultPropertyName = "value"
@@ -855,6 +861,7 @@ object StandardPropertyType
 		
 		override def supportsDefaultJsonValues = true
 		
+		override def isBothOptionalAndConcrete: Boolean = true
 		override def concrete = this
 		
 		override def defaultPropertyName = "values"
@@ -974,9 +981,9 @@ object StandardPropertyType
 		override def sqlConversions =
 			super.sqlConversions.map { _.modifyTarget(indexByDefault = false) }
 		
+		override def isBothOptionalAndConcrete: Boolean = referencedType.isBothOptionalAndConcrete
 		override def optional =
 			if (referencedType.isOptional) this else copy(referencedType = referencedType.optional)
-		
 		override def concrete =
 			if (referencedType.isConcrete) this else copy(referencedType = referencedType.concrete)
 		
@@ -1013,6 +1020,7 @@ object StandardPropertyType
 		override def isFilterGenerationSupported: Boolean = true
 		override def supportsDefaultJsonValues = true
 		
+		override def isBothOptionalAndConcrete: Boolean = false
 		override def optional: PropertyType = Optional
 		override def concrete = this
 		
@@ -1065,6 +1073,7 @@ object StandardPropertyType
 			override def defaultPartNames: Seq[Name] = EnumValue.this.defaultPartNames
 			override def defaultMutability: Option[Mutability] = EnumValue.this.defaultMutability
 			
+			override def isBothOptionalAndConcrete: Boolean = false
 			override def optional = this
 			override def concrete = EnumValue.this
 			
@@ -1144,6 +1153,7 @@ object StandardPropertyType
 		override def emptyValue = CodePiece("Vector.empty")
 		override def nonEmptyDefaultValue = CodePiece.empty
 		
+		override def isBothOptionalAndConcrete: Boolean = true
 		override def concrete = this
 		
 		override def isFilterGenerationSupported: Boolean = innerType.isFilterGenerationSupported
@@ -1242,6 +1252,7 @@ object StandardPropertyType
 		override def defaultMutability: Option[Mutability] = None
 		
 		// TODO: This type doesn't support option-wrapping at this time - Add when needed
+		override def isBothOptionalAndConcrete: Boolean = false
 		override def optional: PropertyType = this
 		override def concrete: PropertyType = this
 		
@@ -1485,6 +1496,7 @@ object StandardPropertyType
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
 	
+	// FIXME: Wrong option to value conversion: "Some(data.location.map { v => v.latLongDegrees }.first)" should be "data.location.map { v => v.latitudeDegrees }"
 	case object LatitudeLongitudePair extends FacadePropertyType
 	{
 		override protected val delegate: PropertyType = Paired(DoubleNumber)
@@ -1495,7 +1507,7 @@ object StandardPropertyType
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
 		
 		override def defaultPropertyName: Name = "latLong"
-		override def defaultPartNames: Seq[Name] = Vector("latitude", "longitude")
+		override def defaultPartNames: Seq[Name] = Pair("latitude", "longitude")
 		override def defaultMutability: Option[Mutability] = None
 		
 		override def supportsDefaultJsonValues: Boolean = true

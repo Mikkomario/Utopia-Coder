@@ -208,6 +208,7 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
 	
 	// IMPLEMENTED  ----------------------------
 	
+	override def isBothOptionalAndConcrete: Boolean = false
 	override def concrete = this
 	override def optional: PropertyType = OptionWrapped
 	
@@ -296,6 +297,7 @@ case class CustomPropertyType(scalaType: ScalaType, conversion: Either[SqlProper
 		override def defaultPartNames: Seq[Name] = CustomPropertyType.this.defaultPartNames
 		override def defaultMutability: Option[Mutability] = CustomPropertyType.this.defaultMutability
 		
+		override def isBothOptionalAndConcrete: Boolean = false
 		override def optional = this
 		override def concrete = CustomPropertyType.this
 		

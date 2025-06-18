@@ -34,6 +34,7 @@ object TargetingWriter
 	// ATTRIBUTES   -----------------
 	
 	private val accessPrefix = Name("Access", "Access", CamelCase.capitalized)
+	private lazy val individualPrefix = Name("Individual", "Individuals", CamelCase.capitalized)
 	private val combinedPrefix = Name("Combined", "Combined", CamelCase.capitalized)
 	private val valueSuffix = Name("Value", "Values", CamelCase.capitalized)
 	private val filterPrefix = Name("Filter", "Filter", CamelCase.capitalized)
@@ -62,94 +63,6 @@ object TargetingWriter
 			Reference(targetPackage, valueAccessNameFor(c, accessMany = true)),
 			Some(Reference(targetPackage, filterTraitNameFor(c))))
 	}
-	
-	// FIXME: When merging, AccessXs becomes a duplicate class. Likely due to line-splitting + generic type param parsing
-	/*
-		Original:
-		/**
-		  * Used for accessing multiple case study analyses from the DB at a time
-		  * @author Mikko Hilpinen
-		  * @since 02.06.2025, v0.1
-		  */
-		abstract class AccessCaseStudyAnalyses[A, +Repr <: AccessManyColumns
-			with FilterableView[Repr]](wrapped: AccessManyColumns)
-			extends TargetingManyLike[A, Repr, AccessCaseStudyAnalysis[A]] with FilterCaseStudyAnalyses[Repr]
-		{
-			// ATTRIBUTES	--------------------
-			
-			/**
-			  * Access to the values of accessible case study analyses
-			  */
-			lazy val values = AccessCaseStudyAnalysisValues(wrapped)
-			
-			/**
-			  * A copy of this access which also targets case_study_analysis_event
-			  */
-			lazy val joinedToEvents = join(HiddenProblemsTables.caseStudyAnalysisEvent)
-			
-			/**
-			  * Access to the values of linked case study analysis events
-			  */
-			lazy val events = AccessCaseStudyAnalysisEventValues(joinedToEvents)
-			
-			/**
-			  * Access to case study analysis event -based filtering functions
-			  */
-			lazy val whereEvents = FilterByCaseStudyAnalysisEvent(joinedToEvents)
-		}
-	 */
-	/*
-		Parsed:
-		/**
-		  * Used for accessing multiple case study analyses from the DB at a time
-		  * @author Mikko Hilpinen
-		  * @since 02.06.2025, v0.1
-		  */
-		class AccessCaseStudyAnalyses[A, +Repr <: AccessManyColumns]()
-			extends TargetingManyLike[A, Repr, AccessCaseStudyAnalysis[A]] with FilterCaseStudyAnalyses[Repr]
-		{
-			// ATTRIBUTES	--------------------
-			
-			/**
-			  * Access to the values of accessible case study analyses
-			  */
-			lazy val values = AccessCaseStudyAnalysisValues(wrapped)
-			
-			/**
-			  * A copy of this access which also targets case_study_analysis_event
-			  */
-			lazy val joinedToEvents = join(HiddenProblemsTables.caseStudyAnalysisEvent)
-			
-			/**
-			  * Access to the values of linked case study analysis events
-			  */
-			lazy val events = AccessCaseStudyAnalysisEventValues(joinedToEvents)
-			
-			/**
-			  * Access to case study analysis event -based filtering functions
-			  */
-			lazy val whereEvents = FilterByCaseStudyAnalysisEvent(joinedToEvents)
-		}
-	 */
-	/*
-		Generated:
-		/**
-		  * Used for accessing multiple case study analyses from the DB at a time
-		  * @author Mikko Hilpinen
-		  * @since 04.06.2025, v0.1
-		  */
-		abstract class AccessCaseStudyAnalyses[A, +Repr <: AccessManyColumns
-			with FilterableView[Repr]](wrapped: AccessManyColumns)
-			extends TargetingManyLike[A, Repr, AccessCaseStudyAnalysis[A]] with FilterCaseStudyAnalyses[Repr]
-		{
-			// ATTRIBUTES	--------------------
-			
-			/**
-			  * Access to the values of accessible case study analyses
-			  */
-			lazy val values = AccessCaseStudyAnalysisValues(wrapped)
-		}
-	 */
 	
 	/**
 	 * Writes targeting access point classes for the specified class
@@ -270,13 +183,13 @@ object TargetingWriter
 					description = s"Access to ${ classToWrite.name } $name")(code))
 			}
 		}
-		val columnProps = classToWrite.properties.filterNot { _.isExtension }.map { prop =>
+		val columnProps = classToWrite.properties.filterNot { p => p.isExtension || p.isMultiColumn }.map { prop =>
 			val name = if (accessMany) prop.name.props else prop.name.prop
 			val readType = if (accessMany) prop.dataType else prop.dataType.optional
 			val inputType = prop.dataType.concrete
 			
 			val fromValue = readType.fromValueCode(Single("v"))
-			val defaultMethodName = if (accessMany) "" else ".optional"
+			val defaultMethodName = if (accessMany || readType.isBothOptionalAndConcrete) "" else ".optional"
 			// When from value yields a try, requires a custom to-value conversion
 			val (methodName, toValue) = {
 				if (readType.yieldsTryFromValue) {
@@ -286,7 +199,7 @@ object TargetingWriter
 						".customInput" -> inputType.toValueCode("v")
 							.mapText { toValue => s" { v: ${ inputType.toScala } => $toValue }" }
 				}
-				else if (accessMany && readType.isOptional)
+				else if (accessMany && !readType.isBothOptionalAndConcrete && readType.isOptional)
 					".flatten" -> CodePiece.empty
 				else
 					defaultMethodName -> CodePiece.empty
@@ -421,9 +334,16 @@ object TargetingWriter
 	                        filterRef: Option[(Name, Reference, String)], author: String, accessMany: Boolean)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val rawAccessName = accessPrefix + className
-		val singleAccessName = rawAccessName.className
+		val rawAccessName = accessPrefix +: className
 		val manyAccessName = rawAccessName.pluralClassName
+		val singleAccessName = {
+			// Makes sure there are no naming conflicts between the singular and plural versions
+			val default = rawAccessName.className
+			if (default == manyAccessName)
+				((accessPrefix + individualPrefix) +: className).className
+			else
+				default
+		}
 		val accessName = if (accessMany) manyAccessName else singleAccessName
 		val accessType = ScalaType.basic(accessName)
 		lazy val singleAccessType = ScalaType.basic(s"$singleAccessName[A]")
