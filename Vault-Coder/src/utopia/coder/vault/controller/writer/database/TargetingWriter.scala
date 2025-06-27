@@ -437,7 +437,7 @@ object TargetingWriter
 		lazy val accessRowsName = (rawAccessName + rowsSuffix).pluralClassName
 		lazy val accessRowsType = ScalaType.basic(accessRowsName)
 		lazy val accessRowsTypeWithOutput = accessRowsType(genericOutputType)
-		lazy val accessCombinedName = (((accessPrefix + combinedPrefix) +: className) + accessPrefix).pluralClassName
+		lazy val accessCombinedName = ((accessPrefix + combinedPrefix) +: className).pluralClassName
 		lazy val accessCombinedType = ScalaType.basic(accessCombinedName)
 		val additionalClasses = {
 			if (accessMany) {

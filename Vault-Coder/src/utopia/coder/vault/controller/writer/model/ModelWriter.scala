@@ -356,6 +356,7 @@ object ModelWriter
 			.map { _ -> buildCopy.name }
 	}
 	
+	// FIXME: When writing inherited properties, where data type has been specified again, applies a wrong data type (e.g. original = Option[Int], extending = Reference with Option[Int], results in Int type param)
 	// Writes the XData model, including its companion object
 	private def writeDataClass(classToWrite: Class, dataPackage: Package, parentClassReferences: Seq[ClassReferences],
 	                           factoryRef: Reference, dataLikeRef: Option[Reference], buildCopyName: String)
@@ -477,7 +478,9 @@ object ModelWriter
 				classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
 					.getOrElse(CodePiece.empty)
 			).withinParenthesis
-		val schema = LazyValue("schema", schemaCode.references, isOverridden = !fromModelMayFail)(schemaCode.text)
+		val schema = LazyValue("schema", schemaCode.references, isOverridden = !fromModelMayFail,
+			isLowMergePriority = classToWrite.isExtension || classToWrite.properties.exists { _.isMultiColumn })(
+			schemaCode.text)
 		
 		val fromModel = fromModelFor(classToWrite, dataClassName)
 		
