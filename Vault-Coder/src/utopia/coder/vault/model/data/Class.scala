@@ -189,7 +189,7 @@ case class Class(name: Name, customTableName: Option[String], storedPrefix: Stri
 	  */
 	def isExpiring = properties.exists { _.dataType.isInstanceOf[Expiration.type] }
 	/**
-	  * @return Whether this class supports deprecation
+	  * @return Whether this class supports timestamp-based deprecation
 	  */
 	def isNullDeprecatable = properties.exists { _.dataType.isInstanceOf[Deprecation.type] }
 	

@@ -12,6 +12,7 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
+import utopia.coder.vault.model.datatype.StandardPropertyType.Deprecation
 import utopia.coder.vault.util.VaultReferences
 import utopia.coder.vault.util.VaultReferences.Vault
 import utopia.coder.vault.util.VaultReferences.Vault._
@@ -415,6 +416,16 @@ object TargetingWriter
 		}
 		val selfProp = ComputedProperty("self", visibility = Protected, isOverridden = true)("this")
 		
+		val deprecationMethod = {
+			if (accessMany)
+				classToWrite.deprecationProperty.filter { _.dataType == Deprecation }.map { prop =>
+					MethodDeclaration("deprecate", Set(flow.now),
+						description = s"Deprecates all accessible ${ className.pluralDoc }")()(
+						s"values.${ prop.name.props }.set(Now)")
+				}
+			else
+				None
+		}
 		def wrapMethodFor(wrappedAccessType: ScalaType, constructedTypeName: String) =
 			MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
 				Parameter("newTarget", wrappedAccessType))(s"$constructedTypeName(newTarget)")
@@ -432,7 +443,8 @@ object TargetingWriter
 					s"${ valuesRef.target }(wrapped)")
 			) ++ modelProp ++ comboProps ++ (if (accessMany) None else Some(selfProp)),
 			// The abstract version doesn't contain wrap functions
-			methods = if (accessMany) Set() else Set(wrapMethodFor(wrappedAccessType, accessName)),
+			methods = (if (accessMany) Set() else Set(wrapMethodFor(wrappedAccessType, accessName))) ++
+				deprecationMethod,
 			description = s"Used for accessing ${ if (accessMany) s"multiple" else "individual" } ${
 				className.pluralDoc } from the DB at a time",
 			author = author,
