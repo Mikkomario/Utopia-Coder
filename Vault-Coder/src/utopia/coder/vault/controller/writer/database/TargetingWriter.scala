@@ -109,7 +109,7 @@ object TargetingWriter
 										refs.filtering.map { _ -> refs.filteringModelPropName }
 									} }
 								}
-								writeAccess(targetPackage, classToWrite.name, combos, tablesRef, modelRef, dbModelRef,
+								writeAccess(targetPackage, classToWrite, combos, tablesRef, modelRef, dbModelRef,
 									dbFactoryRef, accessValueRef,
 									appliedFilter.map { case (ref, modelPropName) =>
 										(classToWrite.name, ref, modelPropName)
@@ -249,11 +249,11 @@ object TargetingWriter
 	{
 		val modelName = (classToWrite.name + modelSuffix).prop
 		// Won't generate a file if there are no "with" or "in" -methods
-		// (except for classes that extend more than 1 other class)
+		// (except for classes that extend more than 1 other class, and those which support deprecation)
 		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, modelName)
 		val parents = parentClassRefs
 			.flatMap { _.targeting.flatMap { refs => refs.filtering.map { _ -> refs.filteringModelPropName } } }
-		if (filterMethods.nonEmpty || parents.hasSize >= 2) {
+		if (filterMethods.nonEmpty || parents.hasSize >= 2 || classToWrite.isDeprecatable) {
 			// Extends filter traits of parents, or FilterableView[+Repr]
 			val reprType = ScalaType.basic("Repr")
 			val extensions = parents.notEmpty match {
@@ -273,13 +273,22 @@ object TargetingWriter
 			val extendedModelImplementations = parents.view.map { _._2 }.filter { _.nonEmpty }
 				.map { propName => ComputedProperty(propName, isOverridden = true)(modelProp.name) }
 				.toOptimizedSeq
+			// Implements an .active -property, if class supports deprecation
+			val activeProp = {
+				if (classToWrite.isDeprecatable && classToWrite.parents.forNone { _.isDeprecatable })
+					Some(ComputedProperty("active",
+						description = s"Copy of this access, limited to currently active ${ classToWrite.name.pluralDoc }")(
+						s"filter($modelName.nonDeprecatedCondition)"))
+				else
+					None
+			}
 			
 			val writeResult = File(targetPackage,
 				TraitDeclaration(
 					name = filterTraitNameFor(classToWrite),
 					genericTypes = Single(GenericType.covariant("Repr")),
 					extensions = extensions,
-					properties = modelProp +: extendedModelImplementations,
+					properties = (modelProp +: extendedModelImplementations) ++ activeProp,
 					methods = filterMethods.toSet,
 					description = s"Common trait for access points which may be filtered based on ${
 						classToWrite.name } properties",
@@ -329,11 +338,13 @@ object TargetingWriter
 		).write()
 	}
 	
-	private def writeAccess(targetPackage: Package, className: Name, combos: Seq[CombinationData], tablesRef: Reference,
-	                        modelRef: Reference, dbModelRef: Reference, dbFactoryRef: Reference, valuesRef: Reference,
-	                        filterRef: Option[(Name, Reference, String)], author: String, accessMany: Boolean)
+	private def writeAccess(targetPackage: Package, classToWrite: Class, combos: Seq[CombinationData],
+	                        tablesRef: Reference, modelRef: Reference, dbModelRef: Reference, dbFactoryRef: Reference,
+	                        valuesRef: Reference, filterRef: Option[(Name, Reference, String)], author: String,
+	                        accessMany: Boolean)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
+		val className = classToWrite.name
 		val rawAccessName = accessPrefix +: className
 		val manyAccessName = rawAccessName.pluralClassName
 		val singleAccessName = {
@@ -487,13 +498,14 @@ object TargetingWriter
 		}
 		
 		// Prepares the companion object, also
+		// Provides access to standard access root(s)
 		val companionParentType = {
 			if (accessMany)
 				accessManyRoot(accessRowsType(modelRef))
 			else
 				accessOneRoot(accessType(modelRef))
 		}
-		val rootCode = {
+		val unfilteredRootCode = {
 			if (accessMany) {
 				val accessRef = VaultReferences.vault.accessManyRows
 				CodePiece(s"$accessRowsName(${ accessRef.target }(${ dbFactoryRef.target }))",
@@ -501,6 +513,18 @@ object TargetingWriter
 			}
 			else
 				CodePiece(s"$manyAccessName.root.head")
+		}
+		// Deprecating classes have a separate includingHistory -access point
+		val defaultRootProps = {
+			if (accessMany && classToWrite.isDeprecatable)
+				Pair(
+					LazyValue("includingHistory", unfilteredRootCode.references,
+						description = s"Access to ${ className.pluralDoc }, including historical entries")(
+						unfilteredRootCode.text),
+					LazyValue("root", isOverridden = true)("includingHistory.active")
+				)
+			else
+				Single(LazyValue("root", unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text))
 		}
 		val comboRootProps = combos.map { combo =>
 			val rawPropName = withPrefix +: combo.childName
@@ -527,7 +551,7 @@ object TargetingWriter
 		val companion = ObjectDeclaration(
 			name = accessName,
 			extensions = Single(companionParentType),
-			properties = LazyValue("root", rootCode.references, isOverridden = true)(rootCode.text) +: comboRootProps,
+			properties = defaultRootProps ++ comboRootProps,
 			methods = Set(
 				MethodDeclaration("accessValues", Set(implicitConversions), explicitOutputType = Some(valuesRef),
 					isImplicit = true, description = "Provides implicit access to an access point's .values property")(
