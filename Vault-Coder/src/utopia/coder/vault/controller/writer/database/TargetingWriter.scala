@@ -9,7 +9,7 @@ import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype._
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
-import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
+import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
 import utopia.coder.vault.model.datatype.StandardPropertyType.Deprecation
@@ -420,7 +420,9 @@ object TargetingWriter
 			if (accessMany)
 				classToWrite.deprecationProperty.filter { _.dataType == Deprecation }.map { prop =>
 					MethodDeclaration("deprecate", Set(flow.now),
-						description = s"Deprecates all accessible ${ className.pluralDoc }")()(
+						description = s"Deprecates all accessible ${ className.pluralDoc }",
+						returnDescription = s"Whether any $className was targeted")(
+						Parameters.implicits(Parameter("connection", connection, description = "Implicit DB connection")))(
 						s"values.${ prop.name.props }.set(Now)")
 				}
 			else
