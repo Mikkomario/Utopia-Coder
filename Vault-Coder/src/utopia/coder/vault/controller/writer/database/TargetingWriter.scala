@@ -12,7 +12,7 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
-import utopia.coder.vault.model.datatype.StandardPropertyType.Deprecation
+import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation}
 import utopia.coder.vault.util.VaultReferences
 import utopia.coder.vault.util.VaultReferences.Vault
 import utopia.coder.vault.util.VaultReferences.Vault._
@@ -375,11 +375,20 @@ object TargetingWriter
 			else
 				None
 		}
-		val parentType: Extension = {
+		val (parentType, timestampProp): (Extension, Option[PropertyDeclaration]) = {
 			if (accessMany)
-				targetingManyLike(genericOutputType, reprType, singleAccessType)
+				classToWrite.properties.find { _.dataType == CreationTime } match {
+					case Some(creationProp) =>
+						Extension.fromType(targetingTimeline(genericOutputType, reprType, singleAccessType)) ->
+							Some(ComputedProperty("timestamp", Set(dbModelRef),
+								isOverridden = true, isLowMergePriority = true)(s"${
+								dbModelRef.target }.${ creationProp.name.prop }"))
+					
+					case None =>
+						Extension.fromType(targetingManyLike(genericOutputType, reprType, singleAccessType)) -> None
+				}
 			else
-				accessOneWrapper(ScalaType.option(genericOutputType), accessTypeWithOutput)
+				Extension.fromType(accessOneWrapper(ScalaType.option(genericOutputType), accessTypeWithOutput)) -> None
 		}
 		
 		// May implement an abstract model property from a filter trait
@@ -443,7 +452,7 @@ object TargetingWriter
 					description = s"Access to the values of accessible ${
 						if (accessMany) className.pluralDoc else className.doc }")(
 					s"${ valuesRef.target }(wrapped)")
-			) ++ modelProp ++ comboProps ++ (if (accessMany) None else Some(selfProp)),
+			) ++ modelProp ++ timestampProp ++ comboProps ++ (if (accessMany) None else Some(selfProp)),
 			// The abstract version doesn't contain wrap functions
 			methods = (if (accessMany) Set() else Set(wrapMethodFor(wrappedAccessType, accessName))) ++
 				deprecationMethod,
