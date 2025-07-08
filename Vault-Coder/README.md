@@ -271,6 +271,8 @@ Each property object should contain following properties:
   - `"date" / "LocalDate"` - Results in **LocalDate** / Date type (default name: `"date"`)
   - `"time" / "LocalTime"` - Results in **LocalTime** / Time type (default name: `"time"`)
   - `"Days"` - Results in **Days** type (default name: `"duration"`)
+  - `"Year"` - Results in utopia.flow.time.**Year** type (default name: `"year"`)
+  - `"Month"` - Results in utopia.flow.time.**Month** type (default name: `"month"`)
   - `"DateRange" / "dates"` - Results in **DateRange** data type
   - `"Duration[X]"` - Results in a `FiniteDuration` type (default name: `"duration"`)
     - `X` determines the unit used when storing the duration to the database. Available options are:

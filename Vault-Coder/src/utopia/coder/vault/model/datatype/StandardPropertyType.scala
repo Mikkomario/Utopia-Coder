@@ -7,19 +7,18 @@ import utopia.coder.model.scala.datatype.Reference.Flow._
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.ValueConvertibleType
+import utopia.coder.vault.model.data.{Class, Enum}
+import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType._
+import utopia.coder.vault.model.datatype.StandardPropertyType.TimeDuration.{fromValueReferences, toValueReferences}
+import utopia.coder.vault.model.enumeration.IntSize.{Default, Medium, Tiny}
+import utopia.coder.vault.model.enumeration.Mutability.{Immutable, Mutable}
+import utopia.coder.vault.model.enumeration.{IntSize, Mutability}
+import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.generic.casting.ValueConversions._
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.controller.writer.model.EnumerationWriter
-import utopia.coder.vault.model.data.{Class, Enum}
-import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.{Bool, Date, DateTime, DoubleNumber, IntNumber, LongNumber}
-import utopia.coder.vault.model.datatype.StandardPropertyType.TimeDuration.{fromValueReferences, toValueReferences}
-import utopia.coder.vault.model.enumeration.{IntSize, Mutability}
-import utopia.coder.vault.model.enumeration.IntSize.Default
-import utopia.coder.vault.model.enumeration.Mutability.{Immutable, Mutable}
-import utopia.coder.vault.util.VaultReferences._
 
 import java.util.concurrent.TimeUnit
 
@@ -57,6 +56,8 @@ object StandardPropertyType
 			case "value" | "val" => Some(GenericValue(appliedLength))
 			case "model" | "values" => Some(GenericModel(appliedLength))
 			case "days" => Some(DayCount)
+			case "year" => Some(YearIndex)
+			case "month" | "mo" => Some(MonthIndex)
 			case "daterange" | "dates" => Some(DateRange)
 			case "angle" => Some(AngleType)
 			case "vector2d" | "doublevector" => Some(DoubleVector2D)
@@ -578,6 +579,56 @@ object StandardPropertyType
 		}
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) = ""
+	}
+	
+	/**
+	 * A data type matching [[utopia.flow.time.Year]].
+	 */
+	case object YearIndex extends FacadePropertyType
+	{
+		override val scalaType: ScalaType = year
+		override protected lazy val delegate: PropertyType = IntNumber(Medium)
+		
+		override val emptyValue: CodePiece = CodePiece.empty
+		override val nonEmptyDefaultValue: CodePiece = CodePiece.empty
+		
+		override val defaultMutability: Option[Mutability] = None
+		
+		override lazy val defaultPropertyName: Name = "Year"
+		override val defaultPartNames: Seq[Name] = Empty
+		
+		override protected val yieldsTryFromDelegate: Boolean = false
+		override val supportsDefaultJsonValues: Boolean = true
+		
+		override protected def toDelegateCode(instanceCode: String): CodePiece = s"$instanceCode.value"
+		override protected def fromDelegateCode(delegateCode: String): CodePiece =
+			CodePiece(s"Year($delegateCode)", Set(year))
+		
+		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
+	}
+	/**
+	 * A data type matching [[utopia.flow.time.Month]]
+	 */
+	case object MonthIndex extends FacadePropertyType
+	{
+		override val scalaType: ScalaType = month
+		override protected val delegate: PropertyType = IntNumber(Tiny, Some(12))
+		
+		override val emptyValue: CodePiece = CodePiece.empty
+		override val nonEmptyDefaultValue: CodePiece = CodePiece.empty
+		
+		override lazy val defaultPropertyName: Name = "month"
+		override val defaultPartNames: Seq[Name] = Empty
+		override val defaultMutability: Option[Mutability] = None
+		
+		override protected val yieldsTryFromDelegate: Boolean = false
+		override val supportsDefaultJsonValues: Boolean = true
+		
+		override protected def toDelegateCode(instanceCode: String): CodePiece = s"$instanceCode.value"
+		override protected def fromDelegateCode(delegateCode: String): CodePiece =
+			CodePiece(s"Month($delegateCode)", Set(month))
+		
+		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
 	
 	object Text

@@ -129,6 +129,8 @@ object Reference
 		lazy val today = apply(time, "Today")
 		lazy val days = apply(time, "Days")
 		lazy val dateRange = apply(time, "DateRange")
+		lazy val year = apply(time, "Year")
+		lazy val month = apply(time, "Month")
 		
 		lazy val changing = apply(eventfulViewTemplate, "Changing")
 		lazy val fixed = apply(eventfulImmutableView, "Fixed")
