@@ -485,8 +485,7 @@ object ScalaParser
 	}
 	
 	// Expects tabulator strikes, whitespaces etc. to be removed from line beginnings
-	private def scalaDocFromLines(lines: Vector[String]) =
-	{
+	private def scalaDocFromLines(lines: Seq[String]) = {
 		// Skips empty lines from the beginning and the end
 		val targetLines = lines.dropWhile(emptyScalaDocLineRegex.apply).dropRightWhile(emptyScalaDocLineRegex.apply)
 		if (targetLines.isEmpty)

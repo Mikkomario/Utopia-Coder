@@ -1,16 +1,15 @@
 package utopia.coder.vault.controller.reader
 
 import utopia.coder.model.data.Name
+import utopia.coder.model.enumeration.NamingConvention.CamelCase
+import utopia.coder.vault.util.Common.{connectionPool, exc}
 import utopia.flow.generic.casting.ValueConversions._
 import utopia.flow.generic.model.immutable.{Model, Value}
-import utopia.flow.generic.model.mutable.DataType.{BooleanType, DoubleType, FloatType, InstantType, IntType, LocalDateType, LocalTimeType, LongType, StringType}
+import utopia.flow.generic.model.mutable.DataType._
 import utopia.flow.util.StringExtensions._
-import utopia.coder.model.enumeration.NamingConvention.CamelCase
-import utopia.coder.vault.util.Common.exc
-import utopia.coder.vault.util.Common.connectionPool
-import utopia.vault.database.{References, Tables}
 import utopia.vault.database.columnlength.{ColumnLengthLimits, ColumnLengthRules}
-import utopia.vault.model.immutable.{Column, ReferencePoint, Table}
+import utopia.vault.database.{References, Tables}
+import utopia.vault.model.immutable.{Column, Table, TableColumn}
 
 /**
   * Interprets an existing database table into an input template
@@ -57,12 +56,12 @@ object TableReader
 				.filterNot { _ == "id" },
 			"use_long_id" -> (if (idCol.exists { _.dataType == LongType }) true else Value.empty),
 			"props" -> table.columns.filterNot { _.isPrimary }
-				.map { c => apply(table.databaseName, c, References.from(table, c), prefixIsUsed) }
+				.map { c => apply(table.databaseName, c, References.findReferencedFrom(c), prefixIsUsed) }
 		).withoutEmptyValues
 	}
 	
 	// Primary key should not be included here
-	private def apply(databaseName: String, col: Column, reference: Option[ReferencePoint],
+	private def apply(databaseName: String, col: Column, reference: Option[TableColumn],
 	                  isPrefixed: Boolean) =
 	{
 		val colName = nameFrom(col.columnName, isPrefixed)

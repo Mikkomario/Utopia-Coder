@@ -446,7 +446,7 @@ object ComponentFactoryWriter
 	
 	private def referencedPropFunctionsFrom(referenceProperty: Property, target: ComponentFactory, prefix: Name,
 	                                        allowNonPrefixed: Boolean = true)
-	                                       (implicit naming: NamingRules): (Vector[PropertyDeclaration], Vector[MethodDeclaration]) =
+	                                       (implicit naming: NamingRules): (Seq[PropertyDeclaration], Seq[MethodDeclaration]) =
 	{
 		val usePrefixes = allowNonPrefixed && referenceProperty.prefixDerivedProperties
 		val base = referenceProperty.name.prop
