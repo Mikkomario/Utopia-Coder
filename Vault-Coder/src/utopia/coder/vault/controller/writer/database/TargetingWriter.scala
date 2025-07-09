@@ -12,13 +12,12 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
-import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation}
+import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation, Expiration}
 import utopia.coder.vault.util.VaultReferences
 import utopia.coder.vault.util.VaultReferences.Vault
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
-import utopia.flow.util.StringExtensions._
 import utopia.flow.util.TryExtensions._
 
 import scala.io.Codec
@@ -45,7 +44,6 @@ object TargetingWriter
 	private lazy val joinedToPrefix = Name("joinedTo", "joinedTo", CamelCase.lower)
 	private lazy val wherePrefix = Name("where", "where", CamelCase.lower)
 	private lazy val withPrefix = Name("with", "with", CamelCase.lower)
-	private val modelSuffix = Name("model", "models", CamelCase.lower)
 	
 	
 	// OTHER    ---------------------
@@ -89,10 +87,9 @@ object TargetingWriter
 		val filterRef = writeFilter(targetPackage, classToWrite, parentClassRefs, dbModelRef)
 			.flatMap { _.logWithMessage(s"Failed to generate the filter trait for ${ classToWrite.name }")(setup.log) }
 		// Writes the filter by -class
-		filterRef.foreach { case (filterRef, abstractModelPropName) =>
-			if (abstractModelPropName.isEmpty || classToWrite.isGeneric)
-				writeFilterBy(targetPackage, classToWrite, filterRef, abstractModelPropName, dbModelRef)
-					.logWithMessage(s"Failed to generate the filter by -class for ${ classToWrite.name }")(setup.log)
+		filterRef.foreach { filterRef =>
+			writeFilterBy(targetPackage, classToWrite, filterRef, dbModelRef)
+				.logWithMessage(s"Failed to generate the filter by -class for ${ classToWrite.name }")(setup.log)
 		}
 		
 		// Writes the single & plural value access classes, and the primary access classes
@@ -106,15 +103,11 @@ object TargetingWriter
 								Success(None)
 							else {
 								val appliedFilter = filterRef.orElse {
-									parentClassRefs.findMap { _.targeting.flatMap { refs =>
-										refs.filtering.map { _ -> refs.filteringModelPropName }
-									} }
+									parentClassRefs.findMap { _.targeting.flatMap { _.filtering } }
 								}
 								writeAccess(targetPackage, classToWrite, combos, tablesRef, modelRef, dbModelRef,
 									dbFactoryRef, accessValueRef,
-									appliedFilter.map { case (ref, modelPropName) =>
-										(classToWrite.name, ref, modelPropName)
-									},
+									appliedFilter.map { classToWrite.name -> _ },
 									author = classToWrite.author,
 									accessMany = accessMany)
 									.map { Some(_) }
@@ -126,12 +119,7 @@ object TargetingWriter
 			.map { references =>
 				val (_, singularValue) = references.head
 				val (_, manyValue) = references(1)
-				val (filter, abstractModelPropName) = filterRef match {
-					case Some((filter, prop)) => Some(filter) -> prop
-					case None => None -> ""
-				}
-				
-				TargetingReferences(singularValue, manyValue, filter, abstractModelPropName)
+				TargetingReferences(singularValue, manyValue, filterRef)
 			}
 	}
 	
@@ -248,71 +236,66 @@ object TargetingWriter
 	                        dbModelRef: Reference)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val modelName = (classToWrite.name + modelSuffix).prop
 		// Won't generate a file if there are no "with" or "in" -methods
 		// (except for classes that extend more than 1 other class, and those which support deprecation)
-		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, modelName)
-		val parents = parentClassRefs
-			.flatMap { _.targeting.flatMap { refs => refs.filtering.map { _ -> refs.filteringModelPropName } } }
+		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, "model")
+		val parents = parentClassRefs.flatMap { _.targeting.flatMap { _.filtering } }
 		if (filterMethods.nonEmpty || parents.hasSize >= 2 || classToWrite.isDeprecatable) {
 			// Extends filter traits of parents, or FilterableView[+Repr]
+			// Also, if deprecation is supported, may extend DeprecatableView, TimeDeprecatableView or NullDeprecatableView
 			val reprType = ScalaType.basic("Repr")
+			val deprecationProp = classToWrite.deprecationProperty.filterNot { _.isExtension }
+			val deprecationParent = deprecationProp.map[Extension] { prop =>
+				val parent = prop.dataType match {
+					case Deprecation => nullDeprecatableView
+					case Expiration => timeDeprecatableView
+					case _ => deprecatableView
+				}
+				parent(reprType)
+			}
 			val extensions = parents.notEmpty match {
-				case Some(parents) => parents.map[Extension] { _._1(reprType) }
-				case None => Single[Extension](filterableView(reprType))
+				case Some(parents) => parents.map[Extension] { _(reprType) } ++ deprecationParent
+				case None => Single(deprecationParent.getOrElse[Extension] { filterableView(reprType) })
 			}
 			
 			// The model declaration is abstract for generic classes
 			val modelProp = {
 				val desc = s"Model that defines ${ classToWrite.name } database properties"
 				if (classToWrite.isGeneric)
-					ComputedProperty.newAbstract(modelName, dbModelRef, description = desc)
+					ComputedProperty.newAbstract("model", dbModelRef, description = desc)
 				else
-					ComputedProperty(modelName, Set(dbModelRef), description = desc)(dbModelRef.target)
-			}
-			// When inheriting, implements those abstract properties
-			val extendedModelImplementations = parents.view.map { _._2 }.filter { _.nonEmpty }
-				.map { propName => ComputedProperty(propName, isOverridden = true)(modelProp.name) }
-				.toOptimizedSeq
-			// Implements an .active -property, if class supports deprecation
-			val activeProp = {
-				if (classToWrite.isDeprecatable && classToWrite.parents.forNone { _.isDeprecatable })
-					Some(ComputedProperty("active",
-						description = s"Copy of this access, limited to currently active ${ classToWrite.name.pluralDoc }")(
-						s"filter($modelName.nonDeprecatedCondition)"))
-				else
-					None
+					ComputedProperty("model", Set(dbModelRef), description = desc)(dbModelRef.target)
 			}
 			
-			val writeResult = File(targetPackage,
+			Some(File(targetPackage,
 				TraitDeclaration(
 					name = filterTraitNameFor(classToWrite),
 					genericTypes = Single(GenericType.covariant("Repr")),
 					extensions = extensions,
-					properties = (modelProp +: extendedModelImplementations) ++ activeProp,
+					properties = Single(modelProp),
 					methods = filterMethods.toSet,
 					description = s"Common trait for access points which may be filtered based on ${
 						classToWrite.name } properties",
 					author = classToWrite.author,
 					since = DeclarationDate.versionedToday
 				)
-			).write()
-			
-			Some(writeResult.map { _ -> (if (classToWrite.isGeneric) modelName else "") })
+			).write())
 		}
 		// Case: Shouldn't write a separate filter trait => Refers to a parent filter trait, if applicable
 		else
 			parents.headOption.map { Success(_) }
 	}
 	
-	private def writeFilterBy(targetPackage: Package, classToWrite: Class, filterRef: Reference,
-	                          abstractModelPropName: String, dbModelRef: Reference)
+	private def writeFilterBy(targetPackage: Package, classToWrite: Class, filterRef: Reference, dbModelRef: Reference)
 	                         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val accessType = ScalaType.basic("A")
-		val modelParam = abstractModelPropName.ifNotEmpty.map { propName =>
-			Parameter(propName, dbModelRef,
-				description = s"A model used for accessing ${ classToWrite.name } database properties")
+		val modelParam = {
+			if (classToWrite.isGeneric)
+				Some(Parameter("model", dbModelRef,
+					description = s"A model used for accessing ${ classToWrite.name } database properties"))
+			else
+				None
 		}
 		
 		File(targetPackage,
@@ -341,7 +324,7 @@ object TargetingWriter
 	
 	private def writeAccess(targetPackage: Package, classToWrite: Class, combos: Seq[CombinationData],
 	                        tablesRef: Reference, modelRef: Reference, dbModelRef: Reference, dbFactoryRef: Reference,
-	                        valuesRef: Reference, filterRef: Option[(Name, Reference, String)], author: String,
+	                        valuesRef: Reference, filterRef: Option[(Name, Reference)], author: String,
 	                        accessMany: Boolean)
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
@@ -369,15 +352,17 @@ object TargetingWriter
 		// The abstract access many version has a Repr type
 		lazy val reprType = ScalaType.basic("Repr")
 		val genericRepr = {
-			if (accessMany)
+			if (accessMany) {
+				val anyType = ScalaType.basic("_")
 				Some(GenericType.covariant("Repr", Some(
-					TypeRequirement.childOf(ScalaType(accessManyColumns).withOther(filterableView.apply(reprType))))))
+					TypeRequirement.childOf(targetingManyLike(anyType, reprType, anyType)))))
+			}
 			else
 				None
 		}
 		val (parentType, timestampProp): (Extension, Option[PropertyDeclaration]) = {
 			if (accessMany)
-				classToWrite.properties.find { _.dataType == CreationTime } match {
+				classToWrite.properties.find { p => p.dataType == CreationTime && p.isIndexed } match {
 					case Some(creationProp) =>
 						Extension.fromType(targetingTimeline(genericOutputType, reprType, singleAccessType)) ->
 							Some(ComputedProperty("timestamp", Set(dbModelRef),
@@ -392,8 +377,13 @@ object TargetingWriter
 		}
 		
 		// May implement an abstract model property from a filter trait
-		val modelProp = filterRef.flatMap { _._3.ifNotEmpty }.map { propName =>
-			ComputedProperty(propName, Set(dbModelRef), isOverridden = true)(dbModelRef.target)
+		val modelProp = {
+			if (filterRef.isEmpty)
+				Some(ImmutableValue("model", Set(dbModelRef),
+					description = s"A database model used for interacting with $className DB properties")(
+					dbModelRef.target))
+			else
+				None
 		}
 		// For combinations, writes additional value access points and filter by -properties
 		val comboProps = combos.flatMap { combo =>
@@ -431,7 +421,8 @@ object TargetingWriter
 					MethodDeclaration("deprecate", Set(flow.now),
 						description = s"Deprecates all accessible ${ className.pluralDoc }",
 						returnDescription = s"Whether any $className was targeted")(
-						Parameters.implicits(Parameter("connection", connection, description = "Implicit DB connection")))(
+						Parameters(Empty,
+							Single(Parameter("connection", connection, description = "Implicit DB connection"))))(
 						s"values.${ prop.name.props }.set(Now)")
 				}
 			else

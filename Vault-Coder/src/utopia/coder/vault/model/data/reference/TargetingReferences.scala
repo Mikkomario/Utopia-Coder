@@ -10,12 +10,8 @@ import utopia.coder.model.scala.datatype.Reference
  * @param value Reference to the AccessXValue -class
  * @param values Reference to the AccessXValues -class
  * @param filtering Reference to the FilterXs -trait, if defined
- * @param filteringModelPropName Name of an abstract "model" property defined in the filtering trait.
- *                               Empty if not applicable
- *                               (only applicable to generic classes that generate a filter trait).
  */
-case class TargetingReferences(value: Reference, values: Reference, filtering: Option[Reference] = None,
-                               filteringModelPropName: String = "")
+case class TargetingReferences(value: Reference, values: Reference, filtering: Option[Reference] = None)
 {
 	def valueFor(accessMany: Boolean) = if (accessMany) values else value
 }
