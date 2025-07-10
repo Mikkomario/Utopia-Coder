@@ -327,7 +327,7 @@ object MainAppLogic extends CoderAppLogic
 			// Writes the tables document, which is referred to later, also
 			.flatMap { _ => TablesWriter(data.classes.filterNot { _.isGeneric }) }
 			.flatMap { tablesRef =>
-				DescriptionLinkInterfaceWriter(data.classes, tablesRef).flatMap { descriptionLinkObjects =>
+				DescriptionLinkInterfaceWriter(data.classes, tablesRef, targetingByDefault).flatMap { descriptionLinkObjects =>
 					// Next writes all required documents for each class in order
 					val combosByClass = data.combinations.groupBy { _.parentClass }
 					writeClassesInOrder(data.classes, combosByClass, Map(), tablesRef, descriptionLinkObjects,

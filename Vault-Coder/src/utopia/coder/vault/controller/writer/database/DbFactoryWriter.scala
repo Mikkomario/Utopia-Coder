@@ -86,7 +86,7 @@ object DbFactoryWriter
 	          modelRefs: ClassModelReferences, dbPropsOrDbModelRef: Reference, targeting: Boolean = false)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		val factoryPackage = setup.factoryPackage / classToWrite.packageName
+		val factoryPackage = setup.factoryPackageFor(targeting) / classToWrite.packageName
 		val classNameSuffix = if (targeting) readerSuffix else factorySuffix
 		val factoryName = (classToWrite.name + classNameSuffix).className
 		

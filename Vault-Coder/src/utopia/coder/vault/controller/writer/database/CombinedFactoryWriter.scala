@@ -24,7 +24,7 @@ object CombinedFactoryWriter
 	
 	def generateReference(combo: CombinationData, targeting: Boolean = false)
 	                     (implicit setup: VaultProjectSetup, naming: NamingRules) =
-		Reference(packageFor(combo), factoryNameFor(combo, targeting))
+		Reference(packageFor(combo, targeting), factoryNameFor(combo, targeting))
 	
 	/**
 	  * Writes a combined model factory object file
@@ -108,7 +108,7 @@ object CombinedFactoryWriter
 				None
 		}
 		
-		File(packageFor(data),
+		File(packageFor(data, targeting),
 			ObjectDeclaration(
 				name = factoryNameFor(data, targeting),
 				extensions = Single(data.combinationType.extensionWith(references, targeting)
@@ -123,8 +123,8 @@ object CombinedFactoryWriter
 		).write()
 	}
 	
-	private def packageFor(data: CombinationData)(implicit setup: VaultProjectSetup) =
-		setup.factoryPackage/data.packageName
+	private def packageFor(data: CombinationData, targeting: Boolean)(implicit setup: VaultProjectSetup) =
+		setup.factoryPackageFor(targeting)/data.packageName
 	
 	private def factoryNameFor(data: CombinationData, targeting: Boolean)(implicit naming: NamingRules) =
 		(data.name + (if (targeting) DbFactoryWriter.readerSuffix else DbFactoryWriter.factorySuffix)).className

@@ -29,7 +29,7 @@ object DescriptionLinkInterfaceWriter
 	  *         reference to the linked description factories. Failure if file writing failed.
 	  *         None if there weren't any classes that used descriptions.
 	  */
-	def apply(classes: Seq[Class], tablesRef: Reference)
+	def apply(classes: Seq[Class], tablesRef: Reference, targeting: Boolean = false)
 	         (implicit setup: VaultProjectSetup, codec: Codec,
 	          naming: NamingRules): Try[Option[(Reference, Reference, Reference)]] =
 	{
@@ -50,12 +50,13 @@ object DescriptionLinkInterfaceWriter
 					since = DeclarationDate.versionedToday
 				)
 			).write().flatMap { modelsRef =>
+				val descriptionFactoryPackage = setup.factoryPackageFor(targeting)/"description"
 				// Next writes the description link factories object
 				val linkFactoryProps = targets.map { case (base, desc) =>
 					tableWrappingPropertyFor(base, desc, tablesRef, descriptionLinkFactory,
 						s"Factory for reading ${base.name} description links")
 				}
-				File(setup.factoryPackage/"description",
+				File(descriptionFactoryPackage,
 					ObjectDeclaration((setup.dbModuleName + "DescriptionLinkFactory").objectName,
 						properties = linkFactoryProps,
 						description = s"Used for accessing description link factories for the models in ${
@@ -69,7 +70,7 @@ object DescriptionLinkInterfaceWriter
 								CodePiece(s"${linksRef.target}.${linkFactoryProp.name}", Set(linksRef)),
 								s"Factory for reading descriptions linked with ${base.name.pluralDoc}")
 						}
-					File(setup.factoryPackage/"description",
+					File(descriptionFactoryPackage,
 						ObjectDeclaration((setup.dbModuleName + "LinkedDescriptionFactory").objectName,
 							properties = descriptionFactoryProps,
 							description = s"Used for reading linked descriptions for models in ${setup.dbModuleName}",

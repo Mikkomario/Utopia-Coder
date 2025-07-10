@@ -60,9 +60,15 @@ class VaultProjectSetup(val dbModuleName: Name, val modelPackage: Package, val d
 	/**
 	  * @return Package that contains from database read factories
 	  */
+	@deprecated("Replaced with factoryPackageFor(Boolean)", "v1.13")
 	def factoryPackage = databasePackage/"factory"
 	/**
 	  * @return Package that contains database interaction models
 	  */
 	def dbModelPackage = databasePackage/"storable"
+	/**
+	 * @param targeting Whether writing targeting DB access classes
+	 * @return Package that contains from database read factories
+	 */
+	def factoryPackageFor(targeting: Boolean) = databasePackage / (if (targeting) "reader" else "factory")
 }
