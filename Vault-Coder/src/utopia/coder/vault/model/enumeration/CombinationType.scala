@@ -25,7 +25,11 @@ sealed trait CombinationType
 	/**
 	  * @return Reference to the parent factory trait for this combination type
 	  */
-	def parentTraitRef: Reference
+	def parentDbFactoryRef: Reference
+	/**
+	 * @return Reference to the parent DB reader trait used with this combination type
+	 */
+	def parentDbReaderRef: Reference
 	
 	/**
 	  * @return Whether the implementation should contain isAlwaysLinked: Boolean -property
@@ -49,10 +53,13 @@ sealed trait CombinationType
 	
 	/**
 	  * @param references Combination-related references
-	  * @return Extension for the factory implementation
+	  * @param targeting Whether targeting DB access classes are written
+	 * @return Extension for the factory implementation
 	  */
-	def extensionWith(references: CombinationReferences): Extension =
-		parentTraitRef(references.combined, references.parent, references.child)
+	def extensionWith(references: CombinationReferences, targeting: Boolean): Extension = {
+		val parent = if (targeting) parentDbReaderRef else parentDbFactoryRef
+		parent(references.combined, references.parent, references.child)
+	}
 	
 	/**
 	  * @param parentName Name of the parent parameter
@@ -81,13 +88,15 @@ sealed trait CombinationType
 	  * @param parentName Name of the parent parameter
 	  * @param childName Name of the child parameter
 	  * @param references Combination-related references
-	  * @return An apply method implementation for the factory implementation
+	  * @param targeting Whether writing targeting DB access classes
+	 * @return An apply method implementation for the factory implementation
 	  */
-	def factoryApplyMethodWith(parentName: Name, childName: Name, references: CombinationReferences)
+	def factoryApplyMethodWith(parentName: Name, childName: Name, references: CombinationReferences, targeting: Boolean)
 	                          (implicit naming: NamingRules) =
 	{
+		val methodName = if (targeting) "combine" else "apply"
 		val params = applyParamsWith(parentName, childName, references.parent, references.child)
-		MethodDeclaration("apply", Set(references.combined), isOverridden = true)(params)(
+		MethodDeclaration(methodName, Set(references.combined), isOverridden = true)(params)(
 			s"${references.combined.target}(${params.head.name}, ${params(1).name})")
 	}
 }
@@ -117,14 +126,14 @@ object CombinationType
 	  */
 	case object Combined extends CombinationType
 	{
-		override def parentTraitRef = combiningFactory
+		override val isOneToMany = false
 		
-		override def shouldSpecifyWhetherAlwaysLinked = false
+		override val parentDbFactoryRef = combiningFactory
+		override val parentDbReaderRef: Reference = combiningReader
 		
-		override def isOneToMany = false
+		override val shouldSpecifyWhetherAlwaysLinked = false
 		
 		override protected def childParamTypeFrom(childRef: Reference) = childRef
-		
 		override protected def secondApplyParameterFrom(childRef: Reference) = Parameter("child", childRef)
 	}
 	/**
@@ -132,14 +141,14 @@ object CombinationType
 	  */
 	case object PossiblyCombined extends CombinationType
 	{
-		override def parentTraitRef = possiblyCombiningFactory
+		override val isOneToMany = false
 		
-		override def shouldSpecifyWhetherAlwaysLinked = false
+		override val parentDbFactoryRef = possiblyCombiningFactory
+		override val parentDbReaderRef: Reference = possiblyCombiningReader
 		
-		override def isOneToMany = false
+		override val shouldSpecifyWhetherAlwaysLinked = false
 		
 		override protected def childParamTypeFrom(childRef: Reference) = ScalaType.option(childRef)
-		
 		override protected def secondApplyParameterFrom(childRef: Reference) =
 			Parameter("child", ScalaType.option(childRef), default = CodePiece.none)
 	}
@@ -148,14 +157,14 @@ object CombinationType
 	  */
 	case object MultiCombined extends CombinationType
 	{
-		override def parentTraitRef = multiCombiningFactory
+		override val isOneToMany = true
 		
-		override def shouldSpecifyWhetherAlwaysLinked = true
+		override val parentDbFactoryRef = multiCombiningFactory
+		override val parentDbReaderRef: Reference = multiLinkedReader
 		
-		override def isOneToMany = true
+		override val shouldSpecifyWhetherAlwaysLinked = true
 		
 		override protected def childParamTypeFrom(childRef: Reference) = ScalaType.seq(childRef)
-		
 		override protected def secondApplyParameterFrom(childRef: Reference) =
 			Parameter("children", ScalaType.seq(childRef))
 	}

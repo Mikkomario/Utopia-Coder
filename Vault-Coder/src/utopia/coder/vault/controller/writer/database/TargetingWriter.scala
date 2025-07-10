@@ -544,7 +544,7 @@ object TargetingWriter
 			val rawPropName = withPrefix +: combo.childName
 			val code = {
 				if (accessMany) {
-					val dbFactoryRef = CombinedFactoryWriter.generateReference(combo)
+					val dbFactoryRef = CombinedFactoryWriter.generateReference(combo, targeting = true)
 					val (function, accessRef) = {
 						if (combo.combinationType.isOneToMany)
 							accessCombinedName -> Vault.accessMany

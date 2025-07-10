@@ -13,7 +13,7 @@ import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassRefer
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences.Vault._
-import utopia.flow.collection.immutable.{Pair, Single}
+import utopia.flow.collection.immutable.{OptimizedIndexedSeq, Pair, Single}
 import utopia.flow.util.Mutate
 
 import scala.collection.immutable.VectorBuilder
@@ -32,6 +32,10 @@ object DbFactoryWriter
 	  * A suffix added to class names in order to make them factory class names
 	  */
 	val factorySuffix = Name("DbFactory", "DbFactories", CamelCase.capitalized)
+	/**
+	 * A suffix added to class names when writing database readers
+	 */
+	val readerSuffix = Name("DbReader", "DbReaders", CamelCase.capitalized)
 	
 	private val likeSuffix = Name("Like", "Likes", CamelCase.capitalized)
 	
@@ -79,21 +83,22 @@ object DbFactoryWriter
 	 *         Failure if writing failed.
 	  */
 	def apply(classToWrite: Class, parentClassReferences: Seq[ClassReferences],
-	          modelRefs: ClassModelReferences, dbPropsOrDbModelRef: Reference)
+	          modelRefs: ClassModelReferences, dbPropsOrDbModelRef: Reference, targeting: Boolean = false)
 	         (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val factoryPackage = setup.factoryPackage / classToWrite.packageName
-		val factoryName = (classToWrite.name + factorySuffix).className
+		val classNameSuffix = if (targeting) readerSuffix else factorySuffix
+		val factoryName = (classToWrite.name + classNameSuffix).className
 		
 		// Case: Abstract trait => Implements XDbFactoryLike, XDbFactory trait
 		//                         and XDbFactory companion object containing a concrete implementation
 		if (classToWrite.isGeneric)
 			writeGenericFactory(classToWrite, factoryPackage, factoryName, parentClassReferences, modelRefs,
-				dbPropsOrDbModelRef)
+				dbPropsOrDbModelRef, targeting)
 		// Case: Concrete factory => Just implements the XDbFactory object
 		else {
 			// Implements the primary from model method
-			val fromModel = fromModelMethodFor(classToWrite) { assignments =>
+			val fromModel = fromModelMethodFor(classToWrite, targeting) { assignments =>
 				modelRefs.stored.targetCode +
 					accessIdInApply(classToWrite)
 						.append(modelRefs.data.targetCode + assignments.withinParenthesis, ", ")
@@ -103,8 +108,8 @@ object DbFactoryWriter
 			File(factoryPackage,
 				ObjectDeclaration(
 					name = factoryName,
-					extensions = extensionsFor(classToWrite, parentClassReferences, modelRefs.stored),
-					properties = concretePropertiesFor(classToWrite, dbPropsOrDbModelRef),
+					extensions = extensionsFor(classToWrite, parentClassReferences, modelRefs.stored, targeting),
+					properties = concretePropertiesFor(classToWrite, dbPropsOrDbModelRef, targeting),
 					methods = Set(fromModel),
 					description = s"Used for reading ${ classToWrite.name.doc } data from the DB",
 					author = classToWrite.author, since = DeclarationDate.versionedToday
@@ -120,9 +125,12 @@ object DbFactoryWriter
 	 * @param naming Implicit naming rules
 	 * @return Reference to the factory class/object + reference to the factory like -trait, if applicable
 	 */
-	def generateReferences(factoryPackage: Package, classToWrite: Class)(implicit naming: NamingRules) = {
+	def generateReferences(factoryPackage: Package, classToWrite: Class, targeting: Boolean = false)
+	                      (implicit naming: NamingRules) =
+	{
 		val pck = factoryPackage / classToWrite.packageName
-		val factoryName = classToWrite.name + factorySuffix
+		val classSuffix = if (targeting) readerSuffix else factorySuffix
+		val factoryName = classToWrite.name + classSuffix
 		val factory = Reference(pck, factoryName.className)
 		
 		val factoryLike = {
@@ -136,7 +144,7 @@ object DbFactoryWriter
 	
 	private def writeGenericFactory(classToWrite: Class, factoryPackage: Package, factoryName: String,
 	                                parentClassReferences: Seq[ClassReferences],
-	                                modelRefs: ClassModelReferences, dbPropsOrDbModelRef: Reference)
+	                                modelRefs: ClassModelReferences, dbPropsOrDbModelRef: Reference, targeting: Boolean)
 	                               (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Starts with the XDbFactoryLike[+A] trait
@@ -155,7 +163,7 @@ object DbFactoryWriter
 			applyParams)
 		
 		// Implements the from model parsing functionality using this apply function
-		val fromModelImplementation = fromModelMethodFor(classToWrite) { propAssignments =>
+		val fromModelImplementation = fromModelMethodFor(classToWrite, targeting) { propAssignments =>
 			val modelName = if (classToWrite.isExtension) "model" else "valid"
 			s"apply($modelName, " +: accessIdInApply(classToWrite).append(propAssignments, ", ").append(")")
 		}
@@ -174,7 +182,7 @@ object DbFactoryWriter
 		File(factoryPackage, TraitDeclaration(
 			name = (classToWrite.name + factorySuffix + likeSuffix).className,
 			genericTypes = Single(aGenericType),
-			extensions = extensionsFor(classToWrite, parentClassReferences, aType),
+			extensions = extensionsFor(classToWrite, parentClassReferences, aType, targeting),
 			properties = Single(dbProps),
 			methods = methods,
 			description = factoryDescription,
@@ -232,13 +240,16 @@ object DbFactoryWriter
 	}
 	
 	private def extensionsFor(classToWrite: Class, parentClassReferences: Seq[ClassReferences],
-	                          modelType: ScalaType): Vector[Extension] =
+	                          modelType: ScalaType, targeting: Boolean): Seq[Extension] =
 	{
-		val builder = new VectorBuilder[Extension]()
+		val builder = OptimizedIndexedSeq.newBuilder[Extension]
 		
 		// When inheriting, extends the YDbFactoryLike[X]
 		if (classToWrite.isExtension)
 			builder ++= parentClassReferences.flatMap { _.generic.map[Extension] { _.dbFactoryLike(modelType) } }
+		// Targeting implementations use a different class hierarchy
+		else if (targeting)
+			builder ++= Pair(rowReader(modelType), parseTableModel(modelType))
 		// If no enumerations are included, the inheritance is more specific (=> uses automatic validation)
 		else if (classToWrite.fromDbModelConversionMayFail)
 			builder += fromRowModelFactory(modelType)
@@ -246,7 +257,8 @@ object DbFactoryWriter
 			builder += fromValidatedRowModelFactory(modelType)
 		
 		// For tables which contain a creation time index, additional inheritance is added
-		if (classToWrite.recordsIndexedCreationTime)
+		// However, this feature is disabled in targeting mode
+		if (!targeting && classToWrite.recordsIndexedCreationTime)
 			builder += fromTimelineRowFactory(modelType)
 		
 		// If the class supports deprecation, it is reflected in this factory also
@@ -256,7 +268,8 @@ object DbFactoryWriter
 		builder.result()
 	}
 	
-	private def concretePropertiesFor(classToWrite: Class, dbModelRef: Reference)(implicit naming: NamingRules) =
+	private def concretePropertiesFor(classToWrite: Class, dbModelRef: Reference, targeting: Boolean)
+	                                 (implicit naming: NamingRules) =
 	{
 		val builder = new VectorBuilder[PropertyDeclaration]()
 		
@@ -270,13 +283,16 @@ object DbFactoryWriter
 		// All objects define the table property (implemented)
 		builder += ComputedProperty("table", isOverridden = true)(s"$modelName.table")
 		// Timestamp-based factories also specify a creation time property name
-		if (classToWrite.recordsIndexedCreationTime)
-			classToWrite.timestampProperty.foreach { createdProp =>
-				builder += ComputedProperty("timestamp", isOverridden = true)(s"$modelName.${createdProp.name.prop}")
-			}
-		// Non-timestamp-based factories need to specify default ordering
-		else
-			builder += defaultOrderingProp
+		// This feature is disabled in targeting mode
+		if (!targeting) {
+			if (classToWrite.recordsIndexedCreationTime)
+				classToWrite.timestampProperty.foreach { createdProp =>
+					builder += ComputedProperty("timestamp", isOverridden = true)(s"$modelName.${createdProp.name.prop}")
+				}
+			// Non-timestamp-based factories need to specify default ordering
+			else
+				builder += defaultOrderingProp
+		}
 			
 		// Deprecatable factories specify the deprecation condition (read from the database model)
 		if (classToWrite.isDeprecatable) {
@@ -287,7 +303,7 @@ object DbFactoryWriter
 		builder.result()
 	}
 	
-	private def fromModelMethodFor(classToWrite: Class)(fromAssignments: Mutate[CodePiece])
+	private def fromModelMethodFor(classToWrite: Class, targeting: Boolean)(fromAssignments: Mutate[CodePiece])
 	                              (implicit naming: NamingRules) =
 	{
 		// When extending a parent YDbFactoryLike trait, implements their prepared apply function
@@ -300,14 +316,18 @@ object DbFactoryWriter
 			
 			// Case: Highest level class or trait => Implements apply(AnyModel) or fromValidatedModel(Model)
 			case None =>
+				// Targeted access points don't use from validated model.
+				// Instead, they wrap the results in Success.
+				if (targeting)
+					ClassMethodFactory.classFromModel(classToWrite, "model") { assignments =>
+						fromAssignments(assignments).flatMapText { c => CodePiece(s"Success($c)", Set(success)) }
+					}
 				// Case: Some properties must be parsed separately => Can't use fromValidatedModel(...)
-				if (classToWrite.fromDbModelConversionMayFail)
-					ClassMethodFactory
-						.classFromModel(classToWrite, "valid")(fromAssignments)
+				if (targeting || classToWrite.fromDbModelConversionMayFail)
+					ClassMethodFactory.classFromModel(classToWrite, "valid")(fromAssignments)
 				// Case: Default => Uses fromValidatedModel(...)
 				else
-					ClassMethodFactory
-						.classFromValidatedModel(classToWrite)(fromAssignments)
+					ClassMethodFactory.classFromValidatedModel(classToWrite)(fromAssignments)
 		}
 	}
 	

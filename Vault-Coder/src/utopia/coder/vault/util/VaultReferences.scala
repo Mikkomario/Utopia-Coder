@@ -54,6 +54,12 @@ object VaultReferences
 		lazy val possiblyCombiningFactory = Reference(singleLinkedFactories, "PossiblyCombiningFactory")
 		lazy val multiCombiningFactory = Reference(factories / "multi", "MultiCombiningFactory")
 		
+		lazy val rowReader = Reference(readers, "DbRowReader")
+		lazy val combiningReader = Reference(linkedReaders, "CombiningDbRowReader")
+		lazy val possiblyCombiningReader = Reference(linkedReaders, "PossiblyCombiningDbRowReader")
+		lazy val multiLinkedReader = Reference(linkedReaders, "MultiLinkedDbReader")
+		lazy val parseTableModel = Reference(parsers, "ParseTableModel")
+		
 		lazy val storable = Reference(immutableModels, "Storable")
 		lazy val storableWithFactory = Reference(immutableModels, "StorableWithFactory")
 		lazy val storableFactory = Reference(noSql/"storable", "StorableFactory")

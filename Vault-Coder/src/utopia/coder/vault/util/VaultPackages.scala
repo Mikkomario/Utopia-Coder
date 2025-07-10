@@ -37,6 +37,10 @@ object VaultPackages
 		lazy val fromRowFactories = factories / ".row"
 		lazy val singleLinkedFactories = fromRowFactories / "linked"
 		
+		lazy val readers = noSql/"read"
+		lazy val linkedReaders = readers/"linked"
+		lazy val parsers = readers/"parse"
+		
 		lazy val access = noSql / "access"
 		lazy val viewAccess = noSql / "view"
 		lazy val singleModelAccess = access / "single.model"

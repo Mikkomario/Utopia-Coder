@@ -375,7 +375,7 @@ object MainAppLogic extends CoderAppLogic
 		def write(classToWrite: Class) = classToWrite.referenceFrom match {
 			// Case: Externally referenced class => Only generates references
 			case Some(externalPackage) =>
-				val refs = generateReferencesForClass(classToWrite, externalPackage)
+				val refs = generateReferencesForClass(classToWrite, externalPackage, targetingByDefault)
 				Success(classToWrite -> refs)
 				
 			// Case: Normal class => Proceeds to write the class files
@@ -429,7 +429,8 @@ object MainAppLogic extends CoderAppLogic
 							case None => dbModelRefs.rightOrMap { _.model }
 							case Some((refs, _)) => refs.first
 						}
-						DbFactoryWriter(classToWrite, parentClassReferences, modelRefs, dbPropsOrModelRef)
+						DbFactoryWriter(classToWrite, parentClassReferences, modelRefs, dbPropsOrModelRef,
+							targetingByDefault)
 							.flatMap { case (dbFactoryRef, dbFactoryLikeRef) =>
 								// Adds description-specific references if applicable
 								(descriptionLinkObjects match {
@@ -500,7 +501,8 @@ object MainAppLogic extends CoderAppLogic
 		CombinedModelWriter(combination, parentRefs.model, childRefs.stored, commonComboTraitRef)
 			.flatMap { combinedRefs =>
 				// Writes the DB factory class
-				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory)
+				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory,
+					targetingByDefault)
 					.flatMap { comboFactoryRef =>
 						// Combo access traits are not written in targeting mode
 						if (targetingByDefault)
@@ -524,13 +526,15 @@ object MainAppLogic extends CoderAppLogic
 	}
 	
 	// Generates references as if class files had been written
-	private def generateReferencesForClass(classToWrite: Class, rootPackage: Package)(implicit naming: NamingRules) = {
+	private def generateReferencesForClass(classToWrite: Class, rootPackage: Package, targeting: Boolean)
+	                                      (implicit naming: NamingRules) =
+	{
 		val dbPackage = rootPackage/"database"
 		val accessPackage = dbPackage/"access"
 		
 		val modelRefs = ModelWriter.generateReferences(rootPackage/"model", classToWrite)
 		val dbModelRefs = DbModelWriter.generateReferences(dbPackage/"storable", classToWrite)
-		val (dbFactory, dbFactoryLike) = DbFactoryWriter.generateReferences(dbPackage/"factory", classToWrite)
+		val (dbFactory, dbFactoryLike) = DbFactoryWriter.generateReferences(dbPackage/"factory", classToWrite, targeting)
 		val accessRefs = AccessWriter.generateReferences(accessPackage, classToWrite)
 		
 		val (dbModel, dbPropsRefs) = dbModelRefs match {
