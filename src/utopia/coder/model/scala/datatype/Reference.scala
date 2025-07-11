@@ -1,10 +1,12 @@
 package utopia.coder.model.scala.datatype
 
 import utopia.coder.model.data.ProjectSetup
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.template.ScalaConvertible
+import utopia.flow.collection.immutable.Single
 
 import java.nio.file.Path
 import scala.collection.StringOps
@@ -48,7 +50,7 @@ object Reference
 	
 	// OTHER    -------------------------------
 	
-	def apply(pck: Package, target: String): Reference = apply(pck, Vector(target))
+	def apply(pck: Package, target: String): Reference = apply(pck, Single(target))
 	
 	/**
 	  * Converts a string into a reference
@@ -60,13 +62,13 @@ object Reference
 		if (ref.isEmpty)
 			apply(empty, "")
 		else {
-			val parts = ref.split(separatorRegex).toVector.filter { s => (s: StringOps).nonEmpty }
+			val parts = ref.split(separatorRegex).filter { s => (s: StringOps).nonEmpty }
 			// Case: Extensions reference or import all -reference
 			if (parts.last == "_" && parts.size > 1)
 				extensions(Package(parts.dropRight(2)), parts(parts.size - 2))
 			// Case: Single property reference or a sub-reference
 			else if (parts.last.head.isLower && parts.size > 1)
-				apply(Package(parts.dropRight(2)), Vector(parts(parts.size - 2)), parts.last)
+				apply(Package(parts.dropRight(2)), Single(parts(parts.size - 2)), parts.last)
 			// Case: Standard reference
 			else
 				apply(Package(parts.dropRight(1)), parts.last)
@@ -148,7 +150,7 @@ object Reference
   *                     as well as in the import
   * @param subReference Item referred to under the imported item. E.g. a specific property
   */
-case class Reference private(packagePath: Package, importTarget: Vector[String], subReference: String = "")
+case class Reference private(packagePath: Package, importTarget: Seq[String], subReference: String = "")
 	extends ScalaConvertible
 {
 	// COMPUTED --------------------------------

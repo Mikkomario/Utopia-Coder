@@ -3,18 +3,16 @@ package utopia.coder.vault.controller.writer.database
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.{Private, Protected}
-import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
+import utopia.coder.vault.controller.writer.model.ParseModelCode
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences}
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
-import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.flow.collection.immutable.{OptimizedIndexedSeq, Pair, Single}
-import utopia.flow.util.Mutate
 
 import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
@@ -45,27 +43,7 @@ object DbFactoryWriter
 	
 	// OTHER    -------------------------
 	
-	/*
-	FIXME: when inheriting a 2 level deep generic trait, the apply implementation is based on the top trait, not implementing renames.
-	E.g.
-	override protected def apply(model: AnyModel, id: Int, parentId: Int, statementId: Int, orderIndex: Int) =
-		ActionRequestStatementPlacement(id, ActionRequestStatementPlacementData(parentId, placedId, orderIndex))
-	 */
-	
 	// TODO: When writing a generic factory trait for a class utilizing timestamps, should generate the override def timestamp = dbProps.<timestampPropName> -property
-	
-	/*
-	FIXME: When generating the apply function, the code is broken if enumerations (without default values) are used (because the parent extends fromValidatedRowModelFactory):
-	override def apply(model: ModelLike[Property]) = {
-		valid.flatMap { valid =>
-			LlmUseCase.fromValue(valid(this.model.task.name)).map { task =>
-				LlmAssignment(valid(this.model.id.name).getInt, LlmAssignmentData(task,
-					valid(this.model.llmId.name).getInt, valid(this.model.created.name).getInstant,
-					valid(this.model.deprecatedAfter.name).instant))
-			}
-		}
-	}
-	 */
 	
 	// FIXME: Generated code fails when an inheriting class attempts enumeration-parsing (there's no way to return Try)
 	
@@ -98,13 +76,7 @@ object DbFactoryWriter
 		// Case: Concrete factory => Just implements the XDbFactory object
 		else {
 			// Implements the primary from model method
-			val fromModel = fromModelMethodFor(classToWrite, targeting) { assignments =>
-				modelRefs.stored.targetCode +
-					accessIdInApply(classToWrite)
-						.append(modelRefs.data.targetCode + assignments.withinParenthesis, ", ")
-						.withinParenthesis
-			}
-			
+			val fromModel = fromModelMethodFor(classToWrite, modelRefs.stored, modelRefs.data, targeting)
 			File(factoryPackage,
 				ObjectDeclaration(
 					name = factoryName,
@@ -163,10 +135,7 @@ object DbFactoryWriter
 			applyParams)
 		
 		// Implements the from model parsing functionality using this apply function
-		val fromModelImplementation = fromModelMethodFor(classToWrite, targeting) { propAssignments =>
-			val modelName = if (classToWrite.isExtension) "model" else "valid"
-			s"apply($modelName, " +: accessIdInApply(classToWrite).append(propAssignments, ", ").append(")")
-		}
+		val fromModelImplementation = fromModelMethodFor(classToWrite, modelRefs.stored, modelRefs.data, targeting)
 		// When inheriting another trait, makes sure the new apply is not identical to the old
 		val methods = {
 			// Case: New apply would just override the old one with no effect => Skips listing either function
@@ -249,7 +218,7 @@ object DbFactoryWriter
 			builder ++= parentClassReferences.flatMap { _.generic.map[Extension] { _.dbFactoryLike(modelType) } }
 		// Targeting implementations use a different class hierarchy
 		else if (targeting)
-			builder ++= Pair(rowReader(modelType), parseTableModel(modelType))
+			builder ++= Vector(rowReader(modelType), parseTableModel(modelType), hasTableAsTarget)
 		// If no enumerations are included, the inheritance is more specific (=> uses automatic validation)
 		else if (classToWrite.fromDbModelConversionMayFail)
 			builder += fromRowModelFactory(modelType)
@@ -303,14 +272,16 @@ object DbFactoryWriter
 		builder.result()
 	}
 	
-	private def fromModelMethodFor(classToWrite: Class, targeting: Boolean)(fromAssignments: Mutate[CodePiece])
+	private def fromModelMethodFor(classToWrite: Class, storedRef: Reference, dataRef: Reference, targeting: Boolean)
 	                              (implicit naming: NamingRules) =
 	{
+		val dbProps = if (classToWrite.isGeneric) "dbProps" else "this.model"
+		
 		// When extending a parent YDbFactoryLike trait, implements their prepared apply function
 		classToWrite.parents.headOption match {
 			// Case: Inheriting an abstract trait => Implements their apply function
 			case Some(parent) =>
-				val code = ClassMethodFactory.classFromModelCode(classToWrite, "model")(fromAssignments)
+				val code = ParseModelCode(classToWrite, dataRef.targetCode, Some(storedRef), propNames = dbProps)
 				MethodDeclaration.usingCode("apply", code, visibility = Protected, isOverridden = true)(
 					genericTraitApplyParamsFor(parent))
 			
@@ -318,16 +289,25 @@ object DbFactoryWriter
 			case None =>
 				// Targeted access points don't use from validated model.
 				// Instead, they wrap the results in Success.
-				if (targeting)
-					ClassMethodFactory.classFromModel(classToWrite, "model") { assignments =>
-						fromAssignments(assignments).flatMapText { c => CodePiece(s"Success($c)", Set(success)) }
-					}
+				if (targeting) {
+					val code = ParseModelCode(classToWrite, dataRef.targetCode, Some(storedRef),
+						modelName = "valid", propNames = dbProps, yieldTry = true)
+					MethodDeclaration.usingCode("fromValid", code, isOverridden = true)(Parameter("valid", flow.model))
+				}
 				// Case: Some properties must be parsed separately => Can't use fromValidatedModel(...)
-				if (targeting || classToWrite.fromDbModelConversionMayFail)
-					ClassMethodFactory.classFromModel(classToWrite, "valid")(fromAssignments)
+				else if (classToWrite.fromDbModelConversionMayFail) {
+					val code = ParseModelCode(classToWrite, dataRef.targetCode, Some(storedRef),
+						modelName = "valid", propNames = dbProps,
+						openParentBlock = "table.validate(model).flatMap { valid => ", yieldTry = true)
+					MethodDeclaration.usingCode("apply", code, isOverridden = true)(Parameter("model", flow.anyModel))
+				}
 				// Case: Default => Uses fromValidatedModel(...)
-				else
-					ClassMethodFactory.classFromValidatedModel(classToWrite)(fromAssignments)
+				else {
+					val code = ParseModelCode(classToWrite, dataRef.targetCode, Some(storedRef),
+						modelName = "valid", propNames = dbProps)
+					MethodDeclaration.usingCode("fromValidatedModel", code, isOverridden = true)(
+						Parameter("valid", flow.model))
+				}
 		}
 	}
 	
@@ -343,16 +323,5 @@ object DbFactoryWriter
 			Parameter("id", classToWrite.idType.toScala,
 				description = s"Id to assign to the read/parsed ${ classToWrite.name }")
 		) ++ customApplyParams
-	}
-	
-	// Accesses the id property in an apply function implementation
-	// Either from a validated model or from a property prepared by a parent trait
-	private def accessIdInApply(classToWrite: Class) = {
-		if (classToWrite.isExtension)
-			CodePiece("id")
-		else {
-			val dbProps = if (classToWrite.isGeneric) "dbProps" else "this.model"
-			classToWrite.idType.fromValueCode(s"valid($dbProps.id.name)")
-		}
 	}
 }

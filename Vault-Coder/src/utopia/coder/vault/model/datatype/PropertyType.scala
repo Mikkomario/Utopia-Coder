@@ -164,6 +164,15 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	// IMPLEMENTED  --------------------
 	
 	override def toScala = scalaType
+	
+	
+	// OTHER    ------------------------
+	
+	/**
+	 * @param json Whether parsing JSON (true) or DB-originated data (false)
+	 * @return Whether, in that context, parsing a Value into this data type yields a Try
+	 */
+	def yieldsTryFromValueIn(json: Boolean): Boolean = if (json) yieldsTryFromJsonValue else yieldsTryFromValue
 }
 
 /**

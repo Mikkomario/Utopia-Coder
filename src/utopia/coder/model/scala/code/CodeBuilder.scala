@@ -3,6 +3,7 @@ package utopia.coder.model.scala.code
 import utopia.coder.model.scala.code
 import utopia.coder.model.scala.datatype.Reference
 import utopia.coder.model.scala.template.Referencing
+import utopia.flow.collection.immutable.OptimizedIndexedSeq
 import utopia.flow.view.mutable.Pointer
 import utopia.flow.view.mutable.caching.ResettableLazy
 
@@ -18,7 +19,7 @@ class CodeBuilder(startIndentation: Int = 0) extends mutable.Builder[String, Cod
 {
 	// ATTRIBUTES   --------------------------
 	
-	private val linesBuilder = new VectorBuilder[CodeLine]()
+	private val linesBuilder = OptimizedIndexedSeq.newBuilder[CodeLine]
 	private val references = mutable.Set[Reference]()
 	
 	private var currentIndent = startIndentation
@@ -192,12 +193,34 @@ class CodeBuilder(startIndentation: Int = 0) extends mutable.Builder[String, Cod
 		indent()
 	}
 	/**
+	 * Opens a new { block } of code, starting with the specified block-opener.
+	 * The following lines will be added inside this block (indented).
+	 * @param blockStartingCode A code which starts a new block of code.
+	 *                          Should include a block-opener.
+	 *                          E.g. "trySomething().flatMap { result => "
+	 * @return This builder
+	 */
+	def openBlockWith(blockStartingCode: CodePiece) = {
+		appendPartial(blockStartingCode)
+		closeOpenLine()
+		indent()
+	}
+	/**
 	  * Closes the previously openened { block } of code
 	  * @return This builder
 	  */
 	def closeBlock() = {
 		unindent()
 		this += "}"
+	}
+	/**
+	 * Closes all previously opened { blocks } of code
+	 * @return This builder
+	 */
+	def closeOpenBlocks() = {
+		while (isInsideBlock)
+			closeBlock()
+		this
 	}
 	/**
 	  * Adds an indented block to this builder. Uses the specified function to fill that block using this same builder.
@@ -238,4 +261,6 @@ class CodeBuilder(startIndentation: Int = 0) extends mutable.Builder[String, Cod
 	  * Finishes / closes a partial / open line if one is present
 	  */
 	def closeOpenLine() = openLineCache.popCurrent().foreach { linesBuilder += _.value }
+	
+	private def isInsideBlock = currentIndent > startIndentation
 }

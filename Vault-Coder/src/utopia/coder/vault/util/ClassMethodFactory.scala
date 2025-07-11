@@ -16,6 +16,7 @@ import utopia.flow.collection.immutable.Empty
   * @author Mikko Hilpinen
   * @since 9.10.2021, v1.2
   */
+@deprecated("Replaced with ParseModelCode", "v1.13")
 object ClassMethodFactory
 {
 	/**

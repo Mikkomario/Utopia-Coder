@@ -34,6 +34,7 @@ object VaultReferences
 		lazy val dbProp = Reference(immutableModels, "DbPropertyDeclaration")
 		
 		lazy val hasTable = Reference(templateModels, "HasTable")
+		lazy val hasTableAsTarget = Reference(templateModels, "HasTableAsTarget")
 		lazy val hasId = Reference(templateModels, "HasId")
 		lazy val hasIdProperty = Reference(templateModels, "HasIdProperty")
 		lazy val stored = Reference(templateModels, "Stored")
