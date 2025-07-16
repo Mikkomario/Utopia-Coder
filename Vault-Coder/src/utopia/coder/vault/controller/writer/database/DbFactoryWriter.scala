@@ -232,7 +232,8 @@ object DbFactoryWriter
 			builder += fromTimelineRowFactory(modelType)
 		
 		// If the class supports deprecation, it is reflected in this factory also
-		if (classToWrite.isDeprecatable)
+		// This feature is disabled in targeting mode
+		if (!targeting && classToWrite.isDeprecatable)
 			builder += deprecatable
 		
 		builder.result()
@@ -262,12 +263,12 @@ object DbFactoryWriter
 			// Non-timestamp-based factories need to specify default ordering
 			else
 				builder += defaultOrderingProp
-		}
 			
-		// Deprecatable factories specify the deprecation condition (read from the database model)
-		if (classToWrite.isDeprecatable) {
-			builder += ComputedProperty("nonDeprecatedCondition", Set(dbModelRef), isOverridden = true)(
-				s"$modelName.nonDeprecatedCondition")
+			// Deprecatable factories specify the deprecation condition (read from the database model)
+			if (classToWrite.isDeprecatable) {
+				builder += ComputedProperty("nonDeprecatedCondition", Set(dbModelRef), isOverridden = true)(
+					s"$modelName.nonDeprecatedCondition")
+			}
 		}
 		
 		builder.result()

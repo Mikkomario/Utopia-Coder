@@ -513,18 +513,28 @@ object TargetingWriter
 		
 		// Prepares the companion object, also
 		// Provides access to standard access root(s)
-		val companionParentType = {
-			if (accessMany)
-				accessManyRoot(accessRowsType(modelRef))
+		val companionParentTypes: Seq[Extension] = {
+			if (accessMany) {
+				Vector(accessManyRoot(accessRowsType(modelRef)),
+					wrapRowAccess(accessRowsType), wrapOneToManyAccess(accessCombinedType))
+			}
 			else
-				accessOneRoot(accessType(modelRef))
+				Single(accessOneRoot(accessType(modelRef)))
+		}
+		val accessMethods = {
+			if (accessMany)
+				Set(
+					MethodDeclaration("apply", isOverridden = true)(Parameter("access", rowReader))(
+						s"$accessRowsType(access)"),
+					MethodDeclaration("apply", isOverridden = true)(Parameter("access", dbReader))(
+						s"$accessCombinedType(access)")
+				)
+			else
+				Set[MethodDeclaration]()
 		}
 		val unfilteredRootCode = {
-			if (accessMany) {
-				val accessRef = VaultReferences.vault.accessManyRows
-				CodePiece(s"$accessRowsName(${ accessRef.target }(${ dbFactoryRef.target }))",
-					Set(accessRef, dbFactoryRef))
-			}
+			if (accessMany)
+				dbFactoryRef.targetCode.mapText { t => s"apply($t)" }
 			else
 				CodePiece(s"$manyAccessName.root.head")
 		}
@@ -564,16 +574,16 @@ object TargetingWriter
 		val anyTypeParam = ScalaType.basic("_")
 		val companion = ObjectDeclaration(
 			name = accessName,
-			extensions = Single(companionParentType),
+			extensions = companionParentTypes,
 			properties = defaultRootProps ++ comboRootProps,
-			methods = Set(
+			methods = accessMethods +
 				MethodDeclaration("accessValues", Set(implicitConversions), explicitOutputType = Some(valuesRef),
 					isImplicit = true, description = "Provides implicit access to an access point's .values property")(
 					Parameter("access",
 						ScalaType.basic(accessName)
 							.apply(if (accessMany) Pair.twice(anyTypeParam) else Single(anyTypeParam)),
 						description = "Access point whose values are accessed"))(
-					"access.values"))
+					"access.values")
 		)
 		
 		File(targetPackage, Pair(companion, accessClass) ++ additionalClasses).write()

@@ -86,26 +86,31 @@ object CombinedFactoryWriter
 			}
 		}
 		
-		val parentDeprecates = data.parentClass.isDeprecatable
-		val childDeprecates = data.childClass.isDeprecatable
-		// If either parent or child type supports deprecation, so does this factory
 		val deprecation = {
-			if (parentDeprecates || childDeprecates) {
-				val condition = {
-					if (parentDeprecates) {
-						if (childDeprecates)
-							"parentFactory.nonDeprecatedCondition && childFactory.nonDeprecatedCondition"
-						else
-							"parentFactory.nonDeprecatedCondition"
-					}
-					else
-						"childFactory.nonDeprecatedCondition"
-				}
-				Some(Extension(deprecatable) ->
-					ComputedProperty("nonDeprecatedCondition", isOverridden = true)(condition))
-			}
-			else
+			// Deprecation is not supported in targeting mode
+			if (targeting)
 				None
+			else {
+				val parentDeprecates = data.parentClass.isDeprecatable
+				val childDeprecates = data.childClass.isDeprecatable
+				// If either parent or child type supports deprecation, so does this factory
+				if (parentDeprecates || childDeprecates) {
+					val condition = {
+						if (parentDeprecates) {
+							if (childDeprecates)
+								"parentFactory.nonDeprecatedCondition && childFactory.nonDeprecatedCondition"
+							else
+								"parentFactory.nonDeprecatedCondition"
+						}
+						else
+							"childFactory.nonDeprecatedCondition"
+					}
+					Some(Extension(deprecatable) ->
+						ComputedProperty("nonDeprecatedCondition", isOverridden = true)(condition))
+				}
+				else
+					None
+			}
 		}
 		
 		File(packageFor(data, targeting),

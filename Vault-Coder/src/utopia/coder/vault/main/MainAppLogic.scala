@@ -534,7 +534,8 @@ object MainAppLogic extends CoderAppLogic
 		
 		val modelRefs = ModelWriter.generateReferences(rootPackage/"model", classToWrite)
 		val dbModelRefs = DbModelWriter.generateReferences(dbPackage/"storable", classToWrite)
-		val (dbFactory, dbFactoryLike) = DbFactoryWriter.generateReferences(dbPackage/"factory", classToWrite, targeting)
+		val (dbFactory, dbFactoryLike) = DbFactoryWriter
+			.generateReferences(dbPackage/(if (targeting) "reader" else "factory"), classToWrite, targeting)
 		val accessRefs = AccessWriter.generateReferences(accessPackage, classToWrite)
 		
 		val (dbModel, dbPropsRefs) = dbModelRefs match {

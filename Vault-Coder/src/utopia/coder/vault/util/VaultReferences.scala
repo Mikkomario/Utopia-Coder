@@ -55,6 +55,7 @@ object VaultReferences
 		lazy val possiblyCombiningFactory = Reference(singleLinkedFactories, "PossiblyCombiningFactory")
 		lazy val multiCombiningFactory = Reference(factories / "multi", "MultiCombiningFactory")
 		
+		lazy val dbReader = Reference(readers, "DbReader")
 		lazy val rowReader = Reference(readers, "DbRowReader")
 		lazy val combiningReader = Reference(linkedReaders, "CombiningDbRowReader")
 		lazy val possiblyCombiningReader = Reference(linkedReaders, "PossiblyCombiningDbRowReader")
@@ -104,6 +105,8 @@ object VaultReferences
 		lazy val accessOneWrapper = Reference(targetOne, "AccessOneWrapper")
 		lazy val accessOneRoot = Reference(targetOne, "AccessOneRoot")
 		lazy val accessManyRoot = Reference(targetMany, "AccessManyRoot")
+		lazy val wrapRowAccess = Reference(targetMany, "WrapRowAccess")
+		lazy val wrapOneToManyAccess = Reference(targetMany, "WrapOneToManyAccess")
 	}
 	
 	object BunnyMunch
