@@ -57,8 +57,10 @@ sealed trait CombinationType
 	 * @return Extension for the factory implementation
 	  */
 	def extensionWith(references: CombinationReferences, targeting: Boolean): Extension = {
-		val parent = if (targeting) parentDbReaderRef else parentDbFactoryRef
-		parent(references.combined, references.parent, references.child)
+		if (targeting)
+			parentDbReaderRef(references.parent, references.child, references.combined)
+		else
+			parentDbFactoryRef(references.combined, references.parent, references.child)
 	}
 	
 	/**

@@ -12,7 +12,7 @@ import utopia.coder.vault.controller.writer.model.ParseModelCode
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences}
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
-import utopia.flow.collection.immutable.{OptimizedIndexedSeq, Pair, Single}
+import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq, Pair, Single}
 
 import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
@@ -148,8 +148,9 @@ object DbFactoryWriter
 		val factoryDescription = s"Common trait for factories which parse ${
 			classToWrite.name } data from database-originated models"
 		
+		val classNameSuffix = if (targeting) readerSuffix else factorySuffix
 		File(factoryPackage, TraitDeclaration(
-			name = (classToWrite.name + factorySuffix + likeSuffix).className,
+			name = (classToWrite.name + classNameSuffix + likeSuffix).className,
 			genericTypes = Single(aGenericType),
 			extensions = extensionsFor(classToWrite, parentClassReferences, aType, targeting),
 			properties = Single(dbProps),
@@ -182,7 +183,7 @@ object DbFactoryWriter
 				name = concreteImplementationName,
 				extensions = Single(factoryType),
 				constructionParams = constructorParams,
-				properties = Single(defaultOrderingProp),
+				properties = if (targeting) Empty else Single(defaultOrderingProp),
 				// NB: The drop(2) here is not very elegant. May require refactoring later.
 				methods = Set(MethodDeclaration("apply", Set(modelRefs.stored, modelRefs.data),
 					visibility = Protected, isOverridden = true)(
@@ -275,7 +276,7 @@ object DbFactoryWriter
 	private def fromModelMethodFor(classToWrite: Class, storedRef: Reference, dataRef: Reference, targeting: Boolean)
 	                              (implicit naming: NamingRules) =
 	{
-		val dbProps = if (classToWrite.isGeneric) "dbProps" else "this.model"
+		val dbProps = if (classToWrite.isGeneric || classToWrite.isExtension) "dbProps" else "this.model"
 		
 		// When extending a parent YDbFactoryLike trait, implements their prepared apply function
 		classToWrite.parents.headOption match {
