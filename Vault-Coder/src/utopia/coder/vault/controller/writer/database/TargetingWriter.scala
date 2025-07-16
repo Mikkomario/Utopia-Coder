@@ -13,9 +13,8 @@ import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
 import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation, Expiration}
-import utopia.coder.vault.util.VaultReferences
-import utopia.coder.vault.util.VaultReferences.Vault
 import utopia.coder.vault.util.VaultReferences.Vault._
+import utopia.coder.vault.util.VaultReferences.{Vault, vault}
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.util.TryExtensions._
@@ -522,13 +521,16 @@ object TargetingWriter
 				Single(accessOneRoot(accessType(modelRef)))
 		}
 		val accessMethods = {
-			if (accessMany)
-				Set(
-					MethodDeclaration("apply", isOverridden = true)(Parameter("access", rowReader))(
-						s"$accessRowsType(access)"),
-					MethodDeclaration("apply", isOverridden = true)(Parameter("access", dbReader))(
-						s"$accessCombinedType(access)")
-				)
+			if (accessMany) {
+				Pair(accessRowsType -> accessManyRows, accessCombinedType -> vault.accessMany)
+					.map { case (wrapper, reader) =>
+						MethodDeclaration("apply",
+							genericTypes = Single(GenericType("A", description = "Type of accessed items")),
+							isOverridden = true)(
+							Parameter("access", reader))(s"$wrapper(access)")
+					}
+					.toSet
+			}
 			else
 				Set[MethodDeclaration]()
 		}
