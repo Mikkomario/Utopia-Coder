@@ -3,6 +3,7 @@
 ## v1.1.3 (in development)
 ### Bugfixes
 - Bugfix to **ScalaType**'s `.withOther(ScalaType)`
+- Classes were previously not recognized as abstract in Scala parsing
 - Scala parsing now supports multi-line generic type declarations
 ### New methods
 - **Name**

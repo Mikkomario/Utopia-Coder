@@ -260,6 +260,7 @@ object ScalaParser
 					val filteredComments = beforeDeclarationComments.filter { !segmentSeparatorRegex(_) }
 					parentBuilder.addFreeCode(beforeDeclarationCode
 						.dropWhile { _.isEmpty }.dropRightWhile { _.isEmpty })
+					
 					/*
 					println(s"Read declaration line: ${declarationLine.code}")
 					if (filteredComments.nonEmpty)

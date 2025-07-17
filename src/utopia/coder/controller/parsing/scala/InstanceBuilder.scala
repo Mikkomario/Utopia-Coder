@@ -2,7 +2,7 @@ package utopia.coder.controller.parsing.scala
 
 import utopia.coder.model.scala.code.{Code, CodeLine}
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference}
-import utopia.coder.model.scala.declaration.DeclarationPrefix.{Case, Sealed}
+import utopia.coder.model.scala.declaration.DeclarationPrefix.{Abstract, Case, Sealed}
 import utopia.coder.model.scala.declaration.InstanceDeclarationType.{ClassD, ObjectD, TraitD}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.doc.ScalaDoc
@@ -71,13 +71,17 @@ class InstanceBuilder(visibility: Visibility, prefixes: Set[DeclarationPrefix], 
 		
 		// TODO: WET WET
 		instanceType match {
-			case ObjectD => ObjectDeclaration(name, extensions, typesBuilder.result(), freeCode,
-				propertiesBuilder.result(), methodsBuilder.result().toSet, nestedBuilder.result().toSet, visibility,
-				annotations, scalaDoc.description, scalaDoc.author, commentsBefore, since, prefixes.contains(Case))
-			case ClassD => ClassDeclaration(name, genericTypes, parameters.getOrElse(Parameters.empty), extensions,
-				typesBuilder.result(), freeCode, propertiesBuilder.result(), methodsBuilder.result().toSet,
-				nestedBuilder.result().toSet, visibility, annotations, scalaDoc.description, scalaDoc.author,
-				commentsBefore, since, prefixes.contains(Case))
+			case ObjectD =>
+				ObjectDeclaration(name, extensions, typesBuilder.result(), freeCode, propertiesBuilder.result(),
+					methodsBuilder.result().toSet, nestedBuilder.result().toSet, visibility, annotations,
+					scalaDoc.description, scalaDoc.author, commentsBefore, since,
+					isCaseObject = prefixes.contains(Case))
+			case ClassD =>
+				ClassDeclaration(name, genericTypes, parameters.getOrElse(Parameters.empty), extensions,
+					typesBuilder.result(), freeCode, propertiesBuilder.result(), methodsBuilder.result().toSet,
+					nestedBuilder.result().toSet, visibility, annotations, scalaDoc.description, scalaDoc.author,
+					commentsBefore, since, isCaseClass = prefixes.contains(Case),
+					isAbstract = prefixes.contains(Abstract))
 			case TraitD =>
 				val freeCode = freeCodeBuilder.result()
 				if (freeCode.nonEmpty) {
