@@ -514,8 +514,15 @@ trait FacadePropertyType extends PropertyType
 			_toValueCode(instanceCode)(FacadePropertyType.this.toJsonValueCode)
 		
 		override def fromValueCode(valueCodes: Seq[String]): CodePiece =
-			_fromValueCode(FacadePropertyType.this.fromValueCode(valueCodes),
-				isTry = FacadePropertyType.this.yieldsTryFromValue)
+			optionDelegate.fromValueCode(valueCodes).flatMapText { delegateOption =>
+				fromDelegateCode("v").mapText { fromDelegate =>
+					if (yieldsTryFromDelegate)
+						s"$delegateOption.flatMap { v=> $fromDelegate(v).toOption }"
+					else
+						s"$delegateOption.map { v => $fromDelegate }"
+				}
+			}
+		
 		override def fromValuesCode(valuesCode: String): CodePiece =
 			delegate.fromValuesCode(valuesCode).flatMapText { delegates =>
 				fromDelegateCode("v").mapText { fromDelegate =>
@@ -525,9 +532,16 @@ trait FacadePropertyType extends PropertyType
 						s"$delegates.map { v => Some($fromDelegate) }"
 				}
 			}
+		// WET WET
 		override def fromJsonValueCode(valueCode: String): CodePiece =
-			_fromValueCode(FacadePropertyType.this.fromJsonValueCode(valueCode),
-				isTry = FacadePropertyType.this.yieldsTryFromJsonValue)
+			optionDelegate.fromJsonValueCode(valueCode).flatMapText { delegateOption =>
+				fromDelegateCode("v").mapText { fromDelegate =>
+					if (yieldsTryFromDelegate)
+						s"$delegateOption.flatMap { v=> $fromDelegate(v).toOption }"
+					else
+						s"$delegateOption.map { v => $fromDelegate }"
+				}
+			}
 		override def fromConcreteCode(concreteCode: String): CodePiece = s"Some($concreteCode)"
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String =
@@ -540,13 +554,5 @@ trait FacadePropertyType extends PropertyType
 			wrappedToValue("v").mapText { instanceToValue =>
 				s"($instanceCode match { case Some(v) => $instanceToValue; case None => Value.empty })"
 			}.referringTo(Reference.flow.value)
-		private def _fromValueCode(wrappedCode: CodePiece, isTry: Boolean) = {
-			// Case: Converting Try to Option
-			if (isTry)
-				wrappedCode.mapText { tryInstance => s"$tryInstance.toOption" }
-			// Case: Converting an instance to Option
-			else
-				wrappedCode.mapText { instance => s"Some($instance)" }
-		}
 	}
 }

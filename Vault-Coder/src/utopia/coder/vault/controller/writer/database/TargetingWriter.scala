@@ -40,7 +40,7 @@ object TargetingWriter
 	private lazy val filterByPrefix = Name("FilterBy", "FilterBy", CamelCase.capitalized)
 	private val rowsSuffix = Name("Row", "Rows", CamelCase.capitalized)
 	
-	private lazy val joinedToPrefix = Name("joinedTo", "joinedTo", CamelCase.lower)
+	private lazy val joinedToPrefix = Name("join", "join", CamelCase.lower)
 	private lazy val wherePrefix = Name("where", "where", CamelCase.lower)
 	private lazy val withPrefix = Name("with", "with", CamelCase.lower)
 	
@@ -527,7 +527,7 @@ object TargetingWriter
 						MethodDeclaration("apply",
 							genericTypes = Single(GenericType("A", description = "Type of accessed items")),
 							isOverridden = true)(
-							Parameter("access", reader))(s"$wrapper(access)")
+							Parameter("access", ScalaType(reader)(ScalaType.basic("A"))))(s"$wrapper(access)")
 					}
 					.toSet
 			}
