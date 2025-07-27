@@ -8,6 +8,7 @@
       <module fileurl="file://$PROJECT_DIR$/Utopia-Coder.iml" filepath="$PROJECT_DIR$/Utopia-Coder.iml" />
       <module fileurl="file://$PROJECT_DIR$/../Utopia-Scala/Vault/Vault.iml" filepath="$PROJECT_DIR$/../Utopia-Scala/Vault/Vault.iml" />
       <module fileurl="file://$PROJECT_DIR$/Vault-Coder/Vault-Coder.iml" filepath="$PROJECT_DIR$/Vault-Coder/Vault-Coder.iml" />
+      <module fileurl="file://$PROJECT_DIR$/../Utopia-Scala/Vault/Vault-Disconnected/Vault-Disconnected.iml" filepath="$PROJECT_DIR$/../Utopia-Scala/Vault/Vault-Disconnected/Vault-Disconnected.iml" />
     </modules>
   </component>
 </project>

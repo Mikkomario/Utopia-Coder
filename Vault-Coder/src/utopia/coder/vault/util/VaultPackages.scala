@@ -25,6 +25,8 @@ object VaultPackages
 	{
 		val base = utopia / "vault"
 		
+		lazy val store = base/"store"
+		
 		lazy val database = base / "database"
 		lazy val models = base / "model"
 		lazy val templateModels = models/"template"
@@ -63,6 +65,7 @@ object VaultPackages
 		val base = utopia / "metropolis"
 		
 		lazy val models = base / "model"
+		@deprecated("Deprecated for removal", "v1.13")
 		lazy val storedModels = models / "stored"
 		lazy val description = models / "stored.description"
 		lazy val combinedDescription = models / "combined.description"

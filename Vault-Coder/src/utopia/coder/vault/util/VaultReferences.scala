@@ -27,6 +27,12 @@ object VaultReferences
 		
 		private def pck = VaultPackages.vault
 		
+		lazy val hasId = Reference(store, "HasId")
+		lazy val fromIdFactory = Reference(store, "FromIdFactory")
+		lazy val stored = Reference(store, "Stored")
+		lazy val storedModelConvertible = Reference(store, "StoredModelConvertible")
+		lazy val storedFromModelFactory = Reference(store, "StoredFromModelFactory")
+		
 		lazy val connection = Reference(database, "Connection")
 		lazy val table = Reference(models / "immutable", "Table")
 		lazy val condition = Reference(sql, "Condition")
@@ -35,14 +41,9 @@ object VaultReferences
 		
 		lazy val hasTable = Reference(templateModels, "HasTable")
 		lazy val hasTableAsTarget = Reference(templateModels, "HasTableAsTarget")
-		lazy val hasId = Reference(templateModels, "HasId")
 		lazy val hasIdProperty = Reference(templateModels, "HasIdProperty")
-		lazy val stored = Reference(templateModels, "Stored")
-		lazy val storedModelConvertible = Reference(templateModels, "StoredModelConvertible")
-		lazy val storedFromModelFactory = Reference(templateModels, "StoredFromModelFactory")
-		lazy val fromIdFactory = Reference(templateModels, "FromIdFactory")
-		
 		lazy val indexed = Reference(noSql / "template", "Indexed")
+		
 		lazy val deprecatable = Reference(noSql / "template", "Deprecatable")
 		lazy val nullDeprecatable = Reference(deprecation, "NullDeprecatable")
 		lazy val deprecatableAfter = Reference(deprecation, "DeprecatableAfter")
@@ -120,9 +121,6 @@ object VaultReferences
 	{
 		import VaultPackages.Metropolis._
 		
-		lazy val stored = Reference(storedModels, "Stored")
-		lazy val storedModelConvertible = Reference(storedModels, "StoredModelConvertible")
-		lazy val storedFromModelFactory = Reference(storedModels, "StoredFromModelFactory")
 		lazy val descriptionRole = Reference(description, "DescriptionRole")
 		lazy val linkedDescription = Reference(combinedDescription, "LinkedDescription")
 		lazy val describedWrapper = Reference(combinedDescription, "DescribedWrapper")

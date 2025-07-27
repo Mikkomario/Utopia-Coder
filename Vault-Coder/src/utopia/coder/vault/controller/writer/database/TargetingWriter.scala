@@ -414,19 +414,6 @@ object TargetingWriter
 		}
 		val selfProp = ComputedProperty("self", visibility = Protected, isOverridden = true)("this")
 		
-		val deprecationMethod = {
-			if (accessMany)
-				classToWrite.deprecationProperty.filter { _.dataType == Deprecation }.map { prop =>
-					MethodDeclaration("deprecate", Set(flow.now),
-						description = s"Deprecates all accessible ${ className.pluralDoc }",
-						returnDescription = s"Whether any $className was targeted")(
-						Parameters(Empty,
-							Single(Parameter("connection", connection, description = "Implicit DB connection"))))(
-						s"values.${ prop.name.props }.set(Now)")
-				}
-			else
-				None
-		}
 		def wrapMethodFor(wrappedAccessType: ScalaType, constructedTypeName: String) =
 			MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
 				Parameter("newTarget", wrappedAccessType))(s"$constructedTypeName(newTarget)")
@@ -444,8 +431,7 @@ object TargetingWriter
 					s"${ valuesRef.target }(wrapped)")
 			) ++ modelProp ++ timestampProp ++ comboProps ++ (if (accessMany) None else Some(selfProp)),
 			// The abstract version doesn't contain wrap functions
-			methods = (if (accessMany) Set() else Set(wrapMethodFor(wrappedAccessType, accessName))) ++
-				deprecationMethod,
+			methods = if (accessMany) Set() else Set(wrapMethodFor(wrappedAccessType, accessName)),
 			description = s"Used for accessing ${ if (accessMany) s"multiple" else "individual" } ${
 				className.pluralDoc } from the DB at a time",
 			author = author,
@@ -522,7 +508,7 @@ object TargetingWriter
 		}
 		val accessMethods = {
 			if (accessMany) {
-				Pair(accessRowsType -> accessManyRows, accessCombinedType -> vault.accessMany)
+				Pair(accessRowsType -> targetingManyRows, accessCombinedType -> vault.targetingMany)
 					.map { case (wrapper, reader) =>
 						MethodDeclaration("apply",
 							genericTypes = Single(GenericType("A", description = "Type of accessed items")),

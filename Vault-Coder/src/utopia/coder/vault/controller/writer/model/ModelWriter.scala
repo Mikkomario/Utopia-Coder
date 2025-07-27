@@ -3,7 +3,7 @@ package utopia.coder.vault.controller.writer.model
 import utopia.coder.model.data
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
-import utopia.coder.model.scala.Visibility.{Private, Protected, Public}
+import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference.Flow._
 import utopia.coder.model.scala.datatype._
@@ -545,20 +545,15 @@ object ModelWriter
 		val inheritedExtensions = parentClassReferences
 			.flatMap[Extension] { _.generic.map { _.storedLike(dataType, reprType) } }
 		
-		// Certain extensions are different if Vault references are enabled
-		// However, if extending another YStoredLike trait, expects these to be defined there already
+		// If extending another YStoredLike trait, expects the parent traits to be defined there already
 		val customExtensions = {
 			if (classToWrite.isExtension)
 				Empty
-			else if (setup.modelCanReferToDB) {
+			else {
 				val stored = vault.stored(dataType, classToWrite.idType.toScala)
 				val fromIdFactory = vault.fromIdFactory(ScalaType.int, reprType)
 				
 				Pair[Extension](stored, fromIdFactory)
-			}
-			else {
-				val stored = metropolis.stored(dataType)
-				Single[Extension](stored)
 			}
 		}
 		
@@ -626,49 +621,42 @@ object ModelWriter
 				// Case: Concrete class => Specifies the implementation required for a stored class
 				case None =>
 					val factoryWrapper = factoryWrapperRef(dataClassRef, classType)
+					val withId = withIdFor(classToWrite)
 					
-					// If Vault references are allowed, provides certain custom features
-					val (customExtensions, customProperties, withId) = {
+					// If Vault references are allowed, provides the access function
+					val (customExtensions, customProperties) = {
 						// Case: Extending another StoredY trait => No need to define the properties again,
-						// except for an accessor property and the withX function
+						//       except for an accessor property and the withId function
 						if (classToWrite.isExtension)
-							(Empty, if (setup.modelCanReferToDB) Single(accessorFor(classToWrite, targeted)) else Empty,
-								Some(withIdFor(classToWrite)))
+							(Empty, if (setup.modelCanReferToDB) Single(accessorFor(classToWrite, targeted)) else Empty)
 						else {
 							val wrappedFactory = ComputedProperty("wrappedFactory", visibility = Protected,
 								isOverridden = true)("data")
 							
-							// Case: Vault references are enabled => Extends StoredModelConvertible & FromIdFactory
-							// and adds a custom accessor property
-							if (setup.modelCanReferToDB) {
-								val fromIdFactory = vault.fromIdFactory(ScalaType.int, classType)
-								val (stored, toModel) = {
-									// Case: Using ids of type Long => Can't utilize StoredModelConvertible
-									if (classToWrite.useLongId) {
-										val stored = vault.stored(dataClassRef, idType)
-										val toModel = ComputedProperty("toModel", Set(valueConversions, constant),
-											isOverridden = true)("Constant(\"id\", id) + data.toModel")
-										
-										Pair[Extension](stored, modelConvertible) -> Some(toModel)
-									}
-									else
-										Single[Extension](vault.storedModelConvertible(dataClassRef)) -> None
+							// Extends StoredModelConvertible & FromIdFactory
+							val fromIdFactory = vault.fromIdFactory(ScalaType.int, classType)
+							val (stored, toModel) = {
+								// Case: Using ids of type Long => Can't utilize StoredModelConvertible
+								if (classToWrite.useLongId) {
+									val stored = vault.stored(dataClassRef, idType)
+									val toModel = ComputedProperty("toModel", Set(valueConversions, constant),
+										isOverridden = true)("Constant(\"id\", id) + data.toModel")
+									
+									Pair[Extension](stored, modelConvertible) -> Some(toModel)
 								}
-								val accessor = accessorFor(classToWrite, targeted)
-								val withId = withIdFor(classToWrite)
-								
-								(stored :+[Extension] fromIdFactory,
-									Pair(accessor, wrappedFactory) ++ toModel, Some(withId))
+								else
+									Single[Extension](vault.storedModelConvertible(dataClassRef)) -> None
 							}
-							// Case: Vault references are not enabled => Utilizes StoredModelConvertible from Metropolis
-							else {
-								val stored = metropolis.storedModelConvertible(dataClassRef)
-								(Single[Extension](stored), Single(wrappedFactory), None)
-							}
+							
+							// Case: Vault references are enabled => Adds a custom accessor property
+							val accessor =
+								if (setup.modelCanReferToDB) Some(accessorFor(classToWrite, targeted)) else None
+							
+							(stored :+[Extension] fromIdFactory, accessor.emptyOrSingle :+ wrappedFactory)
 						}
 					}
 					
-					(customExtensions :+[Extension] factoryWrapper, customProperties, Set(wrap) ++ withId)
+					(customExtensions :+[Extension] factoryWrapper, customProperties, Set(wrap, withId))
 			}
 			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database"
 			
@@ -699,23 +687,13 @@ object ModelWriter
 		
 		// Prepares the companion object
 		val companionObject = {
-			// The type of model parsing used depends on whether Vault references are enabled
-			val dataFactory = ComputedProperty("dataFactory", Set(dataClassRef),
-				visibility = if (setup.modelCanReferToDB) Public else Protected, isOverridden = true)(
+			val dataFactory = ComputedProperty("dataFactory", Set(dataClassRef), isOverridden = true)(
 				dataClassRef.target)
-			val (fromModelFactory, complete) = {
-				if (setup.modelCanReferToDB) {
-					val storedFromModelFactory = vault.storedFromModelFactory(dataClassRef, classType)
-					val idExtractor = if (classToWrite.useLongId) "Long" else "Int"
-					val complete = MethodDeclaration("complete", visibility = Protected, isOverridden = true)(
-						Pair(Parameter("model", anyModel), Parameter("data", dataClassRef)))(
-						s"model(\"id\").try$idExtractor.map { apply(_, data) }")
-					
-					storedFromModelFactory -> Some(complete)
-				}
-				else
-					metropolis.storedFromModelFactory(dataClassRef, classType) -> None
-			}
+			val fromModelFactory = vault.storedFromModelFactory(dataClassRef, classType)
+			val idExtractor = if (classToWrite.useLongId) "Long" else "Int"
+			val complete = MethodDeclaration("complete", visibility = Protected, isOverridden = true)(
+				Pair(Parameter("model", anyModel), Parameter("data", dataClassRef)))(
+				s"model(\"id\").try$idExtractor.map { apply(_, data) }")
 			
 			val (applyToConcrete, nestedConcrete) = {
 				// Case: Generic trait => Provides access to a concrete implementation + from model parsing
@@ -750,7 +728,7 @@ object ModelWriter
 				name = className,
 				extensions = Single(fromModelFactory),
 				properties = Single(dataFactory),
-				methods = complete.toSet ++ applyToConcrete,
+				methods = Set(complete) ++ applyToConcrete,
 				nested = nestedConcrete.toSet
 			)
 		}
