@@ -69,9 +69,9 @@ object StandardPropertyType
 					Some(FilePath(appliedLength))
 				else if (lowerTypeName.startsWith("option"))
 					interpretGenericType(lowerTypeName, length, propertyName).map { _.optional }
-				else if (lowerTypeName.startsWith("vector") ||
+				else if (lowerTypeName.startsWith("seq") || lowerTypeName.startsWith("vector") ||
 					(lowerTypeName.startsWith("[") && lowerTypeName.endsWith("]")))
-					interpretGenericType(lowerTypeName, length, propertyName).map { t => VectorType(t, appliedLength) }
+					interpretGenericType(lowerTypeName, length, propertyName).map { t => SeqType(t, appliedLength) }
 				else if (lowerTypeName.startsWith("pair"))
 					interpretGenericType(lowerTypeName, length, propertyName).map(Paired)
 				else if (lowerTypeName.startsWith("span") || lowerTypeName.startsWith("range")) {
@@ -1172,15 +1172,15 @@ object StandardPropertyType
 	}
 	
 	/**
-	  * A data type which yields Vectors of a specific type
-	  * @param innerType    The type of individual items in this vector
-	  * @param columnLength The maximum database column length used when storing this vector. Default = 255.
+	  * A data type which yields Seq of a specific type
+	  * @param innerType    The type of individual items in this sequence
+	  * @param columnLength The maximum database column length used when storing this sequence. Default = 255.
 	  */
-	case class VectorType(innerType: PropertyType, columnLength: Int = 255) extends DirectlySqlConvertiblePropertyType
+	case class SeqType(innerType: PropertyType, columnLength: Int = 255) extends DirectlySqlConvertiblePropertyType
 	{
 		// ATTRIBUTES   --------------------------
 		
-		override val scalaType = ScalaType.basic("Vector")(innerType.scalaType)
+		override val scalaType = ScalaType.basic("Seq")(innerType.scalaType)
 		override val valueDataType = dataType / "VectorType"
 		override val sqlType: SqlPropertyType = {
 			// WET WET (from Text)
@@ -1195,13 +1195,14 @@ object StandardPropertyType
 			SqlPropertyType(typeName, isNullable = true)
 		}
 		
+		override lazy val emptyValue = empty.targetCode
+		
 		
 		// IMPLEMENTED  ---------------------------
 		
 		override def defaultPropertyName = "values"
 		override def defaultMutability: Option[Mutability] = None
 		
-		override def emptyValue = CodePiece("Vector.empty")
 		override def nonEmptyDefaultValue = CodePiece.empty
 		
 		override def isBothOptionalAndConcrete: Boolean = true
@@ -1215,14 +1216,16 @@ object StandardPropertyType
 		// Converts to json when storing to DB
 		// Empty vectors are treated as empty values
 		override def toValueCode(instanceCode: String) = {
-			innerType.toJsonValueCode("v").mapText { itemToValue =>
-				s"NotEmpty($instanceCode) match { case Some(v) => ((v.map[Value] { v => $itemToValue }: Value).toJson): Value; case None => Value.empty }"
-			}.referringTo(Vector(valueConversions, notEmpty, value))
+			innerType.toJsonValueCode("v")
+				.mapText { itemToValue =>
+					s"(NotEmpty($instanceCode) match { case Some(v) => ((v.map[Value] { v => $itemToValue }: Value).toJson): Value; case None => Value.empty })"
+				}
+				.referringTo(Vector(valueConversions, notEmpty, value))
 		}
 		override def toJsonValueCode(instanceCode: String) =
-			innerType.toJsonValueCode("v").mapText { itemToValue =>
-				s"$instanceCode.map[Value] { v => $itemToValue }"
-			}.referringTo(valueConversions)
+			innerType.toJsonValueCode("v")
+				.mapText { itemToValue => s"$instanceCode.map[Value] { v => $itemToValue }" }
+				.referringTo(valueConversions)
 		
 		override def fromValueCode(valueCode: String, isFromJson: Boolean) = {
 			// Case: Parsing from json => Converts directly to a vector

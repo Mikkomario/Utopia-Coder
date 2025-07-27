@@ -2,6 +2,7 @@
 
 ## v1.13 (in development)
 ### Breaking changes
+- Datatype **Vector** is now **Seq**
 - Generated **UniqueXAccess** & **UniqueXAccessLike** traits now extend **UniqueModelAccess**, 
   which means that the abstract property is now `condition: Condition` instead of `accessCondition: Option[Condition]`
 ### New features
