@@ -3,11 +3,13 @@ package utopia.coder.model.data
 import utopia.coder.model.enumeration.NameContext.{ClassName, ClassPropName, ColumnName, Documentation, EnumName, EnumValueName, FileName, FunctionName, Header, JsonPropName, ObjectName, TableName}
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, Text}
 import utopia.coder.model.enumeration.{NameContext, NamingConvention}
+import utopia.flow.collection.immutable.Pair
 import utopia.flow.generic.factory.FromValueFactory
 import utopia.flow.generic.model.immutable.Value
+import utopia.flow.generic.model.template.ModelLike.AnyModel
 import utopia.flow.operator.MaybeEmpty
-import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.operator.equality.ApproxEquals
+import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.operator.ordering.SelfComparable
 
 import scala.collection.immutable.StringOps
@@ -74,6 +76,25 @@ object Name extends FromValueFactory[Name]
 	  */
 	def interpret(singular: String, expectedStyle: NamingConvention): Name =
 		apply(singular, NamingConvention.of(singular, expectedStyle))
+	
+	/**
+	 * Finds a name from a model. Includes the plural form, if available.
+	 * @param model Model from which a name is searched from
+	 * @param keys Keys looked for. These should apply to singular variants.
+	 * @return A name read from the specified model
+	 */
+	def from(model: AnyModel, keys: Iterable[String], expectedStyle: NamingConvention): Option[Name] = {
+		// Looks for the singular form
+		model(keys).string.map { singular =>
+			val base = interpret(singular, expectedStyle)
+			// Looks for a plural form, also
+			model(keys.view.flatMap { key => Pair(s"plural_$key", s"${key}_plural") }).string match {
+				case Some(plural) =>
+					base.copy(plural = base.style.convert(plural, NamingConvention.of(plural, expectedStyle)))
+				case None => base
+			}
+		}
+	}
 	
 	private def pluralize(singular: String) = {
 		// Handles special cases first

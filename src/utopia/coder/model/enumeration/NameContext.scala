@@ -2,10 +2,14 @@ package utopia.coder.model.enumeration
 
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, Hyphenated, Text, UnderScore}
+import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.immutable.Single
 import utopia.flow.collection.mutable.iterator.OptionsIterator
 import utopia.flow.generic.model.template.{ModelLike, Property}
-import utopia.flow.operator.equality.{ApproxSelfEquals, EqualsFunction}
 import utopia.flow.operator.ScopeUsable
+import utopia.flow.operator.equality.{ApproxSelfEquals, EqualsFunction}
+
+import scala.collection.View
 
 /**
   * A common trait for all name context values. These determine how a name should be displayed.
@@ -64,40 +68,13 @@ sealed trait NameContext extends ScopeUsable[NameContext] with ApproxSelfEquals[
 	  * @return A name read from the specified model
 	  */
 	def from(model: ModelLike[Property], disableGeneric: Boolean = false)(implicit naming: NamingRules): Option[Name] = {
-		// Searches with the json keys of this style first
-		_from(model, disableGeneric = true)
-			// Uses the generic key "name" if no default keys are specified (unless disabled)
-			.orElse {
-				if (disableGeneric)
-					None
-				else
-					model("name").string.map { n => Name.interpret(n, style) }
-						// Otherwise may use more generic name keys, unless disabled
-						.orElse { parent.flatMap { _.from(model) } }
-			}
-			.map { name =>
-				val defaultPluralKeys = jsonProps.map { "plural_" + _ } ++ jsonProps.map { _ + "_plural" }
-				val allPluralKeys = {
-					if (disableGeneric)
-						defaultPluralKeys
-					else
-						defaultPluralKeys ++ Vector("name_plural", "plural_name", "plural")
-				}
-				// Checks for a plural form, also
-				model(allPluralKeys).string match {
-					// Case: Plural form defined => converts it to the same style and adds it to the name
-					case Some(plural) => name.copy(plural = name.style.convert(plural, style))
-					// Case: Plural form not defined => uses the auto-generated plural form
-					case None => name
-				}
-			}
-	}
-	
-	private def _from(model: ModelLike[Property], disableGeneric: Boolean = false)(implicit naming: NamingRules): Option[Name] = {
-		// Looks for some specified property
-		val default = model(jsonProps).string.map { name => Name.interpret(name, style) }
-		// May use recursion for more generic keys (if not disabled)
-		if (disableGeneric) default else default.orElse { parent.flatMap { _._from(model) } }
+		val keys = {
+			if (disableGeneric)
+				jsonProps
+			else
+				View.concat(jsonProps, Single("name"), parentsIterator.flatMap { _.jsonProps }.caching).caching
+		}
+		Name.from(model, keys, style)
 	}
 }
 

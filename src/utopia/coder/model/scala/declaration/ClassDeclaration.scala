@@ -4,7 +4,7 @@ import utopia.coder.model.scala.Visibility.Public
 import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.datatype.{Extension, GenericType}
 import utopia.coder.model.scala.{Annotation, DeclarationDate, Parameters, Visibility}
-import utopia.flow.collection.immutable.Empty
+import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq}
 
 /**
   * Used for declaring scala classes
@@ -19,19 +19,22 @@ case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Empty
                             visibility: Visibility = Public, annotations: Seq[Annotation] = Empty,
                             description: String = "", author: String = "", headerComments: Seq[String] = Empty,
                             since: DeclarationDate = DeclarationDate.today, isCaseClass: Boolean = false,
-                            isAbstract: Boolean = false)
+                            isAbstract: Boolean = false, isImplicit: Boolean = false)
 	extends InstanceDeclaration
 {
 	override val keyword = {
+		val builder = OptimizedIndexedSeq.newBuilder[String]
+		if (isImplicit)
+			builder += "implicit"
+		if (isAbstract || (properties ++ methods).exists { _.isAbstract })
+			builder += "abstract"
 		if (isCaseClass)
-			"case class"
-		else if (isAbstract || (properties ++ methods).exists { _.isAbstract })
-			"abstract class"
-		else
-			"class"
+			builder += "case"
+			
+		builder += "class"
+		builder.result().mkString(" ")
 	}
-	
-	override def declarationType: InstanceDeclarationType = InstanceDeclarationType.ClassD
+	override lazy val declarationType: InstanceDeclarationType = InstanceDeclarationType.ClassD
 	
 	override protected def constructorParams = Some(constructionParams)
 	
@@ -42,5 +45,6 @@ case class ClassDeclaration(name: String, genericTypes: Seq[GenericType] = Empty
 	                                description: String, author: String,
 	                                headerComments: Seq[String], since: DeclarationDate) =
 		ClassDeclaration(name, genericTypes, constructionParams, extensions, types, creationCode, properties, methods,
-			nested, visibility, annotations, description, author, headerComments, since, isCaseClass)
+			nested, visibility, annotations, description, author, headerComments, since,
+			isCaseClass, isAbstract, isImplicit)
 }

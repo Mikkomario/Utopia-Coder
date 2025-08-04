@@ -33,7 +33,9 @@ object Class
 	/**
 	  * Creates a new class with automatic table-naming
 	  * @param name Name of this class (in code)
-	  * @param properties Properties in this class
+	  * @param localName Name used for this class in a local / closed setting, such as in a combo trait
+	 *                  (default = None = use full name)
+	 * @param properties Properties in this class
 	  * @param packageName Name of the package in which to wrap this class (default = empty)
 	  * @param customSubPackageName Name to apply for this class's package when writing access points.
 	  *                                   Empty if to be auto-generated (default).
@@ -51,17 +53,19 @@ object Class
 	 * @return A new class
 	  */
 	def apply(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
-	          comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
-	          description: String = "", author: String = "", useLongId: Boolean = false,
+	          localName: Option[Name] = None, comboIndexColumnNames: Seq[Seq[String]] = Empty,
+	          idName: Name = defaultIdName, description: String = "", author: String = "", useLongId: Boolean = false,
 	          writeGenericAccess: Boolean = false, writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
-		apply(name, None, "", idName, properties, packageName, customSubPackageName, comboIndexColumnNames, None, Empty,
-			description, author, None, useLongId, writeGenericAccess, writeCommonComboTrait, isGeneric)
+		apply(name, localName.getOrElse(name), None, "", idName, properties, packageName, customSubPackageName,
+			comboIndexColumnNames, None, Empty, description, author, None, useLongId, writeGenericAccess,
+			writeCommonComboTrait, isGeneric)
 	
 	/**
 	  * Creates a new class with automatic table-naming with description support
- *
 	  * @param name Name of this class (in code)
-	  * @param properties Properties in this class
+	 * @param localName Name used for this class in a local / closed setting, such as in a combo trait
+	 *                  (default = None = use full name)
+	 * @param properties Properties in this class
 	  * @param packageName Name of the package in which to wrap this class (default = empty)
 	  * @param customSubPackageName Name to apply for this class's package when writing access points.
 	  *                             Empty if to be auto-generated (default).
@@ -82,11 +86,13 @@ object Class
 	  */
 	// WET WET
 	def described(name: Name, properties: Seq[Property], packageName: String = "", customSubPackageName: String = "",
+	              localName: Option[Name] = None,
 	              comboIndexColumnNames: Seq[Seq[String]] = Empty, idName: Name = defaultIdName,
 	              description: String = "", author: String = "", descriptionLinkName: Option[Name] = None,
 	              useLongId: Boolean = false, writeGenericAccess: Boolean = false,
 	              writeCommonComboTrait: Boolean = false, isGeneric: Boolean = false): Class =
-		apply(name, None, "", idName, properties, packageName, customSubPackageName, comboIndexColumnNames,
+		apply(name, localName.getOrElse(name), None, "", idName, properties, packageName, customSubPackageName,
+			comboIndexColumnNames,
 			Some[Name](descriptionLinkName.getOrElse { name + "id" }), Empty, description, author, None, useLongId,
 			writeGenericAccess, writeCommonComboTrait, isGeneric)
 }
@@ -96,7 +102,8 @@ object Class
   * @author Mikko Hilpinen
   * @since 30.8.2021, v0.1
   * @param name Name of this class (in code)
-  * @param customTableName Overridden name of this class' table (optional)
+  * @param localName Name used for this class in a local / closed setting, such as in a combo trait
+ * @param customTableName Overridden name of this class' table (optional)
   * @param storedPrefix Prefix to apply to the "stored" class version's name
  * @param idName Name of this class' id (index) property
   * @param properties Properties in this class
@@ -120,7 +127,8 @@ object Class
  * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
   */
 // TODO: customTableName should be Option[Name]
-case class Class(name: Name, customTableName: Option[String], storedPrefix: String, idName: Name, properties: Seq[Property],
+case class Class(name: Name, localName: Name, customTableName: Option[String], storedPrefix: String,
+                 idName: Name, properties: Seq[Property],
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
                  descriptionLinkName: Option[Name], parents: Seq[Class], description: String, author: String,
                  referenceFrom: Option[Package],

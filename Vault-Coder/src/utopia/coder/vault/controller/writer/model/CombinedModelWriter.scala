@@ -52,7 +52,7 @@ object CombinedModelWriter
 				name = (combinedPrefix +: parent.name).className,
 				genericTypes = Single(repr),
 				extensions = standardExtensions(parent, modelRefs, reprType),
-				properties = standardProperties(parent.name, modelRefs.stored),
+				properties = standardProperties(parent.localName, modelRefs.stored),
 				description = s"Common trait for combinations that add additional data to ${ parent.name.pluralDoc }",
 				author = parent.author,
 				since = DeclarationDate.versionedToday
@@ -71,7 +71,7 @@ object CombinedModelWriter
 	 * @return Combination related references. Failure if file writing failed.
 	 */
 	def apply(data: CombinationData, parentRefs: ClassModelReferences, childRef: Reference,
-	           combinedTraitRef: Option[Reference] = None)
+	          combinedTraitRef: Option[Reference] = None)
 	          (implicit setup: VaultProjectSetup, codec: Codec, naming: NamingRules) =
 	{
 		// The combinations are written in two parts:
@@ -106,7 +106,7 @@ object CombinedModelWriter
 		// If the parent is defined with different names in this trait and the parent trait, implements the rename
 		val renamedParentProps = combinedTraitRef.view
 			.flatMap { _ =>
-				val defaultParentPropName = data.parentClass.name.prop
+				val defaultParentPropName = data.parentClass.localName.prop
 				if (defaultParentPropName != parentPropName) {
 					val newParentProp = parentProp(parentPropName, parentRefs.stored, data.parentClass.name.doc)
 					val rename = ComputedProperty(defaultParentPropName, isOverridden = true)(parentPropName)

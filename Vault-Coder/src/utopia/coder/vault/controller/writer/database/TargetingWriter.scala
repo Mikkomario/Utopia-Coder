@@ -9,12 +9,12 @@ import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype._
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
-import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
+import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
 import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation, Expiration}
 import utopia.coder.vault.util.VaultReferences.Vault._
-import utopia.coder.vault.util.VaultReferences.{Vault, vault}
+import utopia.coder.vault.util.VaultReferences.vault
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.util.TryExtensions._
@@ -391,7 +391,8 @@ object TargetingWriter
 			// 1. Caches the joined access version, which is used in these properties
 			val joinedPropName = (joinedToPrefix +: combo.childName).apply(ClassPropName, plural = accessMany)
 			val joinedProp = LazyValue(joinedPropName, Set(tablesRef),
-				description = s"A copy of this access which also targets ${ combo.childClass.tableName }")(
+				description = s"A copy of this access which also targets ${ combo.childClass.tableName }",
+				isLowMergePriority = true)(
 				s"join(${ tablesRef.target }.${ combo.childClass.name.prop })")
 			
 			// 2. Provides values access
@@ -401,7 +402,8 @@ object TargetingWriter
 					if (accessMany || combo.combinationType.isOneToMany)
 						combo.childClass.name.pluralDoc
 					else
-						combo.childClass.name.doc }")(s"${ accessValuesRef.target }($joinedPropName)")
+						combo.childClass.name.doc }", isLowMergePriority = true)(
+				s"${ accessValuesRef.target }($joinedPropName)")
 			
 			// 3. Provides filtered access
 			val filterByRef = Reference(childAccessPackage, filterByTraitNameFor(combo.childClass))
@@ -527,7 +529,7 @@ object TargetingWriter
 				CodePiece(s"$manyAccessName.root.head")
 		}
 		// Deprecating classes have a separate includingHistory -access point
-		val defaultRootProps = {
+		val rootProps = {
 			if (accessMany && classToWrite.isDeprecatable)
 				Pair(
 					LazyValue("includingHistory", unfilteredRootCode.references,
@@ -538,6 +540,7 @@ object TargetingWriter
 			else
 				Single(LazyValue("root", unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text))
 		}
+		/*
 		val comboRootProps = combos.map { combo =>
 			val rawPropName = withPrefix +: combo.childName
 			val code = {
@@ -551,12 +554,12 @@ object TargetingWriter
 			LazyValue(rawPropName(ClassPropName, accessMany), code.references,
 				description = s"Access to ${ if (accessMany) "" else "individual " }${
 					className.pluralDoc } in the DB, also including ${ combo.childClass.name } information")(code.text)
-		}
+		}*/
 		val anyTypeParam = ScalaType.basic("_")
 		val companion = ObjectDeclaration(
 			name = accessName,
 			extensions = companionParentTypes,
-			properties = defaultRootProps ++ comboRootProps,
+			properties = rootProps,
 			methods = accessMethods +
 				MethodDeclaration("accessValues", Set(implicitConversions), explicitOutputType = Some(valuesRef),
 					isImplicit = true, description = "Provides implicit access to an access point's .values property")(

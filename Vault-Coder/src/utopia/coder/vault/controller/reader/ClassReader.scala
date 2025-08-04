@@ -422,6 +422,9 @@ object ClassReader
 		val tableName = TableName.from(classModel, disableGeneric = true)
 		val name = ClassName.from(classModel).orElse(tableName)
 			.getOrElse { data.Name("Unnamed", naming(ClassName)) + packageName }
+		val localName = Name.from(classModel,
+			Vector("name_local", "local_name", "local", "combo_parent_name", "combo_parent", "combo_name"),
+			naming(ClassName))
 		
 		// Reads properties
 		val (properties, propertyReferences) = classModel("properties", "props").getVector.flatMap { _.model }
@@ -487,6 +490,7 @@ object ClassReader
 		val hasManyCombos = classModel("has_many_combos", "write_combo_trait", "many_combos")
 			.booleanOr(comboInfo.hasSize > 1)
 		val readClass = new Class(name,
+			localName = localName.getOrElse(name),
 			customTableName = tableName.map { _.table },
 			storedPrefix = classModel("prefix")
 				.stringOr { if (classModel("prefix_stored", "stored").getBoolean) "Stored" else "" },

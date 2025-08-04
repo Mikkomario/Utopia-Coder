@@ -209,6 +209,9 @@ Class objects should contain following properties:
   - If omitted or `null`, a more generic access point will be written if this declaration includes any combo classes 
   - Note: Alternatively, you can specify `"has_many_combos": true`, 
     which will set this value to true and also generate more generic combo traits.
+- `"combo_name" / "name_local": String (optional)` - When writing a generic combo trait 
+  (based on `has_many_combos` or `combos`), this name is used for the parent instance, instead of using full class name.
+  - You may specify a pluralized for separately by adding `combo_name_plural` or `name_local_plural`
 - `"description_link"` / `"desc_link": String (optional)` - Specifies the name of 
   the property in a description link table that refers to this class (e.g. `"testClassId"`)
   - Please note that if you specify this value, localized description support is added for this class

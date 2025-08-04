@@ -10,6 +10,7 @@
   - This feature is enabled by passing `-T` as a console argument
 - Added **UncertainBoolean** data type
 - Added **Year** and **Month** data types
+- Generic combo parent class reference name can now be adjusted from the class document 
 ### Bugfixes
 - Fixed a bug that would cause an infinite loop when two classes directly reference each other
 - Fixed a bug that would cause certain inheritance-based combo classes to interrupt the code-generation process

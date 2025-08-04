@@ -860,6 +860,7 @@ object ModelWriter
 	
 	// Writes a property declaration for the model schema
 	private def propertyDeclarationFrom(prop: Property)(implicit naming: NamingRules): CodePiece = {
+		val dt = prop.dataType
 		val name = prop.jsonPropName
 		// Supports some alternative names:
 		//      1) Different naming style used (camel case vs. underscore)
@@ -872,17 +873,17 @@ object ModelWriter
 			.toVector.sorted
 		// May specify a default value
 		val default = prop.customDefaultValue.notEmpty.orElse {
-			val dt = prop.dataType
 			if (dt.supportsDefaultJsonValues) dt.nonEmptyDefaultValue.notEmpty else None
-		}.map { v => prop.dataType.toJsonValueCode(v.text).referringTo(v.references) }
+		}.map { v => dt.toJsonValueCode(v.text).referringTo(v.references) }
 		
 		// Writes only the necessary code parts (i.e. omits duplicate default parameters)
-		var paramsCode = CodePiece(name.quoted).append(prop.dataType.valueDataType.targetCode, ", ")
+		var paramsCode = CodePiece(name.quoted).append(dt.valueDataType.targetCode, ", ")
 		if (altNames.nonEmpty || default.isDefined)
 			paramsCode = paramsCode.append(CodePiece.collection(altNames.size)(
 				altNames.map { _.quoted }.mkString(", ")), ", ")
 		default.foreach { default => paramsCode = paramsCode.append(default, ", ") }
-		if (prop.dataType.isOptional || !prop.dataType.supportsDefaultJsonValues)
+		if ((dt.isOptional && (!dt.isBothOptionalAndConcrete || dt.sqlConversions.forall { _.target.isNullable })) ||
+			!dt.supportsDefaultJsonValues)
 			paramsCode = paramsCode.append("isOptional = true", ", ")
 		
 		propertyDeclaration.targetCode + paramsCode.withinParenthesis
