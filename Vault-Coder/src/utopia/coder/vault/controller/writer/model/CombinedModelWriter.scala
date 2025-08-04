@@ -163,18 +163,12 @@ object CombinedModelWriter
 	}
 	
 	// Generates the extensions applied to the highest level combined model -trait
-	private def standardExtensions(parent: data.Class, parentRefs: ClassModelReferences, reprType: ScalaType)
-	                              (implicit setup: VaultProjectSetup) =
-	{
+	private def standardExtensions(parent: data.Class, parentRefs: ClassModelReferences, reprType: ScalaType) = {
 		// Provides implicit access to the data model (because that's where most of the properties are)
 		val extender: Extension = Reference.flow.extender(parentRefs.data)
 		val factory: Extension = parentRefs.factoryWrapper(parentRefs.stored, reprType)
 		
-		// Extends the HasId trait only if Vault references are enabled
-		if (setup.modelCanReferToDB)
-			Vector[Extension](extender, vault.hasId(parent.idType.toScala), factory)
-		else
-			Pair(extender, factory)
+		Vector[Extension](extender, vault.hasId(parent.idType.toScala), factory)
 	}
 	
 	// Generates the properties placed to the highest level combined model -trait

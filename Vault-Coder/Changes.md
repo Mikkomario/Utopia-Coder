@@ -14,7 +14,9 @@
 - Fixed a bug that would cause an infinite loop when two classes directly reference each other
 - Fixed a bug that would cause certain inheritance-based combo classes to interrupt the code-generation process
 ### Other changes
-- Supports **Vault** v1.22
+- Supports **Vault** v2.0
+- Replaced use-cases of **Deprecatable** and its subtraits to use **Deprecates**, etc. instead
+- Utilizes **StandardStoredFactory** from **Vault**
 - Modified how enumeration values are parsed from **Value**s
 - `schema` and `.apply(ModelLike)` in the data classes are no longer low merge priorities
 

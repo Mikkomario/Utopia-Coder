@@ -543,14 +543,7 @@ object TargetingWriter
 			val code = {
 				if (accessMany) {
 					val dbFactoryRef = CombinedFactoryWriter.generateReference(combo, targeting = true)
-					val (function, accessRef) = {
-						if (combo.combinationType.isOneToMany)
-							accessCombinedName -> Vault.accessMany
-						else
-							accessRowsName -> accessManyRows
-					}
-					CodePiece(s"$function(${ accessRef.target }(${ dbFactoryRef.target }))",
-						Set(accessRef, dbFactoryRef))
+					CodePiece(s"apply(${ dbFactoryRef.target }))", Set(dbFactoryRef))
 				}
 				else
 					CodePiece(s"$manyAccessName.${ rawPropName.props }.head")

@@ -430,9 +430,8 @@ object DbModelWriter
 		}
 		
 		val extensions = customExtensions ++ deprecation.map { _.extensionFor(modelClassType) }
-		val properties = (idProp +: customProps) ++ deprecation.view.flatMap { _.properties }
-		val methods = withMethods.toSet ++ customMethods + withId + applyFromData + complete ++
-			deprecation.view.flatMap { _.methods }
+		val properties = (idProp +: customProps) ++ deprecation.map { _.property }
+		val methods = withMethods.toSet ++ customMethods + withId + applyFromData + complete
 		val description = s"Used for constructing $modelClassType instances and for inserting ${
 			classToWrite.name.pluralDoc } to the database"
 		
@@ -734,11 +733,9 @@ object DbModelWriter
 	
 	private sealed trait DeprecationStyle
 	{
+		def property(implicit naming: NamingRules): PropertyDeclaration
+		
 		def extensionFor(dbModelClass: ScalaType): Extension
-		
-		def properties(implicit naming: NamingRules): Seq[PropertyDeclaration]
-		
-		def methods: Set[MethodDeclaration]
 	}
 	
 	private object DeprecationStyle
@@ -757,47 +754,30 @@ object DbModelWriter
 	
 	private case class NullDeprecates(prop: Property) extends DeprecationStyle
 	{
-		// ATTRIBUTES   -----------------------------
-		
-		private val camelPropName = prop.name.to(CamelCase.lower).singular
-		// Whether this deprecation matches the expected default
-		val isDefault = camelPropName == "deprecatedAfter"
-		
-		
 		// IMPLEMENTED  -----------------------------
 		
-		override def extensionFor(dbModelClass: ScalaType) =
-			(if (isDefault) deprecatableAfter else nullDeprecatable)(dbModelClass)
+		override def extensionFor(dbModelClass: ScalaType) = deprecatesAfterDefined
 		
-		override def properties(implicit naming: NamingRules) =
-			if (isDefault) Empty else Vector(
-				ImmutableValue("deprecationAttName", isOverridden = true)(prop.dbProperties.head.modelName.quoted))
-		// withDeprecatedAfter(...) must be provided separately for custom property names
-		override def methods = if (isDefault) Set() else Set(
-			MethodDeclaration("withDeprecatedAfter", isOverridden = true)(
-				Parameter("deprecationTime", instant))(s"with${ camelPropName.capitalize }(deprecationTime)")
-		)
+		override def property(implicit naming: NamingRules) =
+			ImmutableValue("deprecationColumn", isOverridden = true)(prop.name.prop)
 	}
 	
 	private case class Expires(prop: Property) extends DeprecationStyle
 	{
-		override def extensionFor(dbModelClass: ScalaType) = expiring
+		override def extensionFor(dbModelClass: ScalaType) = deprecatesAfter
 		
-		override def properties(implicit naming: NamingRules) =
-			Vector(ImmutableValue("deprecationAttName", isOverridden = true)(prop.dbProperties.head.modelName.quoted))
-		override def methods = Set()
+		// WET WET
+		override def property(implicit naming: NamingRules) =
+			ImmutableValue("deprecationColumn", isOverridden = true)(prop.name.prop)
 	}
 	
 	private case class CombinedDeprecation(expirationPropName: Name, deprecationPropName: Name)
 		extends DeprecationStyle
 	{
-		override def extensionFor(dbModelClass: ScalaType) = deprecatable
+		override def extensionFor(dbModelClass: ScalaType) = deprecates
 		
-		override def properties(implicit naming: NamingRules) = Vector(
-			ComputedProperty("nonDeprecatedCondition", Set(flow.valueConversions, flow.now),
-				isOverridden = true)(
+		override def property(implicit naming: NamingRules) =
+			ComputedProperty("activeCondition", Set(flow.valueConversions, flow.now), isOverridden = true)(
 				s"${deprecationPropName.prop}.column.isNull && ${expirationPropName.prop}.column > Now")
-		)
-		override def methods = Set()
 	}
 }

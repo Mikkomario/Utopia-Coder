@@ -32,6 +32,7 @@ object VaultReferences
 		lazy val stored = Reference(store, "Stored")
 		lazy val storedModelConvertible = Reference(store, "StoredModelConvertible")
 		lazy val storedFromModelFactory = Reference(store, "StoredFromModelFactory")
+		lazy val standardStoredFactory = Reference(store, "StandardStoredFactory")
 		
 		lazy val connection = Reference(database, "Connection")
 		lazy val table = Reference(models / "immutable", "Table")
@@ -44,9 +45,17 @@ object VaultReferences
 		lazy val hasIdProperty = Reference(templateModels, "HasIdProperty")
 		lazy val indexed = Reference(noSql / "template", "Indexed")
 		
+		lazy val deprecates = Reference(templateModels, "Deprecates")
+		lazy val deprecatesAfter = Reference(templateModels, "DeprecatesAfter")
+		lazy val deprecatesAfterDefined = Reference(templateModels, "DeprecatesAfterDefined")
+		
+		@deprecated("Replaced with deprecates", "v1.13")
 		lazy val deprecatable = Reference(noSql / "template", "Deprecatable")
+		@deprecated("Replaced with deprecatesAfterDefined", "v1.13")
 		lazy val nullDeprecatable = Reference(deprecation, "NullDeprecatable")
+		@deprecated("Deprecated for removal", "v1.13")
 		lazy val deprecatableAfter = Reference(deprecation, "DeprecatableAfter")
+		@deprecated("Replaced with .deprecatesAfter", "v1.13")
 		lazy val expiring = Reference(deprecation, "Expiring")
 		
 		lazy val fromRowModelFactory = Reference(fromRowFactories / "model", "FromRowModelFactory")

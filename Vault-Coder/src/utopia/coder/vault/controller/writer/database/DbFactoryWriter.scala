@@ -234,7 +234,7 @@ object DbFactoryWriter
 		// If the class supports deprecation, it is reflected in this factory also
 		// This feature is disabled in targeting mode
 		if (!targeting && classToWrite.isDeprecatable)
-			builder += deprecatable
+			builder += deprecates
 		
 		builder.result()
 	}
@@ -266,8 +266,8 @@ object DbFactoryWriter
 			
 			// Deprecatable factories specify the deprecation condition (read from the database model)
 			if (classToWrite.isDeprecatable) {
-				builder += ComputedProperty("nonDeprecatedCondition", Set(dbModelRef), isOverridden = true)(
-					s"$modelName.nonDeprecatedCondition")
+				builder += ComputedProperty("activeCondition", Set(dbModelRef), isOverridden = true)(
+					s"$modelName.activeCondition")
 			}
 		}
 		

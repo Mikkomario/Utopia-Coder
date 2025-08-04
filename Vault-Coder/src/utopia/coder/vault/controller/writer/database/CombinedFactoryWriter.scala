@@ -98,15 +98,14 @@ object CombinedFactoryWriter
 					val condition = {
 						if (parentDeprecates) {
 							if (childDeprecates)
-								"parentFactory.nonDeprecatedCondition && childFactory.nonDeprecatedCondition"
+								"parentFactory.activeCondition && childFactory.activeCondition"
 							else
-								"parentFactory.nonDeprecatedCondition"
+								"parentFactory.activeCondition"
 						}
 						else
-							"childFactory.nonDeprecatedCondition"
+							"childFactory.activeCondition"
 					}
-					Some(Extension(deprecatable) ->
-						ComputedProperty("nonDeprecatedCondition", isOverridden = true)(condition))
+					Some(Extension(deprecates) -> ComputedProperty("activeCondition", isOverridden = true)(condition))
 				}
 				else
 					None

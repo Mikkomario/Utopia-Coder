@@ -173,7 +173,8 @@ object StandardPropertyType
 	{
 		// COMPUTED -----------------------
 		
-		private def objectValues = Vector(LongNumber, DoubleNumber, Bool, DateTime, Date, Time)
+		private def objectValues: Vector[BasicPropertyType] =
+			Vector(LongNumber, DoubleNumber, Bool, DateTime, Date, Time, YearIndex, MonthIndex)
 		
 		
 		// OTHER    -----------------------
@@ -417,6 +418,43 @@ object StandardPropertyType
 			override def fromValuePropName = "int"
 			override def defaultPropertyName = Name("index", "indices", CamelCase.lower)
 		}
+		
+		/**
+		 * A data type matching [[utopia.flow.time.Year]].
+		 */
+		case object YearIndex extends BasicPropertyType
+		{
+			override val scalaType: ScalaType = year
+			override lazy val sqlType: SqlPropertyType = IntNumber(Medium).sqlType
+			
+			override val emptyValue: CodePiece = CodePiece.empty
+			override val nonEmptyDefaultValue: CodePiece = CodePiece.empty
+			
+			override lazy val defaultPropertyName: Name = "year"
+			override lazy val fromValuePropName: String = "year"
+			override lazy val valueDataTypeName: String = "YearType"
+			
+			override val supportsDefaultJsonValues: Boolean = true
+			override val isFilterGenerationSupported: Boolean = true
+		}
+		/**
+		 * A data type matching [[utopia.flow.time.Month]]
+		 */
+		case object MonthIndex extends BasicPropertyType
+		{
+			override val scalaType: ScalaType = month
+			override lazy val sqlType: SqlPropertyType = IntNumber(Tiny, Some(12)).sqlType
+			
+			override val emptyValue: CodePiece = CodePiece.empty
+			override val nonEmptyDefaultValue: CodePiece = CodePiece.empty
+			
+			override lazy val defaultPropertyName: Name = "month"
+			override lazy val fromValuePropName: String = "month"
+			override lazy val valueDataTypeName: String = "MonthType"
+			
+			override val supportsDefaultJsonValues: Boolean = true
+			override val isFilterGenerationSupported: Boolean = true
+		}
 	}
 	
 	/**
@@ -579,56 +617,6 @@ object StandardPropertyType
 		}
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) = ""
-	}
-	
-	/**
-	 * A data type matching [[utopia.flow.time.Year]].
-	 */
-	case object YearIndex extends FacadePropertyType
-	{
-		override val scalaType: ScalaType = year
-		override protected lazy val delegate: PropertyType = IntNumber(Medium)
-		
-		override val emptyValue: CodePiece = CodePiece.empty
-		override val nonEmptyDefaultValue: CodePiece = CodePiece.empty
-		
-		override val defaultMutability: Option[Mutability] = None
-		
-		override lazy val defaultPropertyName: Name = "Year"
-		override val defaultPartNames: Seq[Name] = Empty
-		
-		override protected val yieldsTryFromDelegate: Boolean = false
-		override val supportsDefaultJsonValues: Boolean = true
-		
-		override protected def toDelegateCode(instanceCode: String): CodePiece = s"$instanceCode.value"
-		override protected def fromDelegateCode(delegateCode: String): CodePiece =
-			CodePiece(s"Year($delegateCode)", Set(year))
-		
-		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
-	}
-	/**
-	 * A data type matching [[utopia.flow.time.Month]]
-	 */
-	case object MonthIndex extends FacadePropertyType
-	{
-		override val scalaType: ScalaType = month
-		override protected val delegate: PropertyType = IntNumber(Tiny, Some(12))
-		
-		override val emptyValue: CodePiece = CodePiece.empty
-		override val nonEmptyDefaultValue: CodePiece = CodePiece.empty
-		
-		override lazy val defaultPropertyName: Name = "month"
-		override val defaultPartNames: Seq[Name] = Empty
-		override val defaultMutability: Option[Mutability] = None
-		
-		override protected val yieldsTryFromDelegate: Boolean = false
-		override val supportsDefaultJsonValues: Boolean = true
-		
-		override protected def toDelegateCode(instanceCode: String): CodePiece = s"$instanceCode.value"
-		override protected def fromDelegateCode(delegateCode: String): CodePiece =
-			CodePiece(s"Month($delegateCode)", Set(month))
-		
-		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
 	
 	object Text

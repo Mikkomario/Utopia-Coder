@@ -689,11 +689,18 @@ object ModelWriter
 		val companionObject = {
 			val dataFactory = ComputedProperty("dataFactory", Set(dataClassRef), isOverridden = true)(
 				dataClassRef.target)
-			val fromModelFactory = vault.storedFromModelFactory(dataClassRef, classType)
-			val idExtractor = if (classToWrite.useLongId) "Long" else "Int"
-			val complete = MethodDeclaration("complete", visibility = Protected, isOverridden = true)(
-				Pair(Parameter("model", anyModel), Parameter("data", dataClassRef)))(
-				s"model(\"id\").try$idExtractor.map { apply(_, data) }")
+			// The StoredFromModelFactory inheritance is simplified if Int IDs are used
+			val (factoryTrait, complete) = {
+				if (classToWrite.useLongId) {
+					val complete = MethodDeclaration("complete", visibility = Protected, isOverridden = true)(
+						Pair(Parameter("model", anyModel), Parameter("data", dataClassRef)))(
+						s"model(\"id\").tryLong.map { apply(_, data) }")
+					(vault.storedFromModelFactory, Some(complete))
+				}
+				else {
+					(vault.standardStoredFactory, None)
+				}
+			}
 			
 			val (applyToConcrete, nestedConcrete) = {
 				// Case: Generic trait => Provides access to a concrete implementation + from model parsing
@@ -726,9 +733,9 @@ object ModelWriter
 			
 			ObjectDeclaration(
 				name = className,
-				extensions = Single(fromModelFactory),
+				extensions = Single(factoryTrait(dataClassRef, classType)),
 				properties = Single(dataFactory),
-				methods = Set(complete) ++ applyToConcrete,
+				methods = Set.concat(complete, applyToConcrete),
 				nested = nestedConcrete.toSet
 			)
 		}

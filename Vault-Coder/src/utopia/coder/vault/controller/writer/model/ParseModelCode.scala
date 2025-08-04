@@ -71,23 +71,27 @@ object ParseModelCode
 		// Also, prepares the final assignments
 		val (tryDefinitions, finalAssignments) = getProps.splitFlatMap { case (prop, getValue) =>
 			val propYieldsTry = prop.dataType.yieldsTryFromValueIn(json)
-			// Case: map or flatMap is appropriate => In the assignment, refers to the predefined value
-			if (yieldTry && propYieldsTry) {
-				val propName = prop.name.prop
-				Some(propName -> getValue) -> Some(CodePiece(propName))
-			}
-			// Case: map is not appropriate or available => Parses the value upon the final assignment
-			else {
-				val appliedGetValue = {
-					// Case: Parsing still yields a Try
-					//       => must unwrap it and throw if needed (because this method is not allowed to return a Try)
-					if (propYieldsTry)
-						getValue.mapText { _ + ".get" }
-					else
-						getValue
+			val (tryDef, assignCode) = {
+				// Case: map or flatMap is appropriate => In the assignment, refers to the predefined value
+				if (yieldTry && propYieldsTry) {
+					val propName = prop.name.prop
+					Some(propName -> getValue) -> CodePiece(propName)
 				}
-				None -> Some(appliedGetValue)
+				// Case: map is not appropriate or available => Parses the value upon the final assignment
+				else {
+					val appliedGetValue = {
+						// Case: Parsing still yields a Try
+						//       => must unwrap it and throw if needed (because this method is not allowed to return a Try)
+						if (propYieldsTry)
+							getValue.mapText { _ + ".get" }
+						else
+							getValue
+					}
+					None -> appliedGetValue
+				}
 			}
+			// Names the property assignments
+			tryDef -> Some(assignCode.mapText { assign => s"${ prop.name.prop } = $assign" })
 		}
 		
 		// Opens all the necessary blocks of code,
