@@ -49,15 +49,6 @@ object VaultReferences
 		lazy val deprecatesAfter = Reference(templateModels, "DeprecatesAfter")
 		lazy val deprecatesAfterDefined = Reference(templateModels, "DeprecatesAfterDefined")
 		
-		@deprecated("Replaced with deprecates", "v1.13")
-		lazy val deprecatable = Reference(noSql / "template", "Deprecatable")
-		@deprecated("Replaced with deprecatesAfterDefined", "v1.13")
-		lazy val nullDeprecatable = Reference(deprecation, "NullDeprecatable")
-		@deprecated("Deprecated for removal", "v1.13")
-		lazy val deprecatableAfter = Reference(deprecation, "DeprecatableAfter")
-		@deprecated("Replaced with .deprecatesAfter", "v1.13")
-		lazy val expiring = Reference(deprecation, "Expiring")
-		
 		lazy val fromRowModelFactory = Reference(fromRowFactories / "model", "FromRowModelFactory")
 		lazy val fromValidatedRowModelFactory = Reference(fromRowFactories / "model", "FromValidatedRowModelFactory")
 		lazy val fromTimelineRowFactory = Reference(fromRowFactories, "FromTimelineRowFactory")
@@ -114,7 +105,9 @@ object VaultReferences
 		lazy val accessRowsWrapper = Reference(targetMany, "AccessRowsWrapper")
 		lazy val accessOneWrapper = Reference(targetOne, "AccessOneWrapper")
 		lazy val accessOneRoot = Reference(targetOne, "AccessOneRoot")
+		lazy val accessOneDeprecatingRoot = Reference(targetOne, "AccessOneDeprecatingRoot")
 		lazy val accessManyRoot = Reference(targetMany, "AccessManyRoot")
+		lazy val accessManyDeprecatingRoot = Reference(targetMany, "AccessManyDeprecatingRoot")
 		lazy val wrapRowAccess = Reference(targetMany, "WrapRowAccess")
 		lazy val wrapOneToManyAccess = Reference(targetMany, "WrapOneToManyAccess")
 	}

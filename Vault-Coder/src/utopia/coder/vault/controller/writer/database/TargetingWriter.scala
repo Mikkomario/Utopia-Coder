@@ -502,11 +502,14 @@ object TargetingWriter
 		// Provides access to standard access root(s)
 		val companionParentTypes: Seq[Extension] = {
 			if (accessMany) {
-				Vector(accessManyRoot(accessRowsType(modelRef)),
-					wrapRowAccess(accessRowsType), wrapOneToManyAccess(accessCombinedType))
+				val root = if (classToWrite.isDeprecatable) accessManyDeprecatingRoot else accessManyRoot
+				Vector(root(accessRowsType(modelRef)), wrapRowAccess(accessRowsType),
+					wrapOneToManyAccess(accessCombinedType))
 			}
-			else
-				Single(accessOneRoot(accessType(modelRef)))
+			else {
+				val root = if (classToWrite.isDeprecatable) accessOneDeprecatingRoot else accessOneRoot
+				Single(root(accessType(modelRef)))
+			}
 		}
 		val accessMethods = {
 			if (accessMany) {
@@ -529,16 +532,9 @@ object TargetingWriter
 				CodePiece(s"$manyAccessName.root.head")
 		}
 		// Deprecating classes have a separate includingHistory -access point
-		val rootProps = {
-			if (accessMany && classToWrite.isDeprecatable)
-				Pair(
-					LazyValue("includingHistory", unfilteredRootCode.references,
-						description = s"Access to ${ className.pluralDoc }, including historical entries")(
-						unfilteredRootCode.text),
-					LazyValue("root", isOverridden = true)("includingHistory.active")
-				)
-			else
-				Single(LazyValue("root", unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text))
+		val rootProp = {
+			val rootName = if (classToWrite.isDeprecatable) "all" else "root"
+			LazyValue(rootName, unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text)
 		}
 		/*
 		val comboRootProps = combos.map { combo =>
@@ -559,7 +555,7 @@ object TargetingWriter
 		val companion = ObjectDeclaration(
 			name = accessName,
 			extensions = companionParentTypes,
-			properties = rootProps,
+			properties = Single(rootProp),
 			methods = accessMethods +
 				MethodDeclaration("accessValues", Set(implicitConversions), explicitOutputType = Some(valuesRef),
 					isImplicit = true, description = "Provides implicit access to an access point's .values property")(

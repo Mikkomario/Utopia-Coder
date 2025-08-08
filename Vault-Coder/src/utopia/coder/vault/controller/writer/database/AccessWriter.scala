@@ -143,7 +143,7 @@ object AccessWriter
 				if (classToWrite.isGeneric) {
 					val base = dbPropsOrDbModelRef
 					if (classToWrite.isNullDeprecatable)
-						Some((base: ScalaType).withOther(vault.nullDeprecatable(vault.storable)))
+						Some((base: ScalaType).withOther(vault.deprecatesAfterDefined))
 					else Some(base)
 				}
 				else

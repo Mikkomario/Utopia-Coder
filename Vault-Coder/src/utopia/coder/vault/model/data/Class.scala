@@ -154,6 +154,21 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 			description = s"Links ${name.plural} with their descriptions", author = author)
 	}
 	
+	/**
+	 * @return Whether this class supports deprecation or expiration
+	 */
+	lazy val isDeprecatable = properties.exists { _.dataType match {
+		case Deprecation | Expiration => true
+		case _ => false
+	} }
+	/**
+	 * @return Whether this class records a row / instance creation time that is also an index
+	 */
+	lazy val recordsIndexedCreationTime = properties.exists { p => p.dataType match {
+		case CreationTime | UpdateTime => p.isIndexed
+		case _ => false
+	} }
+	
 	
 	// COMPUTED ------------------------------------
 	
@@ -177,21 +192,6 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 	  */
 	def isDescribed = descriptionLinkName.nonEmpty
 	
-	/**
-	  * @return Whether this class records a row / instance creation time that is also an index
-	  */
-	def recordsIndexedCreationTime = properties.exists { p => p.dataType match {
-		case CreationTime | UpdateTime => p.isIndexed
-		case _ => false
-	} }
-	
-	/**
-	  * @return Whether this class supports deprecation or expiration
-	  */
-	def isDeprecatable = properties.exists { _.dataType match {
-		case Deprecation | Expiration => true
-		case _ => false
-	} }
 	/**
 	  * @return Whether this class supports expiration
 	  */
