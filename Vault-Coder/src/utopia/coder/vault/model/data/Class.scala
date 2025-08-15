@@ -154,20 +154,28 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 			description = s"Links ${name.plural} with their descriptions", author = author)
 	}
 	
-	/**
-	 * @return Whether this class supports deprecation or expiration
-	 */
-	lazy val isDeprecatable = properties.exists { _.dataType match {
-		case Deprecation | Expiration => true
-		case _ => false
-	} }
-	/**
-	 * @return Whether this class records a row / instance creation time that is also an index
-	 */
-	lazy val recordsIndexedCreationTime = properties.exists { p => p.dataType match {
+	lazy val indexedCreationTimeProperty = properties.find { p => p.dataType match {
 		case CreationTime | UpdateTime => p.isIndexed
 		case _ => false
 	} }
+	/**
+	 * @return Property in this class which contains instance deprecation time. None if no such property is present.
+	 */
+	lazy val nullDeprecationProperty = properties.find { _.dataType match {
+		case Deprecation => true
+		case _ => false
+	} }
+	/**
+	 * @return Property in this class which contains instance expiration time. None if no such property is present.
+	 */
+	lazy val expirationProperty = properties.find { _.dataType match {
+		case Expiration => true
+		case _ => false
+	} }
+	/**
+	 * The property in this class which relates to instance deprecation
+	 */
+	lazy val deprecationProperty = nullDeprecationProperty.orElse(expirationProperty)
 	
 	
 	// COMPUTED ------------------------------------
@@ -188,18 +196,26 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 	def idType =  if (useLongId) LongNumber else IntNumber(Default)
 	
 	/**
+	 * @return Whether this class records a row / instance creation time that is also an index
+	 */
+	def recordsIndexedCreationTime = indexedCreationTimeProperty.isDefined
+	/**
+	 * @return Whether this class supports deprecation or expiration
+	 */
+	def isDeprecatable = deprecationProperty.isDefined
+	/**
+	 * @return Whether this class supports expiration
+	 */
+	def isExpiring = expirationProperty.isDefined
+	/**
+	 * @return Whether this class supports timestamp-based deprecation
+	 */
+	def isNullDeprecatable = nullDeprecationProperty.isDefined
+	
+	/**
 	  * @return Whether this class supports description linking
 	  */
 	def isDescribed = descriptionLinkName.nonEmpty
-	
-	/**
-	  * @return Whether this class supports expiration
-	  */
-	def isExpiring = properties.exists { _.dataType.isInstanceOf[Expiration.type] }
-	/**
-	  * @return Whether this class supports timestamp-based deprecation
-	  */
-	def isNullDeprecatable = properties.exists { _.dataType.isInstanceOf[Deprecation.type] }
 	
 	/**
 	  * @return Whether this class refers to one or more enumerations in its properties
@@ -223,21 +239,6 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 	  * @return The property in this class which contains instance creation time. None if no such property is present.
 	  */
 	def timestampProperty = dbProperties.find { _.sqlType.baseTypeSql == "TIMESTAMP" }
-	
-	/**
-	  * @return Property in this class which contains instance deprecation time. None if no such property is present.
-	  */
-	def deprecationProperty = properties.find { _.dataType match {
-		case Deprecation => true
-		case _ => false
-	} }
-	/**
-	  * @return Property in this class which contains instance expiration time. None if no such property is present.
-	  */
-	def expirationProperty = properties.find { _.dataType match {
-		case Expiration => true
-		case _ => false
-	} }
 	
 	/**
 	 * @return Whether this class extends another class

@@ -749,7 +749,7 @@ object ModelWriter
 	{
 		// However, won't include any properties in situations where the deprecation is inherited
 		// (in these situations, these properties have already been defined in the parent trait)
-		classToWrite.deprecationProperty.filterNot { _.isExtension } match {
+		classToWrite.nullDeprecationProperty.filterNot { _.isExtension } match {
 			case Some(prop) =>
 				Vector(
 					ComputedProperty("isDeprecated",

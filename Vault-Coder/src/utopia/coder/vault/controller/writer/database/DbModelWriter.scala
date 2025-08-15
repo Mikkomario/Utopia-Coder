@@ -741,7 +741,7 @@ object DbModelWriter
 	private object DeprecationStyle
 	{
 		def of(c: Class) =
-			c.deprecationProperty
+			c.nullDeprecationProperty
 				.map { deprecationProp =>
 					c.expirationProperty match {
 						case Some(expirationProp) =>

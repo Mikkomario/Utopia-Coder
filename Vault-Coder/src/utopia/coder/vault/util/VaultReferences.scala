@@ -77,6 +77,7 @@ object VaultReferences
 		lazy val deprecatableView = Reference(viewAccess, "DeprecatableView")
 		lazy val timeDeprecatableView = Reference(viewAccess, "TimeDeprecatableView")
 		lazy val nullDeprecatableView = Reference(viewAccess, "NullDeprecatableView")
+		lazy val timelineView = Reference(viewAccess, "TimelineView")
 		lazy val viewManyByIntIds = Reference(viewAccess, "ViewManyByIntIds")
 		lazy val viewFactory = Reference(viewAccess, "ViewFactory")
 		

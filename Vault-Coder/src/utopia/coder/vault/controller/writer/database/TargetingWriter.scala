@@ -239,9 +239,12 @@ object TargetingWriter
 		// (except for classes that extend more than 1 other class, and those which support deprecation)
 		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, "model")
 		val parents = parentClassRefs.flatMap { _.targeting.flatMap { _.filtering } }
-		if (filterMethods.nonEmpty || parents.hasSize >= 2 || classToWrite.isDeprecatable) {
+		if (filterMethods.nonEmpty || parents.hasSize >= 2 || classToWrite.isDeprecatable ||
+			classToWrite.recordsIndexedCreationTime)
+		{
 			// Extends filter traits of parents, or FilterableView[+Repr]
 			// Also, if deprecation is supported, may extend DeprecatableView, TimeDeprecatableView or NullDeprecatableView
+			// If row creation time is recorded & indexed, extends TimelineView
 			val reprType = ScalaType.basic("Repr")
 			val deprecationProp = classToWrite.deprecationProperty.filterNot { _.isExtension }
 			val deprecationParent = deprecationProp.map[Extension] { prop =>
@@ -252,9 +255,13 @@ object TargetingWriter
 				}
 				parent(reprType)
 			}
+			val timelineProp = classToWrite.indexedCreationTimeProperty.filterNot { _.isExtension }
+			val timelineParent = if (timelineProp.isDefined) Some[Extension](timelineView(reprType)) else None
 			val extensions = parents.notEmpty match {
-				case Some(parents) => parents.map[Extension] { _(reprType) } ++ deprecationParent
-				case None => Single(deprecationParent.getOrElse[Extension] { filterableView(reprType) })
+				case Some(parents) => parents.map[Extension] { _(reprType) } ++ deprecationParent ++ timelineParent
+				case None =>
+					Pair(deprecationParent, timelineParent).flatten.notEmpty
+						.getOrElse { Single[Extension](filterableView(reprType)) }
 			}
 			
 			// The model declaration is abstract for generic classes
@@ -271,7 +278,10 @@ object TargetingWriter
 					name = filterTraitNameFor(classToWrite),
 					genericTypes = Single(GenericType.covariant("Repr")),
 					extensions = extensions,
-					properties = Single(modelProp),
+					properties = Single(modelProp) ++
+						timelineProp.map { p =>
+							ComputedProperty("timestampColumn", isOverridden = true)(s"model.${ p.name.prop }")
+						},
 					methods = filterMethods.toSet,
 					description = s"Common trait for access points which may be filtered based on ${
 						classToWrite.name } properties",
@@ -359,20 +369,15 @@ object TargetingWriter
 			else
 				None
 		}
-		val (parentType, timestampProp): (Extension, Option[PropertyDeclaration]) = {
-			if (accessMany)
-				classToWrite.properties.find { p => p.dataType == CreationTime && p.isIndexed } match {
-					case Some(creationProp) =>
-						Extension.fromType(targetingTimeline(genericOutputType, reprType, singleAccessType)) ->
-							Some(ComputedProperty("timestamp", Set(dbModelRef),
-								isOverridden = true, isLowMergePriority = true)(s"${
-								dbModelRef.target }.${ creationProp.name.prop }"))
-					
-					case None =>
-						Extension.fromType(targetingManyLike(genericOutputType, reprType, singleAccessType)) -> None
-				}
+		val parentType: Extension = {
+			if (accessMany) {
+				if (classToWrite.recordsIndexedCreationTime)
+					Extension.fromType(targetingTimeline(genericOutputType, reprType, singleAccessType))
+				else
+					Extension.fromType(targetingManyLike(genericOutputType, reprType, singleAccessType))
+			}
 			else
-				Extension.fromType(accessOneWrapper(ScalaType.option(genericOutputType), accessTypeWithOutput)) -> None
+				Extension.fromType(accessOneWrapper(ScalaType.option(genericOutputType), accessTypeWithOutput))
 		}
 		
 		// May implement an abstract model property from a filter trait
@@ -431,7 +436,7 @@ object TargetingWriter
 					description = s"Access to the values of accessible ${
 						if (accessMany) className.pluralDoc else className.doc }")(
 					s"${ valuesRef.target }(wrapped)")
-			) ++ modelProp ++ timestampProp ++ comboProps ++ (if (accessMany) None else Some(selfProp)),
+			) ++ modelProp ++ comboProps ++ (if (accessMany) None else Some(selfProp)),
 			// The abstract version doesn't contain wrap functions
 			methods = if (accessMany) Set() else Set(wrapMethodFor(wrappedAccessType, accessName)),
 			description = s"Used for accessing ${ if (accessMany) s"multiple" else "individual" } ${
@@ -525,17 +530,15 @@ object TargetingWriter
 			else
 				Set[MethodDeclaration]()
 		}
+		val rootName = if (classToWrite.isDeprecatable) "all" else "root"
 		val unfilteredRootCode = {
 			if (accessMany)
 				dbFactoryRef.targetCode.mapText { t => s"apply($t)" }
 			else
-				CodePiece(s"$manyAccessName.root.head")
+				CodePiece(s"$manyAccessName.$rootName.head")
 		}
 		// Deprecating classes have a separate includingHistory -access point
-		val rootProp = {
-			val rootName = if (classToWrite.isDeprecatable) "all" else "root"
-			LazyValue(rootName, unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text)
-		}
+		val rootProp = LazyValue(rootName, unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text)
 		/*
 		val comboRootProps = combos.map { combo =>
 			val rawPropName = withPrefix +: combo.childName
@@ -576,6 +579,11 @@ object TargetingWriter
 		(filterPrefix + classToWrite.name).pluralClassName
 	private def filterByTraitNameFor(classToWrite: Class)(implicit naming: NamingRules) =
 		(filterByPrefix +: classToWrite.name).className
-	private def valueAccessNameFor(classToWrite: Class, accessMany: Boolean)(implicit naming: NamingRules) =
-		((accessPrefix +: classToWrite.name) + (if (accessMany) valueSuffix.plural else valueSuffix.singular)).className
+	private def valueAccessNameFor(classToWrite: Class, accessMany: Boolean)(implicit naming: NamingRules) = {
+		if (accessMany && classToWrite.name.pluralClassName.toLowerCase.endsWith("values"))
+			((accessPrefix +: classToWrite.name) + valueSuffix.singular + valueSuffix.plural).className
+		else
+			((accessPrefix +: classToWrite.name) +
+				(if (accessMany) valueSuffix.plural else valueSuffix.singular)).className
+	}
 }
