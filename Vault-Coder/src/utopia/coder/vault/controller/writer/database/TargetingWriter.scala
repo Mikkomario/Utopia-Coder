@@ -3,16 +3,16 @@ package utopia.coder.vault.controller.writer.database
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NameContext.ClassPropName
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
-import utopia.coder.model.scala.Visibility.Protected
+import utopia.coder.model.scala.Visibility.{Protected, Public}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype._
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
-import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
+import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Visibility}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
-import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation, Expiration}
+import utopia.coder.vault.model.datatype.StandardPropertyType.{Deprecation, Expiration}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences.vault
 import utopia.flow.collection.CollectionExtensions._
@@ -429,13 +429,10 @@ object TargetingWriter
 			name = accessName,
 			genericTypes = Single(genericOutput) ++ genericRepr,
 			constructionParams = Single(Parameter("wrapped", wrappedAccessType)),
-			extensions = Single(parentType) ++
+			extensions = Pair[Extension](parentType, hasValues(valuesRef)) ++
 				filterRef.map[Extension] { _._2(if (accessMany) reprType else accessTypeWithOutput) },
 			properties = Single(
-				LazyValue("values", Set(valuesRef),
-					description = s"Access to the values of accessible ${
-						if (accessMany) className.pluralDoc else className.doc }")(
-					s"${ valuesRef.target }(wrapped)")
+				LazyValue("values", Set(valuesRef), isOverridden = true)(s"${ valuesRef.target }(wrapped)")
 			) ++ modelProp ++ comboProps ++ (if (accessMany) None else Some(selfProp)),
 			// The abstract version doesn't contain wrap functions
 			methods = if (accessMany) Set() else Set(wrapMethodFor(wrappedAccessType, accessName)),
@@ -507,8 +504,14 @@ object TargetingWriter
 		// Provides access to standard access root(s)
 		val companionParentTypes: Seq[Extension] = {
 			if (accessMany) {
-				val root = if (classToWrite.isDeprecatable) accessManyDeprecatingRoot else accessManyRoot
-				Vector(root(accessRowsType(modelRef)), wrapRowAccess(accessRowsType),
+				// Deprecating classes use slightly more complex interfaces
+				val (wrapRows, root) = {
+					if (classToWrite.isDeprecatable)
+						deprecatingWrapRowAccess -> accessManyDeprecatingRoot
+					else
+						wrapRowAccess -> accessManyRoot
+				}
+				Vector(root(accessRowsType(modelRef)), wrapRows(accessRowsType),
 					wrapOneToManyAccess(accessCombinedType))
 			}
 			else {
@@ -518,14 +521,21 @@ object TargetingWriter
 		}
 		val accessMethods = {
 			if (accessMany) {
-				Pair(accessRowsType -> targetingManyRows, accessCombinedType -> vault.targetingMany)
-					.map { case (wrapper, reader) =>
-						MethodDeclaration("apply",
-							genericTypes = Single(GenericType("A", description = "Type of accessed items")),
-							isOverridden = true)(
-							Parameter("access", ScalaType(reader)(ScalaType.basic("A"))))(s"$wrapper(access)")
-					}
-					.toSet
+				def wrapFunction(wrapper: ScalaType, access: Reference, name: String = "apply",
+				                 visibility: Visibility = Public) =
+					MethodDeclaration(name,
+						genericTypes = Single(GenericType("A", description = "Type of accessed items")),
+						visibility = visibility, isOverridden = true)(
+						Parameter("access", ScalaType(access)(ScalaType.basic("A"))))(s"$wrapper(access)")
+				
+				// Deprecating classes hide the root level access in order to enforce all/active/historical selection
+				if (classToWrite.isDeprecatable)
+					Set(wrapFunction(accessRowsType, targetingManyRows, "wrap", Protected),
+						wrapFunction(accessCombinedType, vault.targetingMany))
+				else
+					Pair(accessRowsType -> targetingManyRows, accessCombinedType -> vault.targetingMany).view
+						.map { case (wrapper, access) => wrapFunction(wrapper, access) }
+						.toSet
 			}
 			else
 				Set[MethodDeclaration]()
@@ -554,19 +564,11 @@ object TargetingWriter
 				description = s"Access to ${ if (accessMany) "" else "individual " }${
 					className.pluralDoc } in the DB, also including ${ combo.childClass.name } information")(code.text)
 		}*/
-		val anyTypeParam = ScalaType.basic("_")
 		val companion = ObjectDeclaration(
 			name = accessName,
 			extensions = companionParentTypes,
 			properties = Single(rootProp),
-			methods = accessMethods +
-				MethodDeclaration("accessValues", Set(implicitConversions), explicitOutputType = Some(valuesRef),
-					isImplicit = true, description = "Provides implicit access to an access point's .values property")(
-					Parameter("access",
-						ScalaType.basic(accessName)
-							.apply(if (accessMany) Pair.twice(anyTypeParam) else Single(anyTypeParam)),
-						description = "Access point whose values are accessed"))(
-					"access.values")
+			methods = accessMethods
 		)
 		
 		File(targetPackage, Pair(companion, accessClass) ++ additionalClasses).write()

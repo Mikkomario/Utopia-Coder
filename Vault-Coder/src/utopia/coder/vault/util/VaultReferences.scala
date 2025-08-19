@@ -95,6 +95,7 @@ object VaultReferences
 		lazy val accessManyColumns = Reference(targetColumns, "AccessManyColumns")
 		lazy val accessValue = Reference(targetColumns, "AccessValue")
 		lazy val accessValues = Reference(targetColumns, "AccessValues")
+		lazy val hasValues = Reference(targetColumns, "HasValues")
 		lazy val targetingOne = Reference(targetOne, "TargetingOne")
 		lazy val targetingManyLike = Reference(targetMany, "TargetingManyLike")
 		lazy val targetingMany = Reference(targetMany, "TargetingMany")
@@ -109,6 +110,7 @@ object VaultReferences
 		lazy val accessOneDeprecatingRoot = Reference(targetOne, "AccessOneDeprecatingRoot")
 		lazy val accessManyRoot = Reference(targetMany, "AccessManyRoot")
 		lazy val accessManyDeprecatingRoot = Reference(targetMany, "AccessManyDeprecatingRoot")
+		lazy val deprecatingWrapRowAccess = Reference(targetMany, "DeprecatingWrapRowAccess")
 		lazy val wrapRowAccess = Reference(targetMany, "WrapRowAccess")
 		lazy val wrapOneToManyAccess = Reference(targetMany, "WrapOneToManyAccess")
 	}
