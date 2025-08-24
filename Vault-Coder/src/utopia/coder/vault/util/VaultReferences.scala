@@ -113,6 +113,8 @@ object VaultReferences
 		lazy val deprecatingWrapRowAccess = Reference(targetMany, "DeprecatingWrapRowAccess")
 		lazy val wrapRowAccess = Reference(targetMany, "WrapRowAccess")
 		lazy val wrapOneToManyAccess = Reference(targetMany, "WrapOneToManyAccess")
+		
+		lazy val filterByTimestamp = Reference(viewAccess, "FilterByTimestamp")
 	}
 	
 	object BunnyMunch

@@ -24,6 +24,8 @@ object ScalaType
 	val double = basic("Double")
 	val boolean = basic("Boolean")
 	
+	lazy val instant = apply(Reference.instant)
+	
 	/**
 	  * A function that matches types that have the same base type
 	  */

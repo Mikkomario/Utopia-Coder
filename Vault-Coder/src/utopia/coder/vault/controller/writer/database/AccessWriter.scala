@@ -251,84 +251,84 @@ object AccessWriter
 	 * @return With and in methods for the specified class
 	 */
 	def filterMethodsFor(classToWrite: Class, modelPropName: String)(implicit naming: NamingRules) =
-	{
-		classToWrite.properties.flatMap { prop =>
-			// Only writes the with and in methods for properties with a single column
-			prop.dbProperties.only.iterator.flatMap { dbProp =>
-				// If these methods are not explicitly defined, only writes them for custom index properties
-				lazy val isCustomIndex = dbProp.overrides.indexing.isCertainlyTrue ||
-					classToWrite.comboIndexColumnNames.exists { _.contains(dbProp.columnName) }
-				val withMethodName = prop.withAccessName.nonEmptyOrElse {
-					if (isCustomIndex) ("with" +: prop.name).function else ""
-				}
-				val inMethodName = prop.inAccessName.nonEmptyOrElse {
-					prop.withAccessName.ifNotEmpty match {
-						// Case: "With" defined but "in" not defined => Generates "in" by pluralizing "with"
-						case Some(withAccessName) =>
-							val namingStyle = naming(FunctionName)
-							Name.interpret(withAccessName, namingStyle).pluralIn(namingStyle)
-						case None =>
-							if (isCustomIndex)
-								(Name("with", "with", CamelCase.lower) + prop.name).pluralIn(naming(FunctionName))
-							else
-								""
+		classToWrite.properties.view.filter { _.dataType.isFilterGenerationSupported }
+			.flatMap { prop =>
+				// Only writes the with and in methods for properties with a single column
+				prop.dbProperties.only.iterator.flatMap { dbProp =>
+					// If these methods are not explicitly defined, only writes them for custom index properties
+					lazy val isCustomIndex = dbProp.overrides.indexing.isCertainlyTrue ||
+						classToWrite.comboIndexColumnNames.exists { _.contains(dbProp.columnName) }
+					val withMethodName = prop.withAccessName.nonEmptyOrElse {
+						if (isCustomIndex) ("with" +: prop.name).function else ""
 					}
-				}
-				
-				// Writes the actual methods, if needed
-				lazy val singleParamName = prop.name.prop
-				lazy val concreteType = prop.dataType.concrete
-				lazy val singleValueCode = concreteType.toValueCode(singleParamName)
-				val withMethod = withMethodName.notEmpty
-					// Will not redefine methods already introduced in the parent traits
-					.filterNot { name => prop.parents.exists { _.withAccessName == name } }
-					.map { name =>
-						MethodDeclaration(name, singleValueCode.references,
-							returnDescription = s"Copy of this access point that only includes ${
-								classToWrite.name.pluralDoc } with the specified ${ prop.name }",
-							isLowMergePriority = true)(
-							Parameter(singleParamName, concreteType.toScala,
-								description = s"${ prop.name } to target"))(
-							s"filter($modelPropName.${ dbProp.name.prop }.column <=> ${singleValueCode.text})")
-					}
-				val inMethod = inMethodName.notEmpty
-					// Here, also, won't redefine methods
-					.filterNot { name => prop.parents.exists { _.inAccessName == name } }
-					.map { name =>
-						val paramsName = prop.name.pluralIn(naming(ClassPropName))
-						val (code, inputCollectionName) = {
-							def usingIntSet =
-								CodePiece(s"IntSet.from($paramsName)", Set(flow.intSet)) -> "IterableOnce"
-							val (valuesCode, inputCollectionName) = concreteType match {
-								// Case: The parameter values are of type Int => Uses IntSet from IterableOnce[Int]
-								case _: IntNumber => usingIntSet
-								case c: ClassReference if c.referencedType.isInstanceOf[IntNumber] => usingIntSet
-								case _ =>
-									val implementation = singleValueCode.mapText { valueCode =>
-										if (valueCode == singleParamName)
-											paramsName
-										else
-											s"$paramsName.map { $singleParamName => $valueCode }"
-									}
-									implementation -> "Iterable"
-							}
-							val code = valuesCode.mapText { values =>
-								s"filter($modelPropName.${ dbProp.name.prop }.column.in($values))"
-							}
-							code -> inputCollectionName
+					val inMethodName = prop.inAccessName.nonEmptyOrElse {
+						prop.withAccessName.ifNotEmpty match {
+							// Case: "With" defined but "in" not defined => Generates "in" by pluralizing "with"
+							case Some(withAccessName) =>
+								val namingStyle = naming(FunctionName)
+								Name.interpret(withAccessName, namingStyle).pluralIn(namingStyle)
+							case None =>
+								if (isCustomIndex)
+									(Name("with", "with", CamelCase.lower) + prop.name).pluralIn(naming(FunctionName))
+								else
+									""
 						}
-						MethodDeclaration(name, code.references,
-							returnDescription = s"Copy of this access point that only includes ${
-								classToWrite.name.pluralDoc } where ${ prop.name } is within the specified value set",
-							isLowMergePriority = true)(
-							Parameter(paramsName, ScalaType.generic(inputCollectionName, concreteType.toScala),
-								description = s"Targeted ${ prop.name.pluralDoc }"))(code.text)
 					}
-				
-				Pair(withMethod, inMethod).flatten
+					
+					// Writes the actual methods, if needed
+					lazy val singleParamName = prop.name.prop
+					lazy val concreteType = prop.dataType.concrete
+					lazy val singleValueCode = concreteType.toValueCode(singleParamName)
+					val withMethod = withMethodName.notEmpty
+						// Will not redefine methods already introduced in the parent traits
+						.filterNot { name => prop.parents.exists { _.withAccessName == name } }
+						.map { name =>
+							MethodDeclaration(name, singleValueCode.references,
+								returnDescription = s"Copy of this access point that only includes ${
+									classToWrite.name.pluralDoc } with the specified ${ prop.name }",
+								isLowMergePriority = true)(
+								Parameter(singleParamName, concreteType.toScala,
+									description = s"${ prop.name } to target"))(
+								s"filter($modelPropName.${ dbProp.name.prop }.column <=> ${singleValueCode.text})")
+						}
+					val inMethod = inMethodName.notEmpty
+						// Here, also, won't redefine methods
+						.filterNot { name => prop.parents.exists { _.inAccessName == name } }
+						.map { name =>
+							val paramsName = prop.name.pluralIn(naming(ClassPropName))
+							val (code, inputCollectionName) = {
+								def usingIntSet =
+									CodePiece(s"IntSet.from($paramsName)", Set(flow.intSet)) -> "IterableOnce"
+								val (valuesCode, inputCollectionName) = concreteType match {
+									// Case: The parameter values are of type Int => Uses IntSet from IterableOnce[Int]
+									case _: IntNumber => usingIntSet
+									case c: ClassReference if c.referencedType.isInstanceOf[IntNumber] => usingIntSet
+									case _ =>
+										val implementation = singleValueCode.mapText { valueCode =>
+											if (valueCode == singleParamName)
+												paramsName
+											else
+												s"$paramsName.map { $singleParamName => $valueCode }"
+										}
+										implementation -> "Iterable"
+								}
+								val code = valuesCode.mapText { values =>
+									s"filter($modelPropName.${ dbProp.name.prop }.column.in($values))"
+								}
+								code -> inputCollectionName
+							}
+							MethodDeclaration(name, code.references,
+								returnDescription = s"Copy of this access point that only includes ${
+									classToWrite.name.pluralDoc } where ${ prop.name } is within the specified value set",
+								isLowMergePriority = true)(
+								Parameter(paramsName, ScalaType.generic(inputCollectionName, concreteType.toScala),
+									description = s"Targeted ${ prop.name.pluralDoc }"))(code.text)
+						}
+					
+					Pair(withMethod, inMethod).flatten
+				}
 			}
-		}
-	}
+			.toSet
 	
 	// Writes all single item access points
 	// Returns Try[Option[UniqueAccessLikeRef]] (i.e. reference to the generic single access trait, if generated)

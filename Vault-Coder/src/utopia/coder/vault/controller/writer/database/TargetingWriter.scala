@@ -12,7 +12,7 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Visibility}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
-import utopia.coder.vault.model.datatype.StandardPropertyType.{Deprecation, Expiration}
+import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation, Expiration}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences.vault
 import utopia.flow.collection.CollectionExtensions._
@@ -42,7 +42,6 @@ object TargetingWriter
 	
 	private lazy val joinedToPrefix = Name("join", "join", CamelCase.lower)
 	private lazy val wherePrefix = Name("where", "where", CamelCase.lower)
-	private lazy val withPrefix = Name("with", "with", CamelCase.lower)
 	
 	
 	// OTHER    ---------------------
@@ -238,8 +237,9 @@ object TargetingWriter
 		// Won't generate a file if there are no "with" or "in" -methods
 		// (except for classes that extend more than 1 other class, and those which support deprecation)
 		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, "model")
+		val filterProps = timestampFilterPropsFor(classToWrite)
 		val parents = parentClassRefs.flatMap { _.targeting.flatMap { _.filtering } }
-		if (filterMethods.nonEmpty || parents.hasSize >= 2 || classToWrite.isDeprecatable ||
+		if (filterMethods.nonEmpty || filterProps.nonEmpty || parents.hasSize >= 2 || classToWrite.isDeprecatable ||
 			classToWrite.recordsIndexedCreationTime)
 		{
 			// Extends filter traits of parents, or FilterableView[+Repr]
@@ -278,11 +278,11 @@ object TargetingWriter
 					name = filterTraitNameFor(classToWrite),
 					genericTypes = Single(GenericType.covariant("Repr")),
 					extensions = extensions,
-					properties = Single(modelProp) ++
+					properties = (filterProps :+ modelProp) ++
 						timelineProp.map { p =>
 							ComputedProperty("timestampColumn", isOverridden = true)(s"model.${ p.name.prop }")
 						},
-					methods = filterMethods.toSet,
+					methods = filterMethods,
 					description = s"Common trait for access points which may be filtered based on ${
 						classToWrite.name } properties",
 					author = classToWrite.author,
@@ -507,12 +507,12 @@ object TargetingWriter
 				// Deprecating classes use slightly more complex interfaces
 				val (wrapRows, root) = {
 					if (classToWrite.isDeprecatable)
-						deprecatingWrapRowAccess -> accessManyDeprecatingRoot
+						(deprecatingWrapRowAccess(accessRowsType): Extension).withConstructor(modelRef.targetCode) ->
+							accessManyDeprecatingRoot
 					else
-						wrapRowAccess -> accessManyRoot
+						(wrapRowAccess(accessRowsType): Extension) -> accessManyRoot
 				}
-				Vector(root(accessRowsType(modelRef)), wrapRows(accessRowsType),
-					wrapOneToManyAccess(accessCombinedType))
+				Vector(wrapRows, wrapOneToManyAccess(accessCombinedType), root(accessRowsType(modelRef)))
 			}
 			else {
 				val root = if (classToWrite.isDeprecatable) accessOneDeprecatingRoot else accessOneRoot
@@ -524,7 +524,7 @@ object TargetingWriter
 				def wrapFunction(wrapper: ScalaType, access: Reference, name: String = "apply",
 				                 visibility: Visibility = Public) =
 					MethodDeclaration(name,
-						genericTypes = Single(GenericType("A", description = "Type of accessed items")),
+						genericTypes = Single(GenericType("A")),
 						visibility = visibility, isOverridden = true)(
 						Parameter("access", ScalaType(access)(ScalaType.basic("A"))))(s"$wrapper(access)")
 				
@@ -542,8 +542,13 @@ object TargetingWriter
 		}
 		val rootName = if (classToWrite.isDeprecatable) "all" else "root"
 		val unfilteredRootCode = {
-			if (accessMany)
-				dbFactoryRef.targetCode.mapText { t => s"apply($t)" }
+			if (accessMany) {
+				val base = dbFactoryRef.targetCode.mapText { t => s"apply($t)" }
+				if (classToWrite.isDeprecatable)
+					base.append(".all")
+				else
+					base
+			}
 			else
 				CodePiece(s"$manyAccessName.$rootName.head")
 		}
@@ -588,4 +593,24 @@ object TargetingWriter
 			((accessPrefix +: classToWrite.name) +
 				(if (accessMany) valueSuffix.plural else valueSuffix.singular)).className
 	}
+	
+	/**
+	 * Writes filtering function properties for all timestamp-based class properties,
+	 * except the primary row creation time -property
+	 * @param classToWrite Class for which these properties are written
+	 * @param naming Implicit naming rules
+	 * @return Written filtering properties
+	 */
+	private def timestampFilterPropsFor(classToWrite: Class)(implicit naming: NamingRules) =
+		classToWrite.properties.view
+			.filter { p =>
+				p.isIndexed && p.isSingleColumn && p.dataType.scalaType == ScalaType.instant &&
+					p.dataType != CreationTime
+			}
+			.map { p =>
+				LazyValue((wherePrefix +: p.name).prop, Set(filterByTimestamp),
+					description = s"Access to ${ p.name } -based filtering functions")(
+					s"${ filterByTimestamp.target }(self, model.${ p.name.prop })")
+			}
+			.toOptimizedSeq
 }

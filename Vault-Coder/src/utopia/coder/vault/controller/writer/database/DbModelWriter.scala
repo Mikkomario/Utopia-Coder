@@ -666,7 +666,7 @@ object DbModelWriter
 				val extraDescription = s", which is part of the property ${ concreteProp.name }"
 				val partMethods = dbProps.map { dbProp =>
 					// NB: The accepted parameter type may be incorrect
-					withDbPropertyMethod(dbProp, returnDescriptionAppendix = extraDescription,
+					withDbPropertyMethod(dbProp, returnDescriptionSuffix = extraDescription,
 						calledMethodName = calledMethodName, returnDescriptionStart = returnDescriptionStart)
 				}
 				partMethods :+ withMethod(concreteProp, dbProps, concreteProp.dataType.toScala, concreteProp.description,
@@ -675,18 +675,18 @@ object DbModelWriter
 		}
 	}
 	
-	private def withDbPropertyMethod(property: DbProperty, paramDescription: String = "",
-	                                 returnDescriptionAppendix: String = "", calledMethodName: String = "apply",
-	                                 returnDescriptionStart: String = "A model containing only the specified ",
+	private def withDbPropertyMethod(property: DbProperty, paramDescription: => String = "",
+	                                 returnDescriptionSuffix: => String = "", calledMethodName: String = "apply",
+	                                 returnDescriptionStart: => String = "A model containing only the specified ",
 	                                 isOverridden: Boolean = false)
 	                                (implicit naming: NamingRules) =
-		withMethod(property, Single(property), property.conversion.origin, paramDescription, returnDescriptionAppendix,
+		withMethod(property, Single(property), property.conversion.origin, paramDescription, returnDescriptionSuffix,
 			calledMethodName, returnDescriptionStart, isOverridden)
 			
 	private def withMethod(source: Named, properties: Seq[DbProperty], parameterType: ScalaType,
-	                       paramDescription: String = "", returnDescriptionAppendix: String = "",
+	                       paramDescription: => String = "", returnDescriptionSuffix: => String = "",
 	                       calledMethodName: String = "apply",
-	                       returnDescriptionStart: String = "A model containing only the specified ",
+	                       returnDescriptionStart: => String = "A model containing only the specified ",
 	                       isOverridden: Boolean = false)
 	                      (implicit naming: NamingRules) =
 	{
@@ -695,9 +695,10 @@ object DbModelWriter
 			.map { prop => s"${prop.name.prop} = " +: prop.conversion.midConversion(paramName) }
 			.reduceLeft { _.append(_, ", ") }
 		MethodDeclaration(withMethodNameFor(source), constructionParamsCode.references,
-			returnDescription = s"$returnDescriptionStart${ source.name.doc }$returnDescriptionAppendix",
+			returnDescription =
+				if (isOverridden) "" else s"$returnDescriptionStart${ source.name.doc }$returnDescriptionSuffix",
 			isOverridden = isOverridden, isLowMergePriority = true)(
-			Parameter(paramName, parameterType, description = paramDescription))(
+			Parameter(paramName, parameterType, description = if (isOverridden) "" else paramDescription))(
 			s"$calledMethodName($constructionParamsCode)")
 	}
 	
