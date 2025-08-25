@@ -6,6 +6,7 @@ import utopia.coder.model.scala.doc.ScalaDocKeyword.TypeParam
 import utopia.coder.model.scala.doc.{ScalaDoc, ScalaDocPart}
 import utopia.coder.model.scala.template.{Documented, ScalaConvertible}
 import utopia.flow.collection.immutable.{Empty, Single}
+import utopia.flow.operator.combine.Combinable
 
 object GenericType
 {
@@ -60,7 +61,7 @@ object GenericType
   */
 case class GenericType(name: String, requirement: Option[TypeRequirement] = None, variance: TypeVariance = Invariance,
                        description: String = "")
-	extends ScalaConvertible with Documented
+	extends ScalaConvertible with Documented with Combinable[TypeRequirement, GenericType]
 {
 	// COMPUTED ----------------------------------
 	
@@ -84,4 +85,12 @@ case class GenericType(name: String, requirement: Option[TypeRequirement] = None
 	}
 	
 	override def scalaDoc = ScalaDoc(scalaDocLine)
+	
+	override def +(other: TypeRequirement): GenericType = {
+		val newRequirement = requirement match {
+			case Some(existing) => existing + other
+			case None => other
+		}
+		copy(requirement = Some(newRequirement))
+	}
 }

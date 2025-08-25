@@ -246,6 +246,13 @@ object TargetingWriter
 			// Also, if deprecation is supported, may extend DeprecatableView, TimeDeprecatableView or NullDeprecatableView
 			// If row creation time is recorded & indexed, extends TimelineView
 			val reprType = ScalaType.basic("Repr")
+			val repr = {
+				val base = GenericType.covariant("Repr")
+				if (filterProps.isEmpty)
+					base
+				else
+					base + TypeRequirement.childOf(ScalaType(filterableView)(reprType))
+			}
 			val deprecationProp = classToWrite.deprecationProperty.filterNot { _.isExtension }
 			val deprecationParent = deprecationProp.map[Extension] { prop =>
 				val parent = prop.dataType match {
@@ -276,7 +283,7 @@ object TargetingWriter
 			Some(File(targetPackage,
 				TraitDeclaration(
 					name = filterTraitNameFor(classToWrite),
-					genericTypes = Single(GenericType.covariant("Repr")),
+					genericTypes = Single(repr),
 					extensions = extensions,
 					properties = (filterProps :+ modelProp) ++
 						timelineProp.map { p =>
@@ -507,7 +514,7 @@ object TargetingWriter
 				// Deprecating classes use slightly more complex interfaces
 				val (wrapRows, root) = {
 					if (classToWrite.isDeprecatable)
-						(deprecatingWrapRowAccess(accessRowsType): Extension).withConstructor(modelRef.targetCode) ->
+						(deprecatingWrapRowAccess(accessRowsType): Extension).withConstructor(dbModelRef.targetCode) ->
 							accessManyDeprecatingRoot
 					else
 						(wrapRowAccess(accessRowsType): Extension) -> accessManyRoot

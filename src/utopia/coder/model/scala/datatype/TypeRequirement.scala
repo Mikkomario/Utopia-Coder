@@ -2,6 +2,7 @@ package utopia.coder.model.scala.datatype
 
 import utopia.coder.model.scala.datatype.InheritanceLimitType.{RequiredChild, RequiredParent}
 import utopia.coder.model.scala.template.ScalaConvertible
+import utopia.flow.operator.combine.Combinable.SelfCombinable
 
 object TypeRequirement
 {
@@ -22,7 +23,11 @@ object TypeRequirement
   * @author Mikko Hilpinen
   * @since 12.2.2022, v1.5
   */
-case class TypeRequirement(restrictingType: ScalaType, restrictionType: InheritanceLimitType) extends ScalaConvertible
+case class TypeRequirement(restrictingType: ScalaType, restrictionType: InheritanceLimitType)
+	extends ScalaConvertible with SelfCombinable[TypeRequirement]
 {
 	override def toScala = restrictionType.toScala.append(restrictingType.toScala, " ")
+	
+	override def +(other: TypeRequirement): TypeRequirement =
+		copy(restrictingType = restrictingType.withOther(other.restrictingType))
 }
