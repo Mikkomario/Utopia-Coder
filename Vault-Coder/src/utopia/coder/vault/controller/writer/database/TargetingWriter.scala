@@ -331,6 +331,7 @@ object TargetingWriter
 				extensions = Pair(filterRef(accessType), filterableViewWrapper(accessType)),
 				description = s"An interface which provides ${
 					classToWrite.name } -based filtering for other types of access points.",
+				properties = Single(ComputedProperty("table", isOverridden = true)("model.table")),
 				author = classToWrite.author,
 				since = DeclarationDate.versionedToday,
 				isCaseClass = true
