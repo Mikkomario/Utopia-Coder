@@ -65,8 +65,16 @@ object ComponentFactoryWriter
 		}
 		
 		val contextualDec = factory.contextType.map { context =>
-			contextualFactory(factory, ("Contextual" +: (factory.componentName + "Factory")).className, context,
-				componentType, settingsType, factoryLikeType) -> context
+			// The "Contextual" keyword is only included if there's also a non-contextual version
+			val factoryName = factory.componentName + "Factory"
+			val contextualFactoryName = {
+				if (factory.onlyContextual)
+					factoryName
+				else
+					"Contextual" +: factoryName
+			}
+			contextualFactory(factory, contextualFactoryName.className, context, componentType, settingsType,
+				factoryLikeType) -> context
 		}
 		val nonContextualDec = {
 			if (factory.onlyContextual)

@@ -7,6 +7,7 @@
 ### New features
 - Added context type: `"any"`
 ### Other changes
+- The "Contextual" keyword is omitted from component factory names in situations where no non-contextual version exists
 - Output is now compatible with **Reach v1.6**
 
 ## v1.0.3 - 23.1.2025
