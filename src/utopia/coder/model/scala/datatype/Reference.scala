@@ -1,12 +1,11 @@
 package utopia.coder.model.scala.datatype
 
 import utopia.coder.model.data.ProjectSetup
-import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.util.StringExtensions._
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.template.ScalaConvertible
 import utopia.flow.collection.immutable.Single
+import utopia.flow.util.StringExtensions._
 
 import java.nio.file.Path
 import scala.collection.StringOps
@@ -17,17 +16,11 @@ object Reference
 	
 	import Package._
 	
-	// Scala time
-	
-	lazy val duration = apply(scalaDuration, "Duration")
-	lazy val finiteDuration = apply(scalaDuration, "FiniteDuration")
-	
 	// Java time
 	
 	lazy val instant = apply(javaTime, "Instant")
 	lazy val localDate = apply(javaTime, "LocalDate")
 	lazy val localTime = apply(javaTime, "LocalTime")
-	lazy val timeUnit = apply(java / "util.concurrent", "TimeUnit")
 	
 	// Other Scala
 	
@@ -127,6 +120,8 @@ object Reference
 		lazy val stringType = dataType / "StringType"
 		lazy val instantType = dataType / "InstantType"
 		
+		lazy val duration = apply(time, "Duration")
+		lazy val timeUnit = apply(time, "TimeUnit")
 		lazy val now = apply(time, "Now")
 		lazy val today = apply(time, "Today")
 		lazy val days = apply(time, "Days")

@@ -18,6 +18,7 @@
 - Fixed a bug that would cause certain inheritance-based combo classes to interrupt the code-generation process
 ### Other changes
 - Supports **Vault** v2.0
+- Uses **Duration** and **TimeUnit** classes from **Flow**, according to **Flow** v2.7 changes
 - Replaced use-cases of **Deprecatable** and its subtraits to use **Deprecates**, etc. instead
 - Utilizes **StandardStoredFactory** from **Vault**
 - Modified how enumeration values are parsed from **Value**s

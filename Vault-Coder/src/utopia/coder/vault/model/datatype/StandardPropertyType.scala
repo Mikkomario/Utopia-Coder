@@ -9,7 +9,6 @@ import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.ValueConvertibleType
 import utopia.coder.vault.model.data.{Class, Enum}
 import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType._
-import utopia.coder.vault.model.datatype.StandardPropertyType.TimeDuration.{fromValueReferences, toValueReferences}
 import utopia.coder.vault.model.enumeration.IntSize.{Default, Medium, Tiny}
 import utopia.coder.vault.model.enumeration.Mutability.{Immutable, Mutable}
 import utopia.coder.vault.model.enumeration.{IntSize, Mutability}
@@ -18,9 +17,9 @@ import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.generic.casting.ValueConversions._
 import utopia.flow.operator.equality.EqualsExtensions._
+import utopia.flow.time.TimeUnit
+import utopia.flow.time.TimeUnit.{Day, Hour, MicroSecond, MilliSecond, Minute, NanoSecond, Second, Week}
 import utopia.flow.util.StringExtensions._
-
-import java.util.concurrent.TimeUnit
 
 /**
   * Lists property types that introduced in this module
@@ -81,9 +80,9 @@ object StandardPropertyType
 					}
 				}
 				else if (lowerTypeName.startsWith("duration"))
-					Some(TimeDuration(timeUnitFromString(typeName.afterFirst("[").untilLast("]"), TimeUnit.MILLISECONDS)))
+					Some(TimeDuration(timeUnitFromString(typeName.afterFirst("[").untilLast("]"), MilliSecond)))
 				else if (lowerTypeName.startsWith("velocity"))
-					Some(LinearVelocity(timeUnitFromString(typeName.afterFirst("[").untilLast("]"), TimeUnit.SECONDS)))
+					Some(LinearVelocity(timeUnitFromString(typeName.afterFirst("[").untilLast("]"), Second)))
 				else if (lowerTypeName.startsWith("distance"))
 					Some(LengthDistance(typeName.afterFirst("[").untilLast("]")))
 				else
@@ -107,22 +106,23 @@ object StandardPropertyType
 		interpret(lowerTypeName.afterFirst("[").untilLast("]"), length, propertyName)
 		
 	private def timeUnitToString(unit: TimeUnit) = unit match {
-		case TimeUnit.NANOSECONDS => "nano"
-		case TimeUnit.MICROSECONDS => "microsecond"
-		case TimeUnit.MILLISECONDS => "milli"
-		case TimeUnit.SECONDS => "second"
-		case TimeUnit.MINUTES => "minute"
-		case TimeUnit.HOURS => "hour"
-		case TimeUnit.DAYS => "day"
+		case NanoSecond => "nano"
+		case MicroSecond => "microsecond"
+		case MilliSecond => "milli"
+		case Second => "second"
+		case Minute => "minute"
+		case Hour => "hour"
+		case Day => "day"
+		case Week => "week"
 		case _ => unit.toString.toLowerCase
 	}
 	
 	private def timeUnitFromString(str: String, default: => TimeUnit) = str.toLowerCase match {
-		case "ms" | "milli" | "millis" | "millisecond" | "milliseconds" => TimeUnit.MILLISECONDS
-		case "s" | "sec" | "second" | "seconds" => TimeUnit.SECONDS
-		case "m" | "min" | "minute" | "minutes" => TimeUnit.MINUTES
-		case "h" | "hour" | "hours" => TimeUnit.HOURS
-		case "d" | "day" | "days" => TimeUnit.DAYS
+		case "ms" | "milli" | "millis" | "millisecond" | "milliseconds" => MilliSecond
+		case "s" | "sec" | "second" | "seconds" => Second
+		case "m" | "min" | "minute" | "minutes" => Minute
+		case "h" | "hour" | "hours" => Hour
+		case "d" | "day" | "days" => Day
 		case _ => default
 	}
 	
@@ -931,13 +931,10 @@ object StandardPropertyType
 	
 	case object TimeDuration
 	{
-		private val fromValueReferences = Set(Reference.timeUnit, Reference.finiteDuration)
-		private val toValueReferences = Set(valueConversions, Reference.timeUnit)
-		
-		val millis = apply(TimeUnit.MILLISECONDS)
-		val seconds = apply(TimeUnit.SECONDS)
-		val minutes = apply(TimeUnit.MINUTES)
-		val hours = apply(TimeUnit.HOURS)
+		val millis = apply(MilliSecond)
+		val seconds = apply(Second)
+		val minutes = apply(Minute)
+		val hours = apply(Hour)
 		
 		def values = Vector(millis, seconds, minutes, hours)
 	}
@@ -950,55 +947,80 @@ object StandardPropertyType
 	{
 		// ATTRIBUTES   ------------------------
 		
+		override val scalaType = flow.duration
+		
 		override lazy val sqlType = SqlPropertyType(unit match {
-			case TimeUnit.NANOSECONDS | TimeUnit.MICROSECONDS | TimeUnit.MILLISECONDS => "BIGINT"
+			case NanoSecond | MicroSecond | MilliSecond => "BIGINT"
 			case _ => "INT"
 		}, "0", s"${ timeUnitToString(unit) }s")
 		override lazy val valueDataType = dataType / "DurationType"
 		
+		override val emptyValue = CodePiece.empty
+		override lazy val nonEmptyDefaultValue = CodePiece("Duration.zero", Set(flow.duration))
 		
-		// COMPUTED ----------------------------
+		override val defaultPropertyName = "duration"
+		override val defaultMutability: Option[Mutability] = None
 		
-		private def unitConversionCode = s".toUnit(TimeUnit.${ unit.name })"
+		override val isFilterGenerationSupported: Boolean = false
+		override val supportsDefaultJsonValues = true
+		
+		override val yieldsTryFromValue = false
+		override val yieldsTryFromJsonValue: Boolean = false
+		
+		private lazy val unitName = unit.getClass.getSimpleName
+		private lazy val toDuration = {
+			val convert = unit match {
+				case NanoSecond => ".nanos"
+				case MicroSecond => ".microSeconds"
+				case MilliSecond => ".millis"
+				case Second => ".seconds"
+				case Hour => ".hours"
+				case Day => ".days"
+				case _ => ""
+			}
+			convert.ifNotEmpty
+		}
+		private lazy val toNumber = unit match {
+			case NanoSecond => ".toNanos"
+			case MicroSecond => ".toMicros"
+			case MilliSecond => ".toMillis"
+			case Second => ".toSeconds"
+			case Hour => ".toHours"
+			case _ => s".toUnit($unitName)"
+		}
 		
 		
 		// IMPLEMENTED  ------------------------
 		
-		override def scalaType = Reference.finiteDuration
-		
-		override def emptyValue = CodePiece.empty
-		override def nonEmptyDefaultValue = CodePiece("Duration.Zero", Set(Reference.duration))
-		
-		override def defaultPropertyName = "duration"
-		override def defaultMutability: Option[Mutability] = None
-		
-		override def isFilterGenerationSupported: Boolean = false
-		override def supportsDefaultJsonValues = true
-		
-		override def yieldsTryFromValue = false
-		override def yieldsTryFromJsonValue: Boolean = false
-		
-		override def toValueCode(instanceCode: String) =
-			CodePiece(s"$instanceCode$unitConversionCode", toValueReferences)
+		override def toValueCode(instanceCode: String) = CodePiece(s"$instanceCode$toNumber", Set(valueConversions))
 		override def toJsonValueCode(instanceCode: String): CodePiece = CodePiece(instanceCode, Set(valueConversions))
 		override def optionToValueCode(optionCode: String, isToJson: Boolean) = {
 			if (isToJson)
 				CodePiece(optionCode, Set(valueConversions))
 			else
-				CodePiece(s"$optionCode.map { _$unitConversionCode }", toValueReferences)
+				CodePiece(s"$optionCode.map { _$toNumber }", Set(valueConversions))
 		}
 		
 		override def fromValueCode(valueCode: String, isFromJson: Boolean) = {
 			if (isFromJson)
 				s"$valueCode.getDuration"
 			else
-				CodePiece(s"FiniteDuration($valueCode.getLong, TimeUnit.${ unit.name })", fromValueReferences)
+				toDuration match {
+					case Some(toDuration) => CodePiece(s"$valueCode.getLong$toDuration", Set(timeExtensions))
+					case None =>
+						CodePiece(s"Duration($valueCode.getLong, $unitName)", Set(duration, timeUnit/unitName))
+				}
 		}
 		override def optionFromValueCode(valueCode: String, isFromJson: Boolean) = {
 			if (isFromJson)
 				s"$valueCode.duration"
-			else
-				CodePiece(s"$valueCode.long.map { FiniteDuration(_, TimeUnit.${ unit.name }) }", fromValueReferences)
+			else {
+				toDuration match {
+					case Some(toDuration) => CodePiece(s"$valueCode.long.map { _$toDuration }", Set(timeExtensions))
+					case None =>
+						CodePiece(s"$valueCode.long.map { Duration(_, $unitName) }", Set(duration, timeUnit/unitName))
+				}
+			}
 		}
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) =
@@ -1455,11 +1477,25 @@ object StandardPropertyType
 	
 	object LinearVelocity
 	{
-		lazy val perSecond = LinearVelocity(TimeUnit.SECONDS)
+		lazy val perSecond = LinearVelocity(Second)
 	}
 	case class LinearVelocity(unit: TimeUnit) extends FacadePropertyType
 	{
 		// ATTRIBUTES   ----------------------
+		
+		override protected val delegate: PropertyType = DoubleNumber
+		override val scalaType: ScalaType = paradigm.linearVelocity
+		
+		override val emptyValue: CodePiece = CodePiece.empty
+		override val nonEmptyDefaultValue: CodePiece = CodePiece("LinearVelocity.zero", Set(paradigm.linearVelocity))
+		override val defaultPropertyName: Name = Name("velocity", "velocities", CamelCase.lower)
+		override val defaultPartNames: Seq[Name] = Empty
+		override val defaultMutability: Option[Mutability] = None
+		
+		override protected val yieldsTryFromDelegate: Boolean = false
+		override val supportsDefaultJsonValues: Boolean = true
+		
+		private lazy val unitName = unit.getClass.getSimpleName
 		
 		override lazy val sqlConversions =
 			super.sqlConversions.map { _.withAdditionalColumnNameSuffix(s"per_${ timeUnitToString(unit) }") }
@@ -1467,24 +1503,11 @@ object StandardPropertyType
 		
 		// IMPLEMENTED  ---------------------
 		
-		override protected def delegate: PropertyType = DoubleNumber
-		override def scalaType: ScalaType = paradigm.linearVelocity
-		
-		override def emptyValue: CodePiece = CodePiece.empty
-		override def nonEmptyDefaultValue: CodePiece = CodePiece("LinearVelocity.zero", Set(paradigm.linearVelocity))
-		override def defaultPropertyName: Name = Name("velocity", "velocities", CamelCase.lower)
-		override def defaultPartNames: Seq[Name] = Empty
-		override def defaultMutability: Option[Mutability] = None
-		
-		override protected def yieldsTryFromDelegate: Boolean = false
-		override def supportsDefaultJsonValues: Boolean = true
-		
 		override protected def toDelegateCode(instanceCode: String): CodePiece =
-			CodePiece(s"$instanceCode.over(Duration(1, TimeUnit.${ unit.toString }))", Set(duration, timeUnit))
+			CodePiece(s"$instanceCode.over($unitName.unit)", Set(timeUnit/unitName))
 		
 		override protected def fromDelegateCode(delegateCode: String): CodePiece =
-			CodePiece(s"LinearVelocity($delegateCode)(TimeUnit.${ unit.toString })",
-				Set(paradigm.linearVelocity, timeUnit))
+			CodePiece(s"LinearVelocity($delegateCode, $unitName)", Set(paradigm.linearVelocity, timeUnit/unitName))
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
