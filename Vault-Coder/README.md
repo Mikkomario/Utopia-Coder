@@ -51,6 +51,8 @@ Once you have created a specification document, run the application using the fo
   - If omitted, all project modules will be generated
 - Additionally, if you specify the `-NC` flag, you may prevent any combo classes from being written
 - Specify the `-T` flag if you want to generate newer, **Targeting** -based database access interfaces
+  - It is **highly recommended** you set this flag when generating new projects. 
+    The targeting mode will be set as the default mode in a future release.
 
 The program will inform you if there were any problems during input file processing or during output write operations.
 
@@ -640,6 +642,8 @@ This application will produce the following documents
               - Only generated for classes which support descriptions
 
 Note: The file structure for generic traits and inheriting classes is different from this structure above.
+
+Note: The generated database interactions are different when using the targeting mode (`-T` param)
 
 ## Generating Model Templates
 There's an alternative mode available. This mode reads one or more tables from a database and writes 

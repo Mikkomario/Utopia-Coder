@@ -1,6 +1,9 @@
 # Utopia Vault Coder
 
-## v1.13 (in development)
+## v1.13 - 1.11.2025
+This version is compatible with **Vault v2.0** and **Flow v2.7**. 
+Importantly, this version is able to generate targeting access classes, most compatible with **Vault v2.0** 
+and future **Vault** releases.
 ### Breaking changes
 - Datatype **Vector** is now **Seq**
 - Generated **UniqueXAccess** & **UniqueXAccessLike** traits now extend **UniqueModelAccess**, 

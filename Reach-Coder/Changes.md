@@ -1,6 +1,7 @@
 # Reach Coder - List of changes
 
-## v1.0.4 (in development)
+## v1.0.4 - 1.11.2025
+This **Reach Coder** version is compatible with **Reach v1.7**.
 ### Bugfixes
 - Fixed bugged context property parsing
   - Previously the parsing would not recognize the static and variable variants
@@ -8,7 +9,7 @@
 - Added context type: `"any"`
 ### Other changes
 - The "Contextual" keyword is omitted from component factory names in situations where no non-contextual version exists
-- Output is now compatible with **Reach v1.6**
+- Output is now compatible with **Reach v1.7**
 
 ## v1.0.3 - 23.1.2025
 This update adds support for the new context classes introduced in **Firmament v1.4**. 
