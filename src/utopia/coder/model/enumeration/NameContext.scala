@@ -5,7 +5,7 @@ import utopia.coder.model.enumeration.NamingConvention.{CamelCase, Hyphenated, T
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.Single
 import utopia.flow.collection.mutable.iterator.OptionsIterator
-import utopia.flow.generic.model.template.{ModelLike, Property}
+import utopia.flow.generic.model.template.HasValues
 import utopia.flow.operator.ScopeUsable
 import utopia.flow.operator.equality.{ApproxSelfEquals, EqualsFunction}
 
@@ -67,7 +67,7 @@ sealed trait NameContext extends ScopeUsable[NameContext] with ApproxSelfEquals[
 	  * @param naming Implicit naming rules
 	  * @return A name read from the specified model
 	  */
-	def from(model: ModelLike[Property], disableGeneric: Boolean = false)(implicit naming: NamingRules): Option[Name] = {
+	def from(model: HasValues, disableGeneric: Boolean = false)(implicit naming: NamingRules): Option[Name] = {
 		val keys = {
 			if (disableGeneric)
 				jsonProps

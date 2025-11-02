@@ -1,24 +1,24 @@
 package utopia.coder.vault.model.datatype
 
 import utopia.coder.model.data.{Name, NamingRules}
-import utopia.flow.generic.casting.ValueUnwraps._
-import utopia.flow.generic.factory.FromModelFactory
-import utopia.flow.generic.model.immutable.{ModelDeclaration, ModelValidationFailedException}
-import utopia.flow.generic.model.template.{ModelLike, Property}
-import utopia.flow.generic.model.mutable.DataType.StringType
-import utopia.flow.parse.string.Regex
-import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.util.StringExtensions._
-import utopia.coder.vault.model.datatype.CustomPropertyType.{pluralRegex, singularRegex, valueRegex}
-import utopia.coder.vault.model.datatype.CustomPropertyType.CustomPartConversion
+import utopia.coder.model.enumeration.NameContext.ClassPropName
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.code.CodePiece
+import utopia.coder.model.scala.datatype.Reference.Flow._
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
 import utopia.coder.model.scala.template.ValueConvertibleType
-import Reference.Flow._
-import utopia.coder.model.enumeration.NameContext.ClassPropName
+import utopia.coder.vault.model.datatype.CustomPropertyType.{CustomPartConversion, pluralRegex, singularRegex, valueRegex}
 import utopia.coder.vault.model.enumeration.Mutability
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Single}
+import utopia.flow.generic.casting.ValueUnwraps._
+import utopia.flow.generic.factory.FromModelFactory
+import utopia.flow.generic.model.immutable.ModelDeclaration
+import utopia.flow.generic.model.mutable.DataType.StringType
+import utopia.flow.generic.model.template.HasPropertiesLike.HasProperties
+import utopia.flow.generic.model.template.HasValues
+import utopia.flow.parse.string.Regex
+import utopia.flow.util.StringExtensions._
 
 import scala.util.{Failure, Success}
 
@@ -39,7 +39,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 	
 	// IMPLEMENTED  -------------------------
 	
-	override def apply(model: ModelLike[Property]) =
+	override def apply(model: HasProperties) =
 		schema.validate(model).flatMap { model =>
 			// from_value, from_values and to_value must all exist and contain the appropriate parameter placeholder
 			ensureFunctions(model, Vector("from_value", "to_value", "option_from_value")).flatMap { _ =>
@@ -78,7 +78,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 						))
 					}
 					else
-						Failure(new ModelValidationFailedException(
+						Failure(new IllegalArgumentException(
 							"A custom data type must either define the 'sql' or the 'parts' -property"))
 				}
 			}
@@ -87,7 +87,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 	
 	// OTHER    --------------------------
 	
-	private def ensureFunctions(model: ModelLike[Property], functionNames: Iterable[String]) = {
+	private def ensureFunctions(model: HasValues, functionNames: Iterable[String]) = {
 		functionNames
 			.findMap { propName =>
 				model(propName).string match {
@@ -100,12 +100,12 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 				}
 			} match
 		{
-			case Some(failureMessage) => Failure(new ModelValidationFailedException(failureMessage))
+			case Some(failureMessage) => Failure(new IllegalArgumentException(failureMessage))
 			case None => Success(())
 		}
 	}
 	
-	private def sqlTypeFrom(model: ModelLike[Property], defaultValue: CodePiece = CodePiece.empty) = {
+	private def sqlTypeFrom(model: HasValues, defaultValue: CodePiece = CodePiece.empty) = {
 		val sqlDefault = model("sql_default").stringOr { defaultValue.toSql.getOrElse("") }
 		SqlPropertyType(model("sql"), sqlDefault,
 			model("col_suffix", "column_suffix", "suffix"), model("optional", "nullable", "allows_null"),
@@ -122,7 +122,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 		// NB: Type refers to the mid-state. i.e. what the type is in the dbModel construction parameter
 		private val schema = ModelDeclaration("type" -> StringType, "sql" -> StringType)
 		
-		override def apply(model: ModelLike[Property]) =
+		override def apply(model: HasProperties) =
 			schema.validate(model).flatMap { model =>
 			// extract, extract_from_option must exist and contain the appropriate parameter placeholder ($v)
 			ensureFunctions(model, Vector("extract", "extract_from_option")).map { _ =>

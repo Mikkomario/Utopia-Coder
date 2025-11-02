@@ -18,7 +18,7 @@ import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq}
 import utopia.flow.collection.mutable.builder.MultiMapBuilder
 import utopia.flow.collection.mutable.iterator.PollingIterator
 import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.parse.string.{IterateLines, Regex}
+import utopia.flow.parse.string.{Lines, Regex}
 import utopia.flow.util.RangeExtensions._
 import utopia.flow.util.StringExtensions._
 import utopia.flow.view.immutable.MutatingOnce
@@ -80,25 +80,23 @@ object ScalaParser
 	
 	// OTHER    ---------------------------
 	
-	def apply(path: Path) = {
-		IterateLines.fromPath(path) { linesIter =>
-			val iter = linesIter.pollable
-			
-			val (filePackage, importedReferences) = readPackageAndImportsFrom(iter)
-			val referencesPerTarget = importedReferences.map { ref => ref.target -> ref }.toMap
-			
-			// Finally, finds and processes the object and/or class statements
-			// Implicit references are included in the resulting file directly
-			val builder = new FileBuilder(path.fileNameWithoutExtension, filePackage,
-				referencesPerTarget.valuesIterator.filter { _.target.contains('_') }.toSet)
-			val codeLineIterator = iter.map { line =>
-				val indentation = line.takeWhile { _ == '\t' }.length
-				CodeLine(indentation, line.drop(indentation))
-			}.pollable
-			readAllItemsFrom(codeLineIterator, referencesPerTarget, builder)
-			// Returns the parsed file
-			builder.result()
-		}
+	def apply(path: Path) = Lines.iterate.path(path) { linesIter =>
+		val iter = linesIter.pollable
+		
+		val (filePackage, importedReferences) = readPackageAndImportsFrom(iter)
+		val referencesPerTarget = importedReferences.map { ref => ref.target -> ref }.toMap
+		
+		// Finally, finds and processes the object and/or class statements
+		// Implicit references are included in the resulting file directly
+		val builder = new FileBuilder(path.fileNameWithoutExtension, filePackage,
+			referencesPerTarget.valuesIterator.filter { _.target.contains('_') }.toSet)
+		val codeLineIterator = iter.map { line =>
+			val indentation = line.takeWhile { _ == '\t' }.length
+			CodeLine(indentation, line.drop(indentation))
+		}.pollable
+		readAllItemsFrom(codeLineIterator, referencesPerTarget, builder)
+		// Returns the parsed file
+		builder.result()
 	}
 	
 	/**
@@ -547,8 +545,7 @@ object ScalaParser
 			{
 				// Case: Extension and/or block start line found
 				val line = moreLinesIter.next()
-				line.code.optionIndexOf("{") match
-				{
+				line.code.findIndexOf("{") match {
 					// Case: Block starts on this line
 					case Some(blockStartIndex) =>
 						if (blockStartIndex > 0)

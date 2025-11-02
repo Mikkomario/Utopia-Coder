@@ -3,8 +3,8 @@ package utopia.coder.model.data
 import utopia.coder.model.enumeration.{NameContext, NamingConvention}
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.generic.factory.SureFromModelFactory
-import utopia.flow.generic.model.template.ModelLike.AnyModel
-import utopia.flow.generic.model.template.{ModelLike, Property}
+import utopia.flow.generic.model.template.HasPropertiesLike.HasProperties
+import utopia.flow.generic.model.template.HasValues
 
 object NamingRules extends SureFromModelFactory[NamingRules]
 {
@@ -18,7 +18,7 @@ object NamingRules extends SureFromModelFactory[NamingRules]
 	
 	// IMPLEMENTED  ------------------------
 	
-	override def parseFrom(model: ModelLike[Property]) = {
+	override def parseFrom(model: HasProperties) = {
 		apply(NameContext.values.flatMap { c =>
 			model(c.jsonProps).string.flatMap(NamingConvention.forName).map { c -> _ }
 		}.toMap)
@@ -34,7 +34,7 @@ object NamingRules extends SureFromModelFactory[NamingRules]
 	 * @param default Default rules to apply in case other values have not been applied
 	 * @return Set of naming rules parsed from the specified model + defaults
 	 */
-	def from(model: AnyModel, default: NamingRules = default) = {
+	def from(model: HasValues, default: NamingRules = default) = {
 		val definedRules = NameContext.values
 			.flatMap { context =>
 				// Attempts to find and parse a property matching this name context

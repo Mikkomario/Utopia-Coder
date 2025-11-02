@@ -6,7 +6,7 @@ import utopia.coder.model.enumeration.{NameContext, NamingConvention}
 import utopia.flow.collection.immutable.Pair
 import utopia.flow.generic.factory.FromValueFactory
 import utopia.flow.generic.model.immutable.Value
-import utopia.flow.generic.model.template.ModelLike.AnyModel
+import utopia.flow.generic.model.template.HasValues
 import utopia.flow.operator.MaybeEmpty
 import utopia.flow.operator.equality.ApproxEquals
 import utopia.flow.operator.equality.EqualsExtensions._
@@ -83,7 +83,7 @@ object Name extends FromValueFactory[Name]
 	 * @param keys Keys looked for. These should apply to singular variants.
 	 * @return A name read from the specified model
 	 */
-	def from(model: AnyModel, keys: Iterable[String], expectedStyle: NamingConvention): Option[Name] = {
+	def from(model: HasValues, keys: Iterable[String], expectedStyle: NamingConvention): Option[Name] = {
 		// Looks for the singular form
 		model(keys).string.map { singular =>
 			val base = interpret(singular, expectedStyle)
