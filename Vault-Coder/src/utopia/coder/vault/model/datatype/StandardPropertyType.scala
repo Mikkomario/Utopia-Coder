@@ -1286,16 +1286,22 @@ object StandardPropertyType
 	{
 		// ATTRIBUTES   ----------------------
 		
+		override val isBothOptionalAndConcrete: Boolean = false
+		override val supportsDefaultJsonValues: Boolean = true
+		
 		override lazy val sqlConversions: Vector[SqlTypeConversion] =
 			propertyNames.flatMap { propName => innerType.sqlConversions.map { ElementConversion(propName, _) } }
 				.toVector
 		
+		override val emptyValue: CodePiece = CodePiece.empty
 		override lazy val nonEmptyDefaultValue: CodePiece =
 			innerType.nonEmptyDefaultValue.mapIfNotEmpty {
 				_.mapText { innerDefault =>
 					s"${ pairType.target }.$singleValueConstructorName($innerDefault)"
 				}.referringTo(pairType)
 			}
+		
+		override val defaultMutability: Option[Mutability] = None
 		
 		
 		// ABSTRACT --------------------------
@@ -1313,17 +1319,12 @@ object StandardPropertyType
 			Name(inner.plural, inner.plural, inner.style)
 		}
 		override def defaultPartNames = propertyNames.map { Name(_) }
-		override def defaultMutability: Option[Mutability] = None
 		
 		// TODO: This type doesn't support option-wrapping at this time - Add when needed
-		override def isBothOptionalAndConcrete: Boolean = false
 		override def optional: PropertyType = this
 		override def concrete: PropertyType = this
 		
 		override def isFilterGenerationSupported: Boolean = innerType.isFilterGenerationSupported
-		override def supportsDefaultJsonValues: Boolean = true
-		
-		override def emptyValue: CodePiece = CodePiece.empty
 		
 		override def yieldsTryFromValue: Boolean = innerType.yieldsTryFromValue
 		override def yieldsTryFromJsonValue: Boolean = innerType.yieldsTryFromJsonValue
@@ -1400,8 +1401,8 @@ object StandardPropertyType
 				innerConversion.midConversion(s"$originCode.$propertyName").referringTo(pairType)
 		}
 	}
-	case class Paired(innerType: PropertyType) extends PairLikeType(innerType, pair,
-		Pair("first", "second"), "twice")
+	case class Paired(innerType: PropertyType)
+		extends PairLikeType(innerType, pair, Pair("first", "second"), "twice")
 	{
 		override lazy val scalaType: ScalaType = pair(innerType.scalaType)
 		
