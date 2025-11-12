@@ -301,7 +301,8 @@ object DbFactoryWriter
 					val code = ParseModelCode(classToWrite, dataRef.targetCode, Some(storedRef),
 						modelName = "valid", propNames = dbProps,
 						openParentBlock = "table.validate(model).flatMap { valid => ", yieldTry = true)
-					MethodDeclaration.usingCode("apply", code, isOverridden = true)(Parameter("model", flow.anyModel))
+					MethodDeclaration.usingCode("apply", code, isOverridden = true)(
+						Parameter("model", flow.hasProperties))
 				}
 				// Case: Default => Uses fromValidatedModel(...)
 				else {
@@ -321,7 +322,7 @@ object DbFactoryWriter
 				description = s"${ prop.name } to assign to the new ${ classToWrite.name }")
 		}
 		Pair(
-			Parameter("model", flow.anyModel, description = "Model from which additional data may be read"),
+			Parameter("model", flow.hasProperties, description = "Model from which additional data may be read"),
 			Parameter("id", classToWrite.idType.toScala,
 				description = s"Id to assign to the read/parsed ${ classToWrite.name }")
 		) ++ customApplyParams

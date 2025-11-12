@@ -693,7 +693,7 @@ object ModelWriter
 			val (factoryTrait, complete) = {
 				if (classToWrite.useLongId) {
 					val complete = MethodDeclaration("complete", visibility = Protected, isOverridden = true)(
-						Pair(Parameter("model", anyModel), Parameter("data", dataClassRef)))(
+						Pair(Parameter("model", hasProperties), Parameter("data", dataClassRef)))(
 						s"model(\"id\").tryLong.map { apply(_, data) }")
 					(vault.storedFromModelFactory, Some(complete))
 				}

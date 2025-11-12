@@ -34,7 +34,7 @@ object ClassMethodFactory
 	  */
 	def classFromModel(targetClass: Class, validatedModelCode: CodePiece,
 	                   methodName: String = "apply",
-	                   param: Parameter = Parameter("model", templateModel(property)),
+	                   param: Parameter = Parameter("model", hasProperties),
 	                   isFromJson: Boolean = false)
 	                  (wrapAssignments: CodePiece => CodePiece)
 	                  (implicit naming: NamingRules) =

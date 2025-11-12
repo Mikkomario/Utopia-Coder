@@ -1,6 +1,8 @@
 # Utopia Vault Coder
 
 ## v1.13.1 (in development)
+### Bugfixes
+- Fixed some issues with the software not generating Flow v2.7 -compatible code
 ### Other changes
 - Targeting is now the default mode
   - Replaced the `T` flag with `NT` (no-targeting)
