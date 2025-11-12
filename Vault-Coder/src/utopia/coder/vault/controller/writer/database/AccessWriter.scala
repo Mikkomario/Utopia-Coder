@@ -328,7 +328,7 @@ object AccessWriter
 			.toSet
 			
 	private def inIntsImplementation(propName: String, paramName: String) =
-		CodePiece(s"filter(Condition.indexIn(model.$propName, $paramName)", Set(condition))
+		CodePiece(s"filter(Condition.indexIn(model.$propName, $paramName))", Set(condition))
 	
 	// Writes all single item access points
 	// Returns Try[Option[UniqueAccessLikeRef]] (i.e. reference to the generic single access trait, if generated)
