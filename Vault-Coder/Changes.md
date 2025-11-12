@@ -1,5 +1,12 @@
 # Utopia Vault Coder
 
+## v1.13.1 (in development)
+### Other changes
+- Targeting is now the default mode
+  - Replaced the `T` flag with `NT` (no-targeting)
+- Value-to-enumeration conversion is now more reliable for Int-based enumerations
+- Generated Int-based in-conditions now use `Condition.indexIn(...)`
+
 ## v1.13 - 1.11.2025
 This version is compatible with **Vault v2.0** and **Flow v2.7**. 
 Importantly, this version is able to generate targeting access classes, most compatible with **Vault v2.0** 

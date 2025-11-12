@@ -296,26 +296,23 @@ object AccessWriter
 						.filterNot { name => prop.parents.exists { _.inAccessName == name } }
 						.map { name =>
 							val paramsName = prop.name.pluralIn(naming(ClassPropName))
-							val (code, inputCollectionName) = {
-								def usingIntSet =
-									CodePiece(s"IntSet.from($paramsName)", Set(flow.intSet)) -> "IterableOnce"
-								val (valuesCode, inputCollectionName) = concreteType match {
-									// Case: The parameter values are of type Int => Uses IntSet from IterableOnce[Int]
-									case _: IntNumber => usingIntSet
-									case c: ClassReference if c.referencedType.isInstanceOf[IntNumber] => usingIntSet
-									case _ =>
-										val implementation = singleValueCode.mapText { valueCode =>
-											if (valueCode == singleParamName)
-												paramsName
-											else
-												s"$paramsName.map { $singleParamName => $valueCode }"
-										}
-										implementation -> "Iterable"
-								}
-								val code = valuesCode.mapText { values =>
-									s"filter($modelPropName.${ dbProp.name.prop }.column.in($values))"
-								}
-								code -> inputCollectionName
+							val (code, inputCollectionName) = concreteType match {
+								// Case: The parameter values are of type Int => Uses Condition.indexIn & IterableOnce[Int]
+								case _: IntNumber =>
+									inIntsImplementation(prop.name.prop, paramsName) -> "IterableOnce"
+								case c: ClassReference if c.referencedType.isInstanceOf[IntNumber] =>
+									inIntsImplementation(prop.name.prop, paramsName) -> "IterableOnce"
+								case _ =>
+									val valuesCode = singleValueCode.mapText { valueCode =>
+										if (valueCode == singleParamName)
+											paramsName
+										else
+											s"$paramsName.map { $singleParamName => $valueCode }"
+									}
+									val code = valuesCode.mapText { values =>
+										s"filter($modelPropName.${ dbProp.name.prop }.column.in($values))"
+									}
+									code -> "Iterable"
 							}
 							MethodDeclaration(name, code.references,
 								returnDescription = s"Copy of this access point that only includes ${
@@ -329,6 +326,9 @@ object AccessWriter
 				}
 			}
 			.toSet
+			
+	private def inIntsImplementation(propName: String, paramName: String) =
+		CodePiece(s"filter(Condition.indexIn(model.$propName, $paramName)", Set(condition))
 	
 	// Writes all single item access points
 	// Returns Try[Option[UniqueAccessLikeRef]] (i.e. reference to the generic single access trait, if generated)

@@ -72,8 +72,8 @@ object MainAppLogic extends CoderAppLogic
 		
 		val module = ArgumentSchema("module", help = "Name of the targeted project module (default = all)")
 		val noCombos = ArgumentSchema.flag("no-combos", "NC", help = "Whether combo-class writing should be disabled")
-		val targeting = ArgumentSchema.flag("targeting", "T",
-			help = "Whether targeting access classes should be generated instead of the older access implementations")
+		val targeting = ArgumentSchema.flag("no-targeting", "NT",
+			help = "Whether older access implementations should be used instead of targeting access classes")
 		
 		((original.take(firstFlagIndex) :+ module) ++ original.drop(firstFlagIndex)) ++ Pair(noCombos, targeting)
 	}
@@ -241,7 +241,7 @@ object MainAppLogic extends CoderAppLogic
 		}
 		
 		// Handles one module at a time
-		val targetingByDefault = arguments("targeting").getBoolean
+		val targetingByDefault = !arguments("no-targeting").getBoolean
 		val writeResults = filteredData.filter { _._1.nonEmpty }.map { case (module, paths) =>
 			println(s"Writing class and enumeration data to ${paths.output.toAbsolutePath}...")
 			paths.output.asExistingDirectory.flatMap { directory =>

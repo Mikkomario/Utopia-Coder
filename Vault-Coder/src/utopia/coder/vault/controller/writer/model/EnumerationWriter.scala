@@ -12,6 +12,7 @@ import utopia.coder.model.scala.{DeclarationDate, Parameter}
 import Reference._
 import utopia.flow.util.StringExtensions._
 import utopia.coder.vault.model.data.{Enum, VaultProjectSetup}
+import utopia.coder.vault.model.datatype.StandardPropertyType.BasicPropertyType.IntNumber
 import utopia.coder.vault.model.datatype.StandardPropertyType.Text
 import utopia.flow.collection.immutable.Single
 
@@ -78,7 +79,6 @@ object EnumerationWriter
 			ComputedProperty("default", description = s"The default ${ e.name.doc } (i.e. ${ v.name.doc })")(
 				v.name.enumValue)
 		}
-		//noinspection LegacyStringFormatting
 		// forId implementation differs when the enumeration has a default value
 		val (forIdEndCode, forIdDescriptionPostfix) = e.defaultValue match {
 			case Some(default) => CodePiece(".getOrElse(default)") -> s", or the default ${e.name} (${default.name})"
@@ -98,13 +98,17 @@ object EnumerationWriter
 					s"${_findForIdName}($id)"
 			}
 			// Matches against literal enumeration values as a backup, but not if the keys are of type String
-			if (e.idType.isInstanceOf[Text])
-				CodePiece(parseIdVal)
-			else {
-				val idValueType = e.idType.valueDataType
-				CodePiece(s"value.castTo(${
-					idValueType.target}, StringType) match { case Left(idVal) => $parseIdVal; case Right(stringVal) => val str = stringVal.getString; values.find { _.toString ~== str } }",
-					Set(flow.equalsExtensions, idValueType, stringType))
+			e.idType match {
+				case _: Text => CodePiece(parseIdVal)
+				case _: IntNumber =>
+					CodePiece(s"value.intOrString.flatMap { case Left(id) => ${
+						_findForIdName }(id); case Right(name) => values.find { _.toString ~== name } }",
+						Set(flow.equalsExtensions))
+				case _ =>
+					val idValueType = e.idType.valueDataType
+					CodePiece(s"value.castTo(${
+						idValueType.target}, StringType) match { case Left(idVal) => $parseIdVal; case Right(stringVal) => val str = stringVal.getString; values.find { _.toString ~== str } }",
+						Set(flow.equalsExtensions, idValueType, stringType))
 			}
 		}
 		val fromValueCode = forIdEndCode.mapText { end =>
