@@ -1,6 +1,10 @@
 # Utopia Coder - list of changes
 
-## v1.1.3 (in development)
+## v1.1.4 (in development)
+### Other changes
+- Removed model classes that are no longer present in Flow; Added HasProperties reference.
+
+## v1.1.3 - 1.11.2025
 ### Bugfixes
 - Bugfix to **ScalaType**'s `.withOther(ScalaType)`
 - Classes were previously not recognized as abstract in Scala parsing

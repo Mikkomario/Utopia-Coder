@@ -427,7 +427,7 @@ object TargetingWriter
 			
 			Vector(joinedProp, valuesProp, whereProp)
 		}
-		val selfProp = ComputedProperty("self", visibility = Protected, isOverridden = true)("this")
+		val selfProp = ComputedProperty("self", isOverridden = true)("this")
 		
 		def wrapMethodFor(wrappedAccessType: ScalaType, constructedTypeName: String) =
 			MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(

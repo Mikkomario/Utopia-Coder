@@ -1,6 +1,7 @@
 # Utopia Vault Coder
 
 ## v1.13.1 (in development)
+Compatible with Vault v2.1
 ### Bugfixes
 - Fixed some issues with the software not generating Flow v2.7 -compatible code
 ### Other changes

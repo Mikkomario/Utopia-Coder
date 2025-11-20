@@ -48,7 +48,7 @@ object AccessWriter
 	
 	private lazy val connectionParam = Parameter("connection", connection)
 	
-	private lazy val self = ComputedProperty("self", visibility = Protected, isOverridden = true)("this")
+	private lazy val self = ComputedProperty("self", isOverridden = true)("this")
 	
 	
 	// OTHER    ------------------------------
