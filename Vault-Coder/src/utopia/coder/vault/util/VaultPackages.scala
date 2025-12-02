@@ -33,6 +33,7 @@ object VaultPackages
 		lazy val immutableModels = models/"immutable"
 		lazy val sql = base / "sql"
 		lazy val noSql = base / "nosql"
+		lazy val noSqlTemplate = noSql / "template"
 		lazy val deprecation = noSql / "storable.deprecation"
 		
 		lazy val factories = noSql / "factory"

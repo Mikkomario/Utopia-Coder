@@ -43,7 +43,7 @@ object VaultReferences
 		lazy val hasTable = Reference(templateModels, "HasTable")
 		lazy val hasTableAsTarget = Reference(templateModels, "HasTableAsTarget")
 		lazy val hasIdProperty = Reference(templateModels, "HasIdProperty")
-		lazy val indexed = Reference(noSql / "template", "Indexed")
+		lazy val indexed = Reference(noSqlTemplate, "Indexed")
 		
 		lazy val deprecates = Reference(templateModels, "Deprecates")
 		lazy val deprecatesAfter = Reference(templateModels, "DeprecatesAfter")
@@ -71,7 +71,7 @@ object VaultReferences
 		lazy val subView = Reference(viewAccess, "SubView")
 		lazy val unconditionalView = Reference(viewAccess, "UnconditionalView")
 		lazy val nonDeprecatedView = Reference(viewAccess, "NonDeprecatedView")
-		lazy val filterable = Reference(templateModels, "Filterable")
+		lazy val filterable = Reference(noSqlTemplate, "Filterable")
 		lazy val filterableView = Reference(viewAccess, "FilterableView")
 		lazy val filterableViewWrapper = Reference(viewAccess, "FilterableViewWrapper")
 		lazy val chronoRowFactoryView = Reference(viewAccess, "ChronoRowFactoryView")
