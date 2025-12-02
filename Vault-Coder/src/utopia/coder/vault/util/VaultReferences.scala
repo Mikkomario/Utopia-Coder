@@ -71,6 +71,7 @@ object VaultReferences
 		lazy val subView = Reference(viewAccess, "SubView")
 		lazy val unconditionalView = Reference(viewAccess, "UnconditionalView")
 		lazy val nonDeprecatedView = Reference(viewAccess, "NonDeprecatedView")
+		lazy val filterable = Reference(templateModels, "Filterable")
 		lazy val filterableView = Reference(viewAccess, "FilterableView")
 		lazy val filterableViewWrapper = Reference(viewAccess, "FilterableViewWrapper")
 		lazy val chronoRowFactoryView = Reference(viewAccess, "ChronoRowFactoryView")

@@ -7,7 +7,7 @@ import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference.Flow._
 import utopia.coder.model.scala.datatype._
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.controller.writer.database.{AccessWriter, TargetingWriter}
@@ -687,7 +687,7 @@ object ModelWriter
 		
 		// Prepares the companion object
 		val companionObject = {
-			val dataFactory = ComputedProperty("dataFactory", Set(dataClassRef), isOverridden = true)(
+			val dataFactory = ImmutableValue("dataFactory", Set(dataClassRef), isOverridden = true)(
 				dataClassRef.target)
 			// The StoredFromModelFactory inheritance is simplified if Int IDs are used
 			val (factoryTrait, complete) = {

@@ -356,7 +356,7 @@ object DbModelWriter
 		// Prepares the object data
 		val deprecation = DeprecationStyle.of(classToWrite)
 		
-		val idProp = LazyValue("id", Set(vault.dbProp), isOverridden = true)(
+		val idProp = ImmutableValue("id", Set(vault.dbProp), isOverridden = true)(
 			s"DbPropertyDeclaration(${classToWrite.idDatabasePropName.quoted}, index)")
 		
 		// When converting from XData, converts each property to the "intermediate" state

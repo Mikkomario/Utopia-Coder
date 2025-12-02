@@ -37,7 +37,7 @@ object DbFactoryWriter
 	
 	private val likeSuffix = Name("Like", "Likes", CamelCase.capitalized)
 	
-	private lazy val defaultOrderingProp = LazyValue("defaultOrdering",
+	private lazy val defaultOrderingProp = ImmutableValue("defaultOrdering",
 		explicitOutputType = Some(ScalaType.option(orderBy)), isOverridden = true, isLowMergePriority = true)("None")
 	
 	

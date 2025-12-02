@@ -242,7 +242,7 @@ object TargetingWriter
 		if (filterMethods.nonEmpty || filterProps.nonEmpty || parents.hasSize >= 2 || classToWrite.isDeprecatable ||
 			classToWrite.recordsIndexedCreationTime)
 		{
-			// Extends filter traits of parents, or FilterableView[+Repr]
+			// Extends filter traits of parents, or Filterable[+Repr]
 			// Also, if deprecation is supported, may extend DeprecatableView, TimeDeprecatableView or NullDeprecatableView
 			// If row creation time is recorded & indexed, extends TimelineView
 			val reprType = ScalaType.basic("Repr")
@@ -251,7 +251,7 @@ object TargetingWriter
 				if (filterProps.isEmpty)
 					base
 				else
-					base + TypeRequirement.childOf(ScalaType(filterableView)(reprType))
+					base + TypeRequirement.childOf(ScalaType(filterable)(reprType))
 			}
 			val deprecationProp = classToWrite.deprecationProperty.filterNot { _.isExtension }
 			val deprecationParent = deprecationProp.map[Extension] { prop =>
@@ -268,7 +268,7 @@ object TargetingWriter
 				case Some(parents) => parents.map[Extension] { _(reprType) } ++ deprecationParent ++ timelineParent
 				case None =>
 					Pair(deprecationParent, timelineParent).flatten.notEmpty
-						.getOrElse { Single[Extension](filterableView(reprType)) }
+						.getOrElse { Single[Extension](filterable(reprType)) }
 			}
 			
 			// The model declaration is abstract for generic classes
@@ -561,7 +561,7 @@ object TargetingWriter
 				CodePiece(s"$manyAccessName.$rootName.head")
 		}
 		// Deprecating classes have a separate includingHistory -access point
-		val rootProp = LazyValue(rootName, unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text)
+		val rootProp = ImmutableValue(rootName, unfilteredRootCode.references, isOverridden = true)(unfilteredRootCode.text)
 		/*
 		val comboRootProps = combos.map { combo =>
 			val rawPropName = withPrefix +: combo.childName

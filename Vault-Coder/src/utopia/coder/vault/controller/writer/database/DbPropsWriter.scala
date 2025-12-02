@@ -4,7 +4,7 @@ import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.Private
 import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, LazyValue}
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.model.data.reference.ClassReferences
@@ -120,7 +120,7 @@ object DbPropsWriter
 			LazyValue(prop.name.prop, Set(vault.dbProp), isOverridden = true)(
 				s"${ vault.dbProp.target }.from(table, ${ propParam.name })")
 		}
-		val idProp = LazyValue("id", Set(vault.dbProp), isOverridden = true)("DbPropertyDeclaration(\"id\", index)")
+		val idProp = ImmutableValue("id", Set(vault.dbProp), isOverridden = true)("DbPropertyDeclaration(\"id\", index)")
 		
 		// val defaultIdPropName = classToWrite.idDatabasePropName.quoted
 		/*

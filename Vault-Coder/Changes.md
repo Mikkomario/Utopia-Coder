@@ -7,8 +7,10 @@ Compatible with Vault v2.1
 ### Other changes
 - Targeting is now the default mode
   - Replaced the `T` flag with `NT` (no-targeting)
+- Generated Filter-traits now extend **Filterable** instead of **FilterableView**
 - Value-to-enumeration conversion is now more reliable for Int-based enumerations
 - Generated Int-based in-conditions now use `Condition.indexIn(...)`
+- In some places where `lazy val` was used, `val` is now used instead
 
 ## v1.13 - 1.11.2025
 This version is compatible with **Vault v2.0** and **Flow v2.7**. 
