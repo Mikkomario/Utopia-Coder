@@ -45,7 +45,7 @@ object CustomPropertyType extends FromModelFactory[CustomPropertyType]
 			ensureFunctions(model, Vector("from_value", "to_value", "option_from_value")).flatMap { _ =>
 				// There must be either "parts" -property (multi-column) or "sql" property (single-column)
 				// Plus, the parts must be parseable
-				model("parts").getVector.tryMap { v => CustomPartConversion(v.getModel) }.flatMap { parts =>
+				model("parts").tryVectorWith { v => CustomPartConversion(v.getModel) }.flatMap { parts =>
 					if (parts.nonEmpty || model.containsNonEmpty("sql")) {
 						val valueDataType = {
 							val code = model("value_data_type", "value_type", "data_type").getString

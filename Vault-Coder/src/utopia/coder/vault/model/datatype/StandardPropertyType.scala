@@ -671,8 +671,8 @@ object StandardPropertyType
 	}
 	
 	// Works exactly like Text, except that
-	// a) No default empty value is given (this type is not considered optional)
-	// b) NOT NULL is added to the generated sql type
+	//      a) No default empty value is given (this type is not considered optional)
+	//      b) NOT NULL is added to the generated SQL type
 	case class NonEmptyText(length: Int = 255) extends SingleColumnPropertyType
 	{
 		// ATTRIBUTES   ------------------------

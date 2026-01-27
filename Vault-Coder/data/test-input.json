@@ -131,7 +131,7 @@
           {
             "ref": "Manufacturer",
             "type": "Option[Int]",
-            "doc": "Id of the manufacturer that produced this car, if known"
+            "doc": "ID of the manufacturer that produced this car, if known"
           },
           {
             "name": "weight",

@@ -12,12 +12,12 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Visibility}
 import utopia.coder.vault.model.data.reference.{ClassReferences, TargetingReferences}
 import utopia.coder.vault.model.data.{Class, CombinationData, VaultProjectSetup}
-import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation, Expiration}
+import utopia.coder.vault.model.datatype.StandardPropertyType.{CreationTime, Deprecation, Expiration, GenericValue}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences.vault
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
-import utopia.flow.util.TryExtensions._
+import utopia.flow.util.result.TryExtensions._
 
 import scala.io.Codec
 import scala.util.Success
@@ -93,7 +93,7 @@ object TargetingWriter
 		// Writes the single & plural value access classes, and the primary access classes
 		// NB: Won't generate primary access classes for generic classes
 		Pair(false, true)
-			.tryMap { accessMany =>
+			.tryMapAll { accessMany =>
 				writeAccessValue(targetPackage, classToWrite, parentClassRefs, dbModelRef, accessMany)
 					.flatMap { accessValueRef =>
 						val accessRef = {
@@ -179,6 +179,8 @@ object TargetingWriter
 			val defaultMethodName = if (accessMany || readType.isBothOptionalAndConcrete) "" else ".optional"
 			// When from value yields a try, requires a custom to-value conversion
 			val (methodName, toValue) = {
+				if (readType.isInstanceOf[GenericValue] && !accessMany)
+					".parsingGenericValues.apply(Identity)" -> CodePiece.empty
 				if (readType.yieldsTryFromValue) {
 					if (accessMany)
 						".logging" -> CodePiece.empty

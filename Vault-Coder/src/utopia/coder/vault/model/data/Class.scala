@@ -120,7 +120,7 @@ object Class
  *                      Specify this value only for classes which
  *                      exist in another project and should not generate any files.
  * @param useLongId Whether to use long instead of int in the id property
-  * @param writeGenericAccess Whether a generic access trait should be written for this class (includes combos)
+  * @param hasCombos Whether this class forms combo-classes
  * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
  *                              Generating such a trait is recommended when intending to generate or build multiple
  *                              combinations around this class.
@@ -132,7 +132,7 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
                  packageName: String, customAccessSubPackageName: String, comboIndexColumnNames: Seq[Seq[String]],
                  descriptionLinkName: Option[Name], parents: Seq[Class], description: String, author: String,
                  referenceFrom: Option[Package],
-                 useLongId: Boolean, writeGenericAccess: Boolean, writeCommonComboTrait: Boolean, isGeneric: Boolean)
+                 useLongId: Boolean, hasCombos: Boolean, writeCommonComboTrait: Boolean, isGeneric: Boolean)
 {
 	// ATTRIBUTES   ---------------------------------
 	
@@ -146,9 +146,9 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 		}
 		val props = Pair(
 			Property(linkColumnName, ClassReference(tableName, idName, idType),
-				description = s"Id of the described $name"),
+				description = s"ID of the described $name"),
 			Property(data.Name("descriptionId", CamelCase.lower), ClassReference("description"),
-				description = "Id of the linked description")
+				description = "ID of the linked description")
 		)
 		Class(name + "description", props, "description",
 			description = s"Links ${name.plural} with their descriptions", author = author)

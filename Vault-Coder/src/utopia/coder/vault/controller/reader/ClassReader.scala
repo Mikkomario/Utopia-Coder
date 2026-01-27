@@ -25,7 +25,7 @@ import utopia.flow.generic.model.mutable.DataType.{ModelType, StringType, Vector
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.StringExtensions._
-import utopia.flow.util.TryExtensions._
+import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.logging.Logger
 import utopia.flow.util.{UncertainBoolean, Version}
 
@@ -507,7 +507,7 @@ object ClassReader
 			referenceFrom = classModel("reference_from", "from", "source").string.map(Package.apply),
 			useLongId = classModel("use_long_id").getBoolean,
 			// Writes generic access point if this class has combinations, or if explicitly specified
-			writeGenericAccess = classModel("has_combos", "generic_access", "tree_inheritance")
+			hasCombos = classModel("has_combos", "generic_access", "tree_inheritance")
 				.booleanOr(comboInfo.nonEmpty) || hasManyCombos,
 			writeCommonComboTrait = hasManyCombos,
 			isGeneric = classModel("is_generic", "generic", "is_trait", "trait").getBoolean)

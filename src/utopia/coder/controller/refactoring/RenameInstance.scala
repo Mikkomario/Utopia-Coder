@@ -6,7 +6,7 @@ import utopia.coder.model.scala.declaration.InstanceDeclarationType
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.parse.string.{IterateLines, Regex}
+import utopia.flow.parse.string.{Lines, Regex}
 import utopia.flow.util.logging.Logger
 
 import java.nio.file.Path
@@ -44,7 +44,7 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 		// Locates the target packages
 		targetPackage.locate(sourceRoot)
 			.toVector
-			.tryMap { locatedPackage =>
+			.tryMapAll { locatedPackage =>
 				// Renames the targeted package instances by editing their files
 				locatedPackage.directory
 					.tryIterateChildren { childIter =>
@@ -60,7 +60,7 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 						
 						// Performs the renaming within the primary files
 						filesToRename
-							.tryMap { case (file, from, to) =>
+							.tryMapAll { case (file, from, to) =>
 								// Takes a backup before making any edits
 								backup(file)
 								
@@ -96,12 +96,12 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 					.withDefaultValue(Map.empty)
 				val completedEditPerFile = flatEdits.map { case (_, file, from, _) => file -> from }.toMap
 				
-				sourceRoot.toTree.nodesBelowIterator.filter { _.nav.fileType ~== "scala" }.tryForeach { fileNode =>
+				sourceRoot.toTree.nodesBelowIterator.filter { _.nav.fileType ~== "scala" }.tryUntilFails { fileNode =>
 					val file = fileNode.nav
 					// Reads the package and the imports section of the file in order to see whether
 					// that file is affected by these changes
-					IterateLines
-						.fromPath(file) { iter =>
+					Lines.iterate
+						.path(file) { iter =>
 							val linesIter = iter.pollable
 							ScalaParser.readPackageAndImportsFrom(linesIter)
 						}

@@ -4,7 +4,7 @@ import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.parse.file.FileConflictResolution.Fail
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.logging.Logger
-import utopia.flow.util.TryExtensions._
+import utopia.flow.util.result.TryExtensions._
 
 import java.nio.file.Path
 import scala.collection.mutable

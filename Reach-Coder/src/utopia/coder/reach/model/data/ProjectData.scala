@@ -12,4 +12,4 @@ import utopia.flow.util.Version
   * @param factories Defined component factories
   * @param version Specified project version, if known
   */
-case class ProjectData(name: Name, factories: Vector[ComponentFactory], version: Option[Version] = None)
+case class ProjectData(name: Name, factories: Seq[ComponentFactory], version: Option[Version] = None)

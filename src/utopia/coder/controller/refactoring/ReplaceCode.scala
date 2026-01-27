@@ -4,10 +4,10 @@ import utopia.coder.controller.parsing.scala.ScalaParser
 import utopia.coder.model.refactoring.PackageTarget
 import utopia.coder.model.scala.declaration.InstanceDeclaration
 import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.parse.string.{IterateLines, Regex}
+import utopia.flow.parse.string.{Lines, Regex}
 import utopia.flow.util.Mutate
-import utopia.flow.util.TryExtensions._
 import utopia.flow.util.logging.Logger
+import utopia.flow.util.result.TryExtensions._
 
 import java.nio.file.Path
 import scala.io.Codec
@@ -64,8 +64,7 @@ class ReplaceCode(targetPackage: PackageTarget, identifierRegex: Regex)
 					files
 						.filter { file =>
 							file.fileType == "scala" &&
-								IterateLines.fromPath(file) { _.exists(identifierRegex.existsIn) }
-									.log.getOrElse(false)
+								Lines.iterate.path(file) { _.exists(identifierRegex.existsIn) }.log.getOrElse(false)
 						}
 						// Edits the targeted files
 						.map { edit(_) }

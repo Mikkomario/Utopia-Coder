@@ -5,7 +5,7 @@ import utopia.coder.model.scala.Package
 import utopia.flow.operator.equality.EqualsExtensions._
 import utopia.flow.parse.file.FileConflictResolution.Rename
 import utopia.flow.parse.file.FileExtensions._
-import utopia.flow.util.TryExtensions._
+import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.logging.LogQueue
 
 import java.nio.file.Path

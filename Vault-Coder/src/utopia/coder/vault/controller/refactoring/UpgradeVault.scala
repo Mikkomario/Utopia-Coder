@@ -9,7 +9,7 @@ import utopia.coder.vault.controller.writer.database.AccessWriter
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.immutable.Pair
 import utopia.flow.parse.string.Regex
-import utopia.flow.util.TryExtensions._
+import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.Version
 import utopia.flow.util.logging.Logger
 

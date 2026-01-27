@@ -8,14 +8,14 @@ import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Package
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.{Reference, ScalaType}
+import utopia.coder.reach.model.data.{ComponentFactory, ProjectData, Property}
+import utopia.coder.reach.model.enumeration.{ContainerStyle, ContextType, ReachFactoryTrait}
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.mutable.builder.{CompoundingMapBuilder, CompoundingVectorBuilder}
+import utopia.flow.collection.mutable.builder.{CompoundingMapBuilder, CompoundingSeqBuilder}
 import utopia.flow.generic.model.immutable.Model
 import utopia.flow.generic.model.mutable.DataType.{ModelType, VectorType}
 import utopia.flow.util.StringExtensions._
 import utopia.flow.util.Version
-import utopia.coder.reach.model.data.{ComponentFactory, ProjectData, Property}
-import utopia.coder.reach.model.enumeration.{ContainerStyle, ContextType, ReachFactoryTrait}
 
 import java.nio.file.Path
 import scala.annotation.tailrec
@@ -111,7 +111,7 @@ object ComponentFactoryReader
 	                                   referenceAliases: Map[String, Reference], projectAuthor: String)
 	                                  (implicit naming: NamingRules) =
 	{
-		val builder = new CompoundingVectorBuilder[ComponentFactory]()
+		val builder = new CompoundingSeqBuilder[ComponentFactory]()
 		// Reads all models and packages and then converts them to component factories
 		resolveReferences(componentModelsIteratorFrom(componentsModel, basePackage).toVector) { (models, unresolvedBuilder) =>
 			models.foreach { case (model, pck) =>
@@ -151,7 +151,7 @@ object ComponentFactoryReader
 	{
 		def propsFrom(propName: String, moreNames: String*) =
 			model(propName +: moreNames).getVector
-				.tryMap { v => propertyFrom(v.getModel, packageAliases, referenceAliases)(factoryReferences) }
+				.tryMapAll { v => propertyFrom(v.getModel, packageAliases, referenceAliases)(factoryReferences) }
 		
 		// Makes sure the property references can be resolved first
 		propsFrom("properties", "props").flatMap { props =>

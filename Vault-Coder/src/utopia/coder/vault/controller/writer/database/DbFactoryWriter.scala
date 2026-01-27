@@ -75,7 +75,7 @@ object DbFactoryWriter
 				dbPropsOrDbModelRef, targeting)
 		// Case: Concrete factory => Just implements the XDbFactory object
 		else {
-			// Implements the primary from model method
+			// Implements the primary from-model method
 			val fromModel = fromModelMethodFor(classToWrite, modelRefs.stored, modelRefs.data, targeting)
 			File(factoryPackage,
 				ObjectDeclaration(

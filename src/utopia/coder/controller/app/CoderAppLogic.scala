@@ -14,7 +14,7 @@ import utopia.flow.time.TimeExtensions._
 import utopia.flow.util.EitherExtensions._
 import utopia.flow.util.NotEmpty
 import utopia.flow.util.StringExtensions._
-import utopia.flow.util.TryExtensions._
+import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.console.ConsoleExtensions._
 import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
 import utopia.flow.util.logging.Logger

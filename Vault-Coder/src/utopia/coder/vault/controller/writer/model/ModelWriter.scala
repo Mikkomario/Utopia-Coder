@@ -16,7 +16,7 @@ import utopia.coder.vault.model.data.{Class, Property, VaultProjectSetup}
 import utopia.coder.vault.util.ClassMethodFactory
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.CollectionExtensions.{RichIterable, _}
-import utopia.flow.collection.immutable.{Empty, Pair, Single}
+import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq, Pair, Single}
 import utopia.flow.util.StringExtensions._
 
 import scala.io.Codec
@@ -597,13 +597,15 @@ object ModelWriter
 		val idType = classToWrite.idType.toScala
 		// Accepts id and data -parameters
 		val constructionParams = Vector(
-			Parameter("id", idType, description = s"id of this ${ classToWrite.name.doc } in the database"),
+			Parameter("id", idType, description = s"ID of this ${ classToWrite.name.doc } in the database"),
 			Parameter("data", dataClassRef, description = s"Wrapped ${ classToWrite.name.doc } data")
 		)
 		val wrap = MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
 			Parameter("data", dataClassRef))("copy(data = data)")
 		
-		// Prepares class data
+		val isTrait = classToWrite.isGeneric || classToWrite.hasCombos
+		
+		// Prepares class or main trait data
 		val storedClass = {
 			// When inheriting other classes, extends their YData with StoredYLike[Data, Repr]
 			val inheritedExtensions = parentClassReferences.flatMap[Extension] { refs =>
@@ -652,16 +654,19 @@ object ModelWriter
 							val accessor =
 								if (setup.modelCanReferToDB) Some(accessorFor(classToWrite, targeted)) else None
 							
-							(stored :+[Extension] fromIdFactory, accessor.emptyOrSingle :+ wrappedFactory)
+							(stored :+[Extension] fromIdFactory,
+								OptimizedIndexedSeq.concat(accessor, toModel, Single(wrappedFactory)))
 						}
 					}
 					
-					(customExtensions :+[Extension] factoryWrapper, customProperties, Set(wrap, withId))
+					(customExtensions :+[Extension] factoryWrapper, customProperties,
+						Set(withId) ++ (if (classToWrite.hasCombos) None else Some(wrap)))
 			}
-			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database"
+			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database.${
+				classToWrite.description.prependIfNotEmpty(" \n") }"
 			
 			// Writes either a class or a trait
-			if (classToWrite.isGeneric)
+			if (isTrait)
 				TraitDeclaration(
 					name = className,
 					extensions = customExtensions ++ inheritedExtensions,
@@ -697,14 +702,13 @@ object ModelWriter
 						s"model(\"id\").tryLong.map { apply(_, data) }")
 					(vault.storedFromModelFactory, Some(complete))
 				}
-				else {
+				else
 					(vault.standardStoredFactory, None)
-				}
 			}
 			
 			val (applyToConcrete, nestedConcrete) = {
-				// Case: Generic trait => Provides access to a concrete implementation + from model parsing
-				if (classToWrite.isGeneric) {
+				// Case: Generic trait => Provides access to a concrete implementation
+				if (isTrait) {
 					val concreteClassName = s"_$className"
 					val constructConcrete = s"$concreteClassName(${
 						constructionParams.map { _.name }.mkString(", ") })"

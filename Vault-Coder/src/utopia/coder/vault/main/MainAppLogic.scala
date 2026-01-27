@@ -21,7 +21,7 @@ import utopia.flow.collection.template.MapAccess
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.time.Today
 import utopia.flow.util.EitherExtensions._
-import utopia.flow.util.TryExtensions._
+import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
 import utopia.flow.util.logging.Logger
 import utopia.flow.util.{Mutate, Version}
@@ -321,7 +321,7 @@ object MainAppLogic extends CoderAppLogic
 		}
 		
 		// Writes the enumerations
-		data.enumerations.tryMap { EnumerationWriter(_) }
+		data.enumerations.tryMapAll { EnumerationWriter(_) }
 			// Writes project documentation
 			.flatMap { _ => DocumentationWriter(data, path("md")) }
 			// Writes the tables document, which is referred to later, also
@@ -334,7 +334,7 @@ object MainAppLogic extends CoderAppLogic
 						targetingByDefault)
 						.flatMap { classRefs =>
 							// Finally writes the combined models
-							combosByClass.tryForeach { case (parent, combos) =>
+							combosByClass.tryUntilFails { case (parent, combos) =>
 								// Provides alternative mapping in case of certain inheriting combo-classes,
 								// where classes are transformed
 								lazy val simplifiedRefs = classRefs.mapKeys { _.name.singularIn(CamelCase.capitalized) }
@@ -351,7 +351,7 @@ object MainAppLogic extends CoderAppLogic
 										Success(None)
 								}
 								commonComboTrait.flatMap { commonComboTrait =>
-									combos.tryForeach {
+									combos.tryUntilFails {
 										writeCombo(_, safeClassRefMap, commonComboTrait, targetingByDefault)
 									}
 								}
@@ -386,19 +386,19 @@ object MainAppLogic extends CoderAppLogic
 		
 		// Case: All remaining classes may be written => Writes and returns
 		if (pendingClasses.isEmpty)
-			readyClasses.tryMap(write).map { classReferenceMap ++ _ }
+			readyClasses.tryMapAll(write).map { classReferenceMap ++ _ }
 		// Case: No class may be written => Logs a warning and writes without proper references
 		else if (readyClasses.isEmpty) {
 			println(s"Warning: ${ pendingClasses.size } classes can't resolve their inheritances:")
 			pendingClasses.foreach { c => println(s"\t- ${ c.name.className } extends ${
 				c.parents.map { _.name.className }.mkString(" with ") }") }
 			
-			pendingClasses.tryMap(write).map { classReferenceMap ++ _ }
+			pendingClasses.tryMapAll(write).map { classReferenceMap ++ _ }
 		}
 		// Case: Some may be written while some can't
 		//       => Writes the immediately available classes and uses recursion to write the rest
 		else
-			readyClasses.tryMap(write).flatMap { newRefs =>
+			readyClasses.tryMapAll(write).flatMap { newRefs =>
 				writeClassesInOrder(pendingClasses, combosByClass, classReferenceMap ++ newRefs, tablesRef,
 					descriptionLinkObjects, targetingByDefault)
 			}

@@ -94,7 +94,7 @@ object AccessWriter
 	 *         None if these traits would not have been generated.
 	 */
 	def generateReferences(accessPackage: Package, classToWrite: Class)(implicit naming: NamingRules) = {
-		if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
+		if (classToWrite.hasCombos || classToWrite.isGeneric) {
 			val many = Reference(packageFor(accessPackage/"many", classToWrite),
 				((manyPrefix +: classToWrite.name) + accessTraitSuffix + genericAccessSuffix).className)
 			val single = Reference(packageFor(accessPackage/"single", classToWrite),
@@ -490,7 +490,7 @@ object AccessWriter
 			else {
 				val pullIdCode = classToWrite.idType.optional.fromValueCode(s"pullColumn(index)")
 				Some(ComputedProperty("id", pullIdCode.references, implicitParams = Single(connectionParam),
-					description = s"Unique id of the accessible ${ classToWrite.name }. None if no ${
+					description = s"Unique ID of the accessible ${ classToWrite.name }. None if no ${
 						classToWrite.name } was accessible.")(pullIdCode.text))
 			}
 		}
@@ -500,7 +500,7 @@ object AccessWriter
 		
 		// Writes the more generic trait version (-Like) first, if one is requested
 		val parentRef = {
-			if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
+			if (classToWrite.hasCombos || classToWrite.isGeneric) {
 				val item = GenericType.covariant("A",
 					description = s"Type of read (${ classToWrite.name.pluralDoc } -like) instances")
 				val itemType = item.toScalaType
@@ -651,7 +651,7 @@ object AccessWriter
 		val applyDec = MethodDeclaration("apply", Set(singleIdAccessRef),
 			returnDescription = s"An access point to that ${ className.doc }")(
 			Parameter("id", idType.toScala,
-				description = s"Database id of the targeted ${ className.doc }"))(
+				description = s"Database ID of the targeted ${ className.doc }"))(
 			s"${ singleIdAccessRef.target }(id)")
 		// Defines .filterDistinct(Condition) or .distinct(Condition) method for creating new unique access points
 		// The implementation depends on whether this root access point defines any conditions
@@ -793,7 +793,7 @@ object AccessWriter
 		
 		// Writes the more generic trait version (-Like) first, if one is requested
 		val parentRef = {
-			if (classToWrite.writeGenericAccess || classToWrite.isGeneric) {
+			if (classToWrite.hasCombos || classToWrite.isGeneric) {
 				// WET WET
 				val item = GenericType.covariant("A",
 					description = s"Type of read (${ classToWrite.name.pluralDoc } -like) instances")

@@ -51,7 +51,7 @@ object CombinedModelWriter
 			TraitDeclaration(
 				name = (combinedPrefix +: parent.name).className,
 				genericTypes = Single(repr),
-				extensions = standardExtensions(parent, modelRefs, reprType),
+				extensions = standardExtensions(modelRefs, reprType),
 				properties = standardProperties(parent.localName, modelRefs.stored),
 				description = s"Common trait for combinations that add additional data to ${ parent.name.pluralDoc }",
 				author = parent.author,
@@ -100,7 +100,7 @@ object CombinedModelWriter
 		
 		val traitExtensions = combinedTraitRef match {
 			case Some(combinedTrait) => Single[Extension](combinedTrait(traitType))
-			case None => standardExtensions(data.parentClass, parentRefs, traitType)
+			case None => standardExtensions(parentRefs, traitType)
 		}
 		
 		// If the parent is defined with different names in this trait and the parent trait, implements the rename
@@ -163,12 +163,10 @@ object CombinedModelWriter
 	}
 	
 	// Generates the extensions applied to the highest level combined model -trait
-	private def standardExtensions(parent: data.Class, parentRefs: ClassModelReferences, reprType: ScalaType) = {
-		// Provides implicit access to the data model (because that's where most of the properties are)
-		val extender: Extension = Reference.flow.extender(parentRefs.data)
+	private def standardExtensions(parentRefs: ClassModelReferences, reprType: ScalaType) = {
+		// Extends the stored version, and the factory wrapper trait
 		val factory: Extension = parentRefs.factoryWrapper(parentRefs.stored, reprType)
-		
-		Vector[Extension](extender, vault.hasId(parent.idType.toScala), factory)
+		Pair[Extension](parentRefs.stored, factory)
 	}
 	
 	// Generates the properties placed to the highest level combined model -trait
@@ -179,9 +177,9 @@ object CombinedModelWriter
 		Vector(
 			parentProp(parentPropName, parentType, parentName.doc),
 			// Provides direct access to parent.id
-			ComputedProperty("id", description = s"Id of this ${ parentName.doc } in the database",
+			ComputedProperty("id", description = s"ID of this ${ parentName.doc } in the database",
 				isOverridden = setup.modelCanReferToDB)(s"$parentPropName.id"),
-			ComputedProperty("wrapped", isOverridden = true)(s"$parentPropName.data"),
+			ComputedProperty("data", isOverridden = true)(s"$parentPropName.data"),
 			ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)(parentPropName))
 	}
 	
