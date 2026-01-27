@@ -11,10 +11,10 @@ import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedPro
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences, GenericDbModelRefs}
-import utopia.flow.collection.CollectionExtensions._
 import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.util.StringExtensions._
 
@@ -193,7 +193,7 @@ object DbModelWriter
 		
 		// Generates withX for all class properties, except for those already defined in parents
 		val withMethods = classToWrite.properties.view.filterNot { _.isDirectExtension }
-			.flatMap { withPropertyMethods(_, buildCopyName, "A new copy of this model with the specified ") }.toSet
+			.map { withPropertyMethod(_, buildCopyName, "A new copy of this model with the specified ") }.toSet
 		val withRenameImplementations = classToWrite.properties.flatMap { prop =>
 			prop.rename.map { case (original, implementation) =>
 				val paramName = original.prop
@@ -376,7 +376,7 @@ object DbModelWriter
 		
 		// Implements withId(...) & withX(...) methods
 		val withId = withIdMethod(classToWrite, "apply")
-		val withMethods = classToWrite.properties.flatMap { withPropertyMethods(_) }
+		val withMethods = classToWrite.properties.map { withPropertyMethod(_) }
 		
 		// Certain properties differ between concrete classes and abstract traits
 		val (constructionParams, customExtensions, customProps, customMethods) = dbPropsData match {
@@ -553,8 +553,8 @@ object DbModelWriter
 					
 					// Implements withX(...) functions and the withId(...) function,
 					// but only if not already defined in parent traits
-					val withMethods = classToWrite.properties.filterNot { _.isDirectExtension }.flatMap { prop =>
-						withPropertyMethods(prop, "copy", "A new copy of this model with the specified ")
+					val withMethods = classToWrite.properties.filterNot { _.isDirectExtension }.map { prop =>
+						withPropertyMethod(prop, "copy", "A new copy of this model with the specified ")
 					}
 					val withId = if (classToWrite.isExtension) None else Some(withIdMethod(classToWrite, "copy"))
 					
@@ -650,26 +650,26 @@ object DbModelWriter
 		MethodDeclaration("withId", isOverridden = true)(
 			Parameter("id", classToWrite.idType.toScala))(s"$assignFunctionName(id = Some(id))")
 	
-	private def withPropertyMethods(property: Property, calledMethodName: String = "apply",
-	                                returnDescriptionStart: String = "A model containing only the specified ")
+	private def withPropertyMethod(property: Property, calledMethodName: String = "apply",
+	                               returnDescriptionStart: String = "A model containing only the specified ")
 	                               (implicit naming: NamingRules) =
 	{
 		val concreteProp = property.concrete
 		concreteProp.oneOrManyDbVariants match {
 			// Case: The property matches a single column => generates one withX -method
 			case Left(dbProp) =>
-				Single(withDbPropertyMethod(dbProp, concreteProp.description, calledMethodName = calledMethodName,
-					returnDescriptionStart = returnDescriptionStart, isOverridden = true))
-			// Case: The property matches multiple columns => generates partial and full withX method
-			// variants
+				withDbPropertyMethod(dbProp, concreteProp.description, calledMethodName = calledMethodName,
+					returnDescriptionStart = returnDescriptionStart, isOverridden = true)
+			// Case: The property matches multiple columns => generates partial and full withX method variants
 			case Right(dbProps) =>
-				val extraDescription = s", which is part of the property ${ concreteProp.name }"
+				// val extraDescription = s", which is part of the property ${ concreteProp.name }"
+				/*
 				val partMethods = dbProps.map { dbProp =>
 					// NB: The accepted parameter type may be incorrect
 					withDbPropertyMethod(dbProp, returnDescriptionSuffix = extraDescription,
 						calledMethodName = calledMethodName, returnDescriptionStart = returnDescriptionStart)
-				}
-				partMethods :+ withMethod(concreteProp, dbProps, concreteProp.dataType.toScala, concreteProp.description,
+				}*/
+				withMethod(concreteProp, dbProps, concreteProp.dataType.toScala, concreteProp.description,
 					s" (sets all ${dbProps.size} values)", calledMethodName, returnDescriptionStart,
 					isOverridden = true)
 		}

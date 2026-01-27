@@ -253,7 +253,7 @@ object TargetingWriter
 				if (filterProps.isEmpty)
 					base
 				else
-					base + TypeRequirement.childOf(ScalaType(filterable)(reprType))
+					base + TypeRequirement.childOf(ScalaType(filterableView)(reprType))
 			}
 			val deprecationProp = classToWrite.deprecationProperty.filterNot { _.isExtension }
 			val deprecationParent = deprecationProp.map[Extension] { prop =>

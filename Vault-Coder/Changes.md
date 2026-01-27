@@ -4,6 +4,8 @@
 Compatible with Vault v2.1
 ### Bugfixes
 - Fixed some issues with the software not generating Flow v2.7 -compatible code
+- **UncertainBoolean** value conversions were updated
+- When timestamp-property -based filtering is applied, the **Repr** type is now required to be **FilterableView**
 ### Other changes
 - Targeting is now the default mode
   - Replaced the `T` flag with `NT` (no-targeting)
@@ -12,6 +14,7 @@ Compatible with Vault v2.1
 - Value-to-enumeration conversion is now more reliable for Int-based enumerations
 - Generated Int-based in-conditions now use `Condition.indexIn(...)`
 - In some places where `lazy val` was used, `val` is now used instead
+- The storedLike -traits now extend **StoredModelConvertible**
 
 ## v1.13 - 1.11.2025
 This version is compatible with **Vault v2.0** and **Flow v2.7**. 

@@ -747,6 +747,7 @@ object StandardPropertyType
 		// IMPLEMENTED  ----------------------
 		
 		override def optional = this
+		override def isBothOptionalAndConcrete = true
 		
 		override def emptyValue: CodePiece = uncertainBoolean.targetCode
 		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
@@ -1536,23 +1537,23 @@ object StandardPropertyType
 	{
 		// ATTRIBUTES   --------------------------
 		
-		override lazy val sqlConversions = super.sqlConversions.map { _.modifyTarget(columnNameSuffix = abbreviation) }
+		override val sqlConversions = super.sqlConversions.map { _.modifyTarget(columnNameSuffix = abbreviation) }
 		
 		
 		// IMPLEMENTED  --------------------------
 		
-		override protected def delegate: PropertyType = DoubleNumber
-		override def scalaType: ScalaType = paradigm.distance
+		override protected val delegate: PropertyType = DoubleNumber
+		override val scalaType: ScalaType = paradigm.distance
 		
-		override def emptyValue: CodePiece = CodePiece.empty
-		override def nonEmptyDefaultValue: CodePiece = CodePiece.empty
+		override val emptyValue: CodePiece = CodePiece.empty
+		override val nonEmptyDefaultValue: CodePiece = CodePiece.empty
 		
-		override def defaultPropertyName: Name = "distance"
-		override def defaultPartNames: Seq[Name] = Empty
-		override def defaultMutability: Option[Mutability] = None
+		override val defaultPropertyName: Name = "distance"
+		override val defaultPartNames: Seq[Name] = Empty
+		override val defaultMutability: Option[Mutability] = None
 		
-		override def supportsDefaultJsonValues: Boolean = true
-		override protected def yieldsTryFromDelegate: Boolean = false
+		override val supportsDefaultJsonValues: Boolean = true
+		override protected val yieldsTryFromDelegate: Boolean = false
 		
 		override protected def toDelegateCode(instanceCode: String): CodePiece =
 			CodePiece(s"$instanceCode.toUnit(DistanceUnit.$unitName)", Set(paradigm.distanceUnit))

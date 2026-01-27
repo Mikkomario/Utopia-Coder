@@ -553,7 +553,7 @@ object ModelWriter
 				val stored = vault.stored(dataType, classToWrite.idType.toScala)
 				val fromIdFactory = vault.fromIdFactory(ScalaType.int, reprType)
 				
-				Pair[Extension](stored, fromIdFactory)
+				Vector[Extension](stored, vault.storedModelConvertible(dataType), fromIdFactory)
 			}
 		}
 		
