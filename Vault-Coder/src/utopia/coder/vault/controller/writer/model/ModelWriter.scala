@@ -623,7 +623,7 @@ object ModelWriter
 				// Case: Implementing trait or class => Specifies the implementation required for a stored class
 				case None =>
 					val factoryWrapper = factoryWrapperRef(dataClassRef, classType)
-					val withId = if (isTrait) Some(withIdFor(classToWrite)) else None
+					val withId = if (isTrait) None else Some(withIdFor(classToWrite))
 					
 					// If Vault references are allowed, provides the access function
 					val (customExtensions, customProperties) = {

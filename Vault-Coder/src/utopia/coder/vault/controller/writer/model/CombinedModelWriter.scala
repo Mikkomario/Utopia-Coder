@@ -1,13 +1,11 @@
 package utopia.coder.vault.controller.writer.model
 
-import utopia.coder.model.data.{Name, NamingRules}
-import utopia.coder.model.enumeration.NamingConvention.CamelCase
+import utopia.coder.model.data.NamingRules
 import utopia.coder.model.scala.Visibility.{Private, Protected}
-import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
+import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Parameter, Parameters}
-import utopia.coder.vault.model.data
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, CombinationReferences}
 import utopia.coder.vault.model.data.{CombinationData, VaultProjectSetup}
 import utopia.flow.collection.immutable.{Pair, Single}
@@ -22,42 +20,7 @@ import scala.io.Codec
   */
 object CombinedModelWriter
 {
-	// ATTRIBUTES   ----------------------
-	
-	private val combinedPrefix = Name("Combined", "Combined", CamelCase.capitalized)
-	
-	
 	// OTHER    --------------------------
-	
-	/**
-	 * Writes a common trait for all combined classes.
-	 * This trait contains the commonly shared features between these combinations.
-	 * @param parent The primary component (class) within the combinations
-	 * @param modelRefs References to various files generated for 'parent'
-	 * @param setup Implicit project setup
-	 * @param codec Implicit codec used when writing the file
-	 * @param naming Implicit naming rules applied
-	 * @return Combination related references. Failure if file writing failed.
-	 */
-	@deprecated("With the new implementation style (the stored version being a trait), this method is no longer needed", "v1.13.1")
-	def writeGeneralCombinationTrait(parent: data.Class, modelRefs: ClassModelReferences)
-	                                (implicit setup: VaultProjectSetup, codec: Codec, naming: NamingRules) =
-	{
-		val repr = GenericType.covariant("Repr", description = "Type of the implementing class")
-		val reprType = repr.toScalaType
-		
-		File(setup.combinedModelPackage/parent.packageName,
-			TraitDeclaration(
-				name = (combinedPrefix +: parent.name).className,
-				genericTypes = Single(repr),
-				extensions = standardExtensions(modelRefs, reprType),
-				properties = standardProperties(parent.localName, modelRefs.stored),
-				description = s"Common trait for combinations that add additional data to ${ parent.name.pluralDoc }",
-				author = parent.author,
-				since = DeclarationDate.versionedToday
-			)
-		).write()
-	}
 	
 	/**
 	 * Writes the combination of two model classes
@@ -96,7 +59,7 @@ object CombinedModelWriter
 		val comboTrait = TraitDeclaration(
 			name = traitName,
 			extensions = standardExtensions(parentRefs, traitType),
-			properties = standardProperties(parentName, parentRefs.stored) :+ childProp,
+			properties = Single(childProp),
 			description = data.description
 				.nonEmptyOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
 			author = data.author,
@@ -116,8 +79,12 @@ object CombinedModelWriter
 			visibility = Private,
 			constructionParams = constructorParams,
 			extensions = Single(traitType),
-			methods = Set(MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
-				Parameter("factory", parentRefs.data))("copy(data = factory)")),
+			methods = Set(
+				MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
+					Parameter("factory", parentRefs.data))("copy(data = factory)"),
+				MethodDeclaration("withId", isOverridden = true)(Parameter("id", data.parentClass.idType.toScala))(
+					"copy(id = id)")
+			),
 			isCaseClass = true
 		)
 		
@@ -145,21 +112,7 @@ object CombinedModelWriter
 	// Generates the extensions applied to the highest level combined model -trait
 	private def standardExtensions(parentRefs: ClassModelReferences, reprType: ScalaType) = {
 		// Extends the stored version, and the factory trait with a custom Repr type
-		Pair[Extension](parentRefs.stored, parentRefs.factory(reprType))
-	}
-	
-	// Generates the properties placed to the highest level combined model -trait
-	private def standardProperties(parentName: Name, parentType: ScalaType)
-	                              (implicit naming: NamingRules, setup: VaultProjectSetup) =
-	{
-		val parentPropName = parentName.prop
-		Vector(
-			parentProp(parentPropName, parentType, parentName.doc),
-			// Provides direct access to parent.id
-			ComputedProperty("id", description = s"ID of this ${ parentName.doc } in the database",
-				isOverridden = setup.modelCanReferToDB)(s"$parentPropName.id"),
-			ComputedProperty("data", isOverridden = true)(s"$parentPropName.data"),
-			ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)(parentPropName))
+		Pair[Extension](parentRefs.stored, parentRefs.factoryWrapper(parentRefs.data, reprType))
 	}
 	
 	private def parentProp(name: String, dataType: ScalaType, docName: String) =
