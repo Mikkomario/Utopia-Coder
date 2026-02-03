@@ -108,7 +108,7 @@ object ParseModelCode
 		}
 		
 		// Prepares the parameters for the actual constructor
-		val assignValues = finalAssignments.reduceOption { _.append(_, ", \n") }.getOrElse(CodePiece.empty)
+		val assignValues = finalAssignments.reduceOption { _.append(_, ", ") }.getOrElse(CodePiece.empty)
 		// Prepares the actual constructor
 		val constructResult = {
 			// Case: A generic trait => Utilizes the generic apply(...) function

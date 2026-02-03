@@ -1537,11 +1537,6 @@ object StandardPropertyType
 	{
 		// ATTRIBUTES   --------------------------
 		
-		override val sqlConversions = super.sqlConversions.map { _.modifyTarget(columnNameSuffix = abbreviation) }
-		
-		
-		// IMPLEMENTED  --------------------------
-		
 		override protected val delegate: PropertyType = DoubleNumber
 		override val scalaType: ScalaType = paradigm.distance
 		
@@ -1554,6 +1549,11 @@ object StandardPropertyType
 		
 		override val supportsDefaultJsonValues: Boolean = true
 		override protected val yieldsTryFromDelegate: Boolean = false
+		
+		override val sqlConversions = super.sqlConversions.map { _.modifyTarget(columnNameSuffix = abbreviation) }
+		
+		
+		// IMPLEMENTED  --------------------------
 		
 		override protected def toDelegateCode(instanceCode: String): CodePiece =
 			CodePiece(s"$instanceCode.toUnit(DistanceUnit.$unitName)", Set(paradigm.distanceUnit))

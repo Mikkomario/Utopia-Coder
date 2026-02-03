@@ -21,9 +21,9 @@ import utopia.flow.collection.template.MapAccess
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.time.Today
 import utopia.flow.util.EitherExtensions._
-import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.console.{ArgumentSchema, CommandArguments}
 import utopia.flow.util.logging.Logger
+import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.{Mutate, Version}
 import utopia.flow.view.immutable.caching.Lazy
 
@@ -341,20 +341,7 @@ object MainAppLogic extends CoderAppLogic
 								val safeClassRefMap = MapAccess { c: Class =>
 									classRefs.getOrElse(c, simplifiedRefs(c.name.singularIn(CamelCase.capitalized)))
 								}
-								
-								// May write a generic combination trait first
-								val commonComboTrait = {
-									if (parent.writeCommonComboTrait)
-										CombinedModelWriter.writeGeneralCombinationTrait(parent, safeClassRefMap(parent))
-											.map { Some(_) }
-									else
-										Success(None)
-								}
-								commonComboTrait.flatMap { commonComboTrait =>
-									combos.tryUntilFails {
-										writeCombo(_, safeClassRefMap, commonComboTrait, targetingByDefault)
-									}
-								}
+								combos.tryUntilFails { writeCombo(_, safeClassRefMap, targetingByDefault) }
 							}
 						}
 				}
@@ -491,38 +478,37 @@ object MainAppLogic extends CoderAppLogic
 	}
 	
 	private def writeCombo(combination: CombinationData, classRefsMap: MapAccess[Class, ClassReferences],
-	                       commonComboTraitRef: Option[Reference], targetingByDefault: Boolean)
+	                       targetingByDefault: Boolean)
 	                      (implicit setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		val parentRefs = classRefsMap(combination.parentClass)
 		val childRefs = classRefsMap(combination.childClass)
 		
 		// Writes the combo class / trait
-		CombinedModelWriter(combination, parentRefs.model, childRefs.stored, commonComboTraitRef)
-			.flatMap { combinedRefs =>
-				// Writes the DB factory class
-				CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory,
-					targetingByDefault)
-					.flatMap { comboFactoryRef =>
-						// Combo access traits are not written in targeting mode
-						if (targetingByDefault)
-							Success(())
-						else
-							parentRefs.genericUniqueAccessTrait
-								.toTry { new IllegalStateException(
-									"No generic unique access trait exists for a combined class") }
-								.flatMap { genericUniqueAccessTraitRef =>
-									parentRefs.genericManyAccessTrait
-										.toTry { new IllegalStateException(
-											"No generic access trait exists for a combined class") }
-										.flatMap { genericManyAccessTraitRef =>
-											AccessWriter.writeComboAccessPoints(combination, genericUniqueAccessTraitRef,
-												genericManyAccessTraitRef, combinedRefs.combined, comboFactoryRef,
-												parentRefs.dbModel, childRefs.dbModel)
-										}
-								}
-					}
-			}
+		CombinedModelWriter(combination, parentRefs.model, childRefs.stored).flatMap { combinedRefs =>
+			// Writes the DB factory class
+			CombinedFactoryWriter(combination, combinedRefs, parentRefs.dbFactory, childRefs.dbFactory,
+				targetingByDefault)
+				.flatMap { comboFactoryRef =>
+					// Combo access traits are not written in targeting mode
+					if (targetingByDefault)
+						Success(())
+					else
+						parentRefs.genericUniqueAccessTrait
+							.toTry { new IllegalStateException(
+								"No generic unique access trait exists for a combined class") }
+							.flatMap { genericUniqueAccessTraitRef =>
+								parentRefs.genericManyAccessTrait
+									.toTry { new IllegalStateException(
+										"No generic access trait exists for a combined class") }
+									.flatMap { genericManyAccessTraitRef =>
+										AccessWriter.writeComboAccessPoints(combination, genericUniqueAccessTraitRef,
+											genericManyAccessTraitRef, combinedRefs.combined, comboFactoryRef,
+											parentRefs.dbModel, childRefs.dbModel)
+									}
+							}
+				}
+		}
 	}
 	
 	// Generates references as if class files had been written

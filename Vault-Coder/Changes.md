@@ -2,6 +2,10 @@
 
 ## v1.13.1 (in development)
 Compatible with Vault v2.1
+### Breaking changes
+- Stored class versions are now traits instead of case classes
+- Combined models now extend the stored trait
+  - No generic combined model trait is generated anymore
 ### Bugfixes
 - Fixed some issues with the software not generating Flow v2.7 -compatible code
 - **UncertainBoolean** value conversions were updated

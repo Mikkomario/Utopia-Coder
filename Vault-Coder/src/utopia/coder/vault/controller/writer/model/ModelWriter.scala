@@ -620,10 +620,10 @@ object ModelWriter
 					
 					(Pair[Extension](storedLike, dataClassRef), Empty, Set[MethodDeclaration]())
 				
-				// Case: Concrete class => Specifies the implementation required for a stored class
+				// Case: Implementing trait or class => Specifies the implementation required for a stored class
 				case None =>
 					val factoryWrapper = factoryWrapperRef(dataClassRef, classType)
-					val withId = withIdFor(classToWrite)
+					val withId = if (isTrait) Some(withIdFor(classToWrite)) else None
 					
 					// If Vault references are allowed, provides the access function
 					val (customExtensions, customProperties) = {
@@ -660,7 +660,7 @@ object ModelWriter
 					}
 					
 					(customExtensions :+[Extension] factoryWrapper, customProperties,
-						Set(withId) ++ (if (classToWrite.hasCombos) None else Some(wrap)))
+						Set.concat(withId, if (classToWrite.hasCombos) None else Some(wrap)))
 			}
 			val description = s"Represents a ${ classToWrite.name.doc } that has already been stored in the database.${
 				classToWrite.description.prependIfNotEmpty(" \n") }"
