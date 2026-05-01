@@ -7,6 +7,8 @@ import utopia.coder.vault.model.data.{Class, DbProperty}
 import utopia.coder.vault.model.datatype.PropertyType
 import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, EnumValue}
 import utopia.flow.collection.CollectionExtensions._
+import utopia.flow.collection.immutable.Empty
+import utopia.flow.collection.mutable.iterator.{LazyInitIterator, PollableOnce}
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.parse.string.Regex
 import utopia.flow.time.Today
@@ -26,6 +28,11 @@ import scala.util.Success
   */
 object SqlWriter
 {
+	// ATTRIBUTES   --------------------
+	
+	private val vocals = Set('a', 'e', 'i', 'o', 'u', 'y')
+	
+	
 	// OTHER    ------------------------
 	
 	/**
@@ -300,40 +307,178 @@ object SqlWriter
 	def initialsFrom(tableNames: Iterable[String])(implicit naming: NamingRules) = {
 		val convention = naming(TableName)
 		// Splits each table name into parts
-		val allOptions = tableNames.map { name => name -> convention.split(name) }
+		val tableNamesWithParts = tableNames.map { name => name -> convention.split(name) }
 		// Groups by the default initials (1 char from each part)
-		allOptions.groupBy { _._2.map { _.head }.mkString }.flatMap { case (defaultInitials, options) =>
-			// Case: Not unique => Makes unique
-			if (options.hasSize > 1)
-				makeUnique(options, 1)
-			// Case: Unique => Preserves
-			else
-				options.map { _._1 -> defaultInitials }
+		val (uniquePrimaryResults, duplicates) = tableNamesWithParts.groupToSeqsBy { _._2.map { _.head }.mkString }
+			.divideWith { case (initials, originals) =>
+				originals.oneOrMany match {
+					case Left((unique, _)) => Left(unique -> initials)
+					case Right(duplicates) => Right(duplicates -> initials.length)
+				}
+			}
+		
+		// Case: There were no duplicates => Finishes
+		if (duplicates.isEmpty)
+			uniquePrimaryResults.toMap
+		// Case: There were duplicates => Continues using more advanced initial-forming
+		else {
+			val usedInPrimary = uniquePrimaryResults.iterator.map { _._2 }.toSet
+			(uniquePrimaryResults.iterator ++
+				_initialsFrom(
+					duplicates.map { case (duplicates, minLength) =>
+						duplicates.map { case (original, parts) => (original, parts, minLength) } },
+					usedInPrimary))
+				.toMap
+		}
+	}
+	private def _initialsFrom(overlappingGroups: Iterable[Seq[(String, Seq[String], Int)]], used: Set[String]): Seq[(String, String)] = {
+		// Generates unique initials for each duplicate-group
+		val (uniqueResults, duplicateEntries) = overlappingGroups.iterator.flatMap { makeUnique(_, used) }
+			// Checks whether any duplicates were formed between groups
+			.groupMapToSeqs { _._3 } { case (original, parts, _) => original -> parts }
+			.divideWith { case (initials, originals) =>
+				originals.oneOrMany match {
+					case Left((original, _)) => Left(original -> initials)
+					case Right(duplicates) => Right(duplicates -> initials.length)
+				}
+			}
+		
+		// Case: There are no more duplicates => Finishes
+		if (duplicateEntries.isEmpty)
+			uniqueResults
+		// Case: There are some duplicates => Continues recursively
+		else {
+			val nowUsed = used ++ uniqueResults.view.map { _._2 }
+			uniqueResults ++
+				_initialsFrom(
+					duplicateEntries.map { case (originals, lastLength) =>
+						originals.map { case (original, parts) => (original, parts, lastLength) }
+					},
+					nowUsed)
 		}
 	}
 	
-	// Assumes that 1 char from each entry has been tested already
-	// Also assumes that the specified set contains items of identical lengths
-	@tailrec
-	private def makeUnique(options: Iterable[(String, Seq[String])], testedChars: Int): Iterable[(String, String)] = {
-		// Checks whether it is possible to find some index that (with this character count) makes the results distinct
-		options.head._2.indices
-			.find { i =>
-				val partOptions = options.map { _._2(i) }
-				val uniqueStarts = partOptions.map { _.take(testedChars + 1) }.toSet
-				uniqueStarts.size == partOptions.size
-			} match
-		{
-			// Case: Index found => Expands that index
-			case Some(targetIndex) =>
-				options.map { case (tableName, parts) =>
-					tableName -> parts.zipWithIndex
-						.map { case (part, i) => part.take(if (i == targetIndex) testedChars + 1 else 1) }
-						.mkString
-				}
-			// Case: No index found => Increases the amount of characters taken
-			case None => makeUnique(options, testedChars + 1)
+	private def makeUnique(items: Seq[(String, Seq[String], Int)], used: Set[String]): Seq[(String, Seq[String], String)] =
+	{
+		// Increases the "other prefix" complexity between iterations
+		val otherComplexityRange = {
+			if (items.forall { _._2.hasSize(1) })
+				1 to 1
+			else {
+				val longestWordLength = items.iterator.flatMap { _._2 }.map { _.length }.max
+				1 to (longestWordLength + 1)
+			}
 		}
+		otherComplexityRange.iterator
+			.flatMap { otherPrefixLevel =>
+				// Finds the first word that can be used to separate these options
+				targetIndicesIteratorFor(items.view.map { _._2 }).flatMap { i =>
+					val targetWords = items.map { _._2.getOrElse(i, "") }
+					// Case: This word index is distinct
+					//       => Generate unique shortened versions of that word, in order to find unique sets of initials
+					if (targetWords.view.distinct.size == items.size) {
+						// The other words are prefixed using a specific level (which may be increased between iterations)
+						val before = items.map { _._2.view.take(i).map { shorten(_, otherPrefixLevel) }.mkString }
+						val after = items.map { _._2.view.drop(i + 1).map { shorten(_, otherPrefixLevel) }.mkString }
+						
+						// Attempts to convert words in that index into a unique shorter versions
+						uniqueVersionsOf(targetWords)
+							.map { shortenedWords =>
+								items.iterator.zipWithIndex
+									.map { case ((original, parts, minLength), i) =>
+										(original, parts, s"${ before(i) }${ shortenedWords(i) }${ after(i) }",
+											minLength)
+									}
+									.toOptimizedSeq
+							}
+							// Minimum total length must be reached
+							.filter { _.forall { case (_, _, initials, minLength) => initials.length >= minLength } }
+							// Generated initials must be distinct
+							.filter { initials => initials.iterator.map { _._3 }.distinct.size == initials.size }
+							// There must be no overlap with the previously generated initials-sets
+							.filter { _.forNone { case (_, _, initials, _) => used.contains(initials) } }
+					}
+					// Case: This word is not distinct => Continues to the next word
+					else
+						Empty
+				}
+			}
+			// Selects the first valid result
+			.next().map { case (original, parts, initials, _) => (original, parts, initials) }
+	}
+	
+	private def shorten(word: String, prefixLevel: Int) = prefixLevel match {
+		case 1 => word.take(1)
+		case 2 => word.take(2)
+		case 3 => twoCharConsonantPrefixFor(word)
+		case prefixLevel =>
+			val suffixLen = prefixLevel - 2
+			val consonants = word.view.tail.filterNot(vocals.contains).take(suffixLen).mkString
+			if (consonants.length == suffixLen)
+				s"${ word.head }$consonants"
+			else
+				word.take(suffixLen + 1)
+	}
+	
+	private def uniqueVersionsOf(words: Seq[String]) = {
+		val count = words.size
+		
+		// Approach 1: Checks if the initials are different and uses those
+		val option1 = Some(words.map { _.take(1) }).filter { _.iterator.distinct.size == count }
+		// Approach 2: Checks if the first 2 characters are distinct
+		val option2 = LazyInitIterator {
+			Some(words.map { _.take(2) }).filter { _.iterator.distinct.size == count }
+		}
+		// Approach 3: Checks if 1st char + 1 consonant are distinct
+		val option3 = LazyInitIterator {
+			Some(words.map(twoCharConsonantPrefixFor)).filter { _.iterator.distinct.size == count }
+		}
+		// Approach 4: Finds a distinct consonant and appends that
+		val options4 = PollableOnce {
+			appendUniqueCharsTo(words.map { word =>
+				val prefix = twoCharConsonantPrefixFor(word)
+				val otherConsonants = word.drop(1).filterNot(vocals.contains).drop(1)
+				prefix -> otherConsonants
+			})
+		}
+		// Approach 5: Finds and appends distinct characters from each version
+		val options5 = PollableOnce { appendUniqueCharsTo(words.map { word => word.take(2) -> word.drop(2) }) }
+		
+		option1.iterator ++ option2 ++ option3 ++ options4 ++ options5
+	}
+	
+	private def twoCharConsonantPrefixFor(word: String) = word.view.drop(1).find { !vocals.contains(_) } match {
+		case Some(consonant) => s"${word.head}$consonant"
+		case None => word.take(2)
+	}
+	
+	private def appendUniqueCharsTo(options: Seq[(String, String)]) = {
+		// Appends characters until the options become distinct
+		options.zipWithIndex.map { case ((prefix, chars), i) =>
+			val others = options.iterator.zipWithIndex
+				.filter { case ((prefix2, _), i2) => prefix2 == prefix && i2 != i }
+				.map { _._1._2 }.toOptimizedSeq
+			val suffix = (1 to chars.length)
+				.findMap { takeLen =>
+					val suffix = chars.take(takeLen)
+					if (others.exists { _.take(takeLen) == suffix })
+						None
+					else
+						Some(suffix)
+				}
+				.getOrElse(chars)
+			s"$prefix$suffix"
+		}
+	}
+	
+	private def targetIndicesIteratorFor(options: Iterable[Iterable[_]]) = {
+		val count = options.size
+		val sizes = options.map { _.size }
+		val lengthRange = sizes.minMax
+		// Allows one shorter entry, but the others must all have an element at the included position
+		(0 until lengthRange.first).iterator ++
+			(lengthRange.first until lengthRange.second)
+				.takeWhile { len => sizes.existsCount(count - 1) { _ >= len } }
 	}
 	
 	private def writeDocumentation(doc: String)(implicit writer: PrintWriter) = {
