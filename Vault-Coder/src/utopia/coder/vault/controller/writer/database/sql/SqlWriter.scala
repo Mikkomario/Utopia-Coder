@@ -67,11 +67,6 @@ object SqlWriter
 				c.tableName -> refs.toSet
 			}
 			
-			println("\nReferences")
-			references.toVector.sortBy { _._1 }.foreach { case (from, to) =>
-				println(s"$from: ${ to.toOptimizedSeq.sorted.mkString(", ") }")
-			}
-			
 			// Forms the table initials, also
 			val initials = initialsFrom(references.flatMap { case (tableName, refs) => refs + tableName }.toSet)
 			targetPath.writeUsing { writer =>
@@ -126,12 +121,10 @@ object SqlWriter
 		val notReferencingTableNames = remainingTableNames.filterNot { tableName =>
 			references(tableName).exists(remainingTableNames.contains)
 		}
-		println(s"Classes possible to write: [${ notReferencingTableNames.toVector.sorted.mkString(", ") }]")
 		
 		// Case: All classes are referenced at least once (indicates a cyclic loop)
 		//       => Writes one class in two parts
 		if (notReferencingTableNames.isEmpty) {
-			println(s"Resolving a cyclical loop involving: [${ remainingTableNames.toVector.sorted.mkString(", ") }]")
 			// Finds the most referenced remaining class
 			remainingTableNames.iterator.flatMap(references.apply).countAll.toVector.reverseSortBy { _._2 }
 				.iterator.map { _._1 }.filter(remainingTableNames.contains)
