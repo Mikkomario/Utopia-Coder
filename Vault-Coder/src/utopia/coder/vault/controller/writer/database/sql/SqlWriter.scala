@@ -66,13 +66,10 @@ object SqlWriter
 				} }
 				c.tableName -> refs.toSet
 			}
-			// Removes double-references, where both classes refer to each other
-			val doubleReferences = references.map { case (tableName, referredTables) =>
-				val doubleReferenced = referredTables.filter { references.get(_).exists { _.contains(tableName) } }
-				tableName -> doubleReferenced
-			}
-			val cleanedReferences = references.map { case (tableName, referencedTables) =>
-				tableName -> (referencedTables -- doubleReferences(tableName))
+			
+			println("\nReferences")
+			references.toVector.sortBy { _._1 }.foreach { case (from, to) =>
+				println(s"$from: ${ to.toOptimizedSeq.sorted.mkString(", ") }")
 			}
 			
 			// Forms the table initials, also
@@ -95,7 +92,7 @@ object SqlWriter
 				}
 				
 				// Groups the classes by package and writes them
-				writeClasses(writer, initials, classesByTableName.groupBy { _._2.packageName }, cleanedReferences,
+				writeClasses(writer, initials, classesByTableName.groupBy { _._2.packageName }, references,
 					projectPrefix.appendIfNotEmpty("_"), prefixColumnNames)
 			}
 		}
@@ -103,51 +100,113 @@ object SqlWriter
 			Success(targetPath)
 	}
 	
-	// classesByPackageAndTableName: first key is package name (header) and second key is table name
-	// references: Keys and values are both table names
-	@tailrec
+	/**
+	 * Writes table information
+	 * @param writer Writer to use
+	 * @param initialsMap A map that contains a set of initials for each table
+	 * @param classesByPackageAndTableName A two-levels deep map where keys are:
+	 *                                          1. Package name (header)
+	 *                                          1. Table name
+	 *
+	 *                                     And values are the matching classes.
+	 * @param references A map that contains references between tables.
+	 *                      - The keys are referencing table names
+	 *                      - The values are referenced table names (many-to-one)
+	 * @param projectPrefix Prefix added to all generated indices & foreign keys
+	 * @param prefixProperties Whether to prefix column names
+	 * @param naming Implicit naming rules
+	 */
 	private def writeClasses(writer: PrintWriter, initialsMap: Map[String, String],
-	                          classesByPackageAndTableName: Map[String, Map[String, Class]],
-	                          references: Map[String, Set[String]], projectPrefix: String, prefixProperties: Boolean)
+	                         classesByPackageAndTableName: Map[String, Map[String, Class]],
+	                         references: Map[String, Set[String]], projectPrefix: String, prefixProperties: Boolean)
 	                        (implicit naming: NamingRules): Unit =
 	{
 		// Finds the classes which don't make any references to other remaining classes
-		val remainingTableNames = classesByPackageAndTableName.flatMap { _._2.keys }.toSet
-		val notReferencingTableNames = remainingTableNames
-			.filterNot { tableName =>
-				references(tableName)
-					.exists { referencedTableName => remainingTableNames.contains(referencedTableName) }
-			}
-		// Case: All classes are referenced at least once (indicates a cyclic loop) => Writes them in alphabetical order
+		val remainingTableNames = classesByPackageAndTableName.valuesIterator.flatMap { _.keysIterator }.toSet
+		val notReferencingTableNames = remainingTableNames.filterNot { tableName =>
+			references(tableName).exists(remainingTableNames.contains)
+		}
+		println(s"Classes possible to write: [${ notReferencingTableNames.toVector.sorted.mkString(", ") }]")
+		
+		// Case: All classes are referenced at least once (indicates a cyclic loop)
+		//       => Writes one class in two parts
 		if (notReferencingTableNames.isEmpty) {
-			writer.println("\n-- WARNING: Following classes contain a cyclic loop\n")
-			classesByPackageAndTableName.valuesIterator.flatMap { _.valuesIterator }.toVector.sortBy { _.name.singular }
-				.foreach { writeClass(writer, _, initialsMap, projectPrefix, prefixProperties) }
+			println(s"Resolving a cyclical loop involving: [${ remainingTableNames.toVector.sorted.mkString(", ") }]")
+			// Finds the most referenced remaining class
+			remainingTableNames.iterator.flatMap(references.apply).countAll.toVector.reverseSortBy { _._2 }
+				.iterator.map { _._1 }.filter(remainingTableNames.contains)
+				.findMap { tableName =>
+					classesByPackageAndTableName.iterator.findMap { case (packageName, tableClasses) =>
+						tableClasses.get(tableName).map { tableClass => (packageName, tableName, tableClass) }
+					}
+				} match
+			{
+				case Some((partedPackage, partedTable, partedClass)) =>
+					// Writes the class without the foreign keys
+					writer.println(s"\n-- NB: $partedTable is split in order to resolve a cyclic loop\n")
+					val preparedAlterTable = writeClass(writer, partedClass, initialsMap, projectPrefix,
+						prefixProperties, excludeForeignKeys = true)
+					
+					val remainingClasses = (classesByPackageAndTableName(partedPackage) - partedTable).notEmpty match {
+						case Some(remainingPackageClasses) =>
+							classesByPackageAndTableName + (partedPackage -> remainingPackageClasses)
+						case None => classesByPackageAndTableName - partedPackage
+					}
+					
+					// Writes the remaining classes
+					writeClasses(writer, initialsMap, remainingClasses, references, projectPrefix, prefixProperties)
+					
+					// Writes the delayed foreign keys
+					preparedAlterTable.foreach { case (tableName, foreignKeyRows) =>
+						writer.println(s"\n-- Adds missing foreign keys to $partedTable")
+						writer.println(s"ALTER TABLE `$tableName` \n${
+							foreignKeyRows.iterator.map { decl => s"\tADD $decl" }.mkString(", \n") }")
+					}
+				
+				// Case: No referenced table was found (unexpected)
+				//       => Writes the remaining classes in alphabetical order
+				case None =>
+					writer.println("\n-- WARNING: Following classes contain a cyclic loop\n")
+					classesByPackageAndTableName.valuesIterator.flatMap { _.valuesIterator }
+						.toVector.sortBy { _.name.singular }
+						.foreach { writeClass(writer, _, initialsMap, projectPrefix, prefixProperties) }
+			}
 		}
 		// Case: There are some classes which don't reference remaining classes => writes those
 		else {
 			// Writes a single package, including as many classes as possible
 			// Prefers packages which can be finished off, also preferring larger class sets
 			// Package name -> (currently writeable classes, classes which are dependent from other remaining packages)
-			val packagesWithInfo = classesByPackageAndTableName.map { case (packageName, classesByTableName) =>
-				val packageClassTables = classesByTableName.keySet
-				// Writeable = Class only makes references inside this package
-				// Dependent = Class makes references to other remaining packages
-				val (writeableClasses, dependentClasses) = classesByTableName
-					.divideBy { case (tableName, _) =>
-						references.get(tableName)
-							.exists { refs => ((refs & remainingTableNames) -- packageClassTables).nonEmpty }
+			val packagesWithInfo: Map[String, (Map[String, Class], Map[String, Class])] =
+				classesByPackageAndTableName.map { case (packageName, classesByTableName) =>
+					val packageClassTables = classesByTableName.keySet
+					// Writeable = Class only makes references inside this package
+					// Dependent = Class makes references to other remaining packages
+					val (writeableClasses, dependentClasses) = {
+						if (classesByTableName.keysIterator.exists(notReferencingTableNames.contains))
+							classesByTableName
+								.divideBy { case (tableName, _) =>
+									references.get(tableName).exists { refs =>
+										((refs & remainingTableNames) -- packageClassTables).nonEmpty
+									}
+								}
+								.toTuple
+						// Case: None of these classes may be written at this time => Can't initiate this package
+						else
+							(Map[String, Class](), classesByTableName)
 					}
-					.toTuple
-				packageName -> (writeableClasses, dependentClasses)
-			}
+					packageName -> (writeableClasses, dependentClasses)
+				}
 			// Finds the next package to target and starts writing classes within that package
 			val (packageName, (writeableClasses, remainingPackageClasses)) = packagesWithInfo
 				.bestMatch { _._2._2.isEmpty }.maxBy { _._2._1.size }
+			
 			val packageHeader = Name.interpret(packageName, CamelCase.lower).to(Text.allCapitalized).singular
 			writer.println(s"\n--\t$packageHeader\t${"-" * 10}\n")
+			
 			val allRemainingPackageClasses = writePossibleClasses(writer, initialsMap, writeableClasses, references,
 				projectPrefix, prefixProperties) ++ remainingPackageClasses
+			
 			// Prepares the next recursive iteration
 			val remainingClasses = {
 				if (allRemainingPackageClasses.isEmpty)
@@ -190,9 +249,12 @@ object SqlWriter
 		}
 	}
 	
+	// Returns possible declarations to delay, containing 2 values:
+	//      1. Name of the altered table
+	//      2. declarations to add
 	private def writeClass(writer: PrintWriter, classToWrite: Class, initialsMap: Map[String, String],
-	                       projectPrefix: String, prefixProperties: Boolean)
-	                      (implicit naming: NamingRules): Unit =
+	                       projectPrefix: String, prefixProperties: Boolean, excludeForeignKeys: Boolean = false)
+	                      (implicit naming: NamingRules) =
 	{
 		implicit val wr: PrintWriter = writer
 		
@@ -244,66 +306,87 @@ object SqlWriter
 		// Writes the table
 		writer.println(s"CREATE TABLE `$tableName`(")
 		val idBase = s"\t`$idName` ${ classToWrite.idType.sqlType.toSql } PRIMARY KEY AUTO_INCREMENT"
-		if (columns.isEmpty)
-			writer.println(idBase)
-		else {
-			writer.println(s"$idBase, ")
-			
-			val propertyDeclarations = columns.map { case (prop, name) =>
-				val defaultPart = prop.default.mapIfNotEmpty { " DEFAULT " + _ }
-				s"`$name` ${ prop.sqlType.baseTypeSql }${ prop.sqlType.notNullPart }$defaultPart"
+		val delayed = {
+			if (columns.isEmpty) {
+				writer.println(idBase)
+				None
 			}
-			val comboIndexColumnNames = classToWrite.comboIndexColumnNames.map { _.map { prefixColumnName(_) } }
-			val firstComboIndexColumns = comboIndexColumnNames.filter { _.size > 1 }.map { _.head }.toSet
-			val individualIndexDeclarations = columns
-				.filter { case (prop, name) => prop.isIndexed && !firstComboIndexColumns.contains(name) }
-				.map { case (_, name) => s"INDEX $projectPrefix${ classInitials }_${ name }_idx (`$name`)" }
-			val comboIndexDeclarations = comboIndexColumnNames.filter { _.size > 1 }
-				.zipWithIndex.map { case (colNames, index) =>
-				s"INDEX $projectPrefix${ classInitials }_combo_${ index + 1 }_idx (${ colNames.mkString(", ") })"
-			}
-			val foreignKeyDeclarations = namedProps.flatMap { case (prop, columns) =>
-				prop.dataType match {
-					case ClassReference(rawReferencedTableName, rawColumnName, referenceType) =>
-						val refTableName = rawReferencedTableName.table
-						val refInitials = initialsMap(refTableName)
-						val refColumnName = {
-							val base = rawColumnName.column
-							if (prefixProperties)
-								s"${ refInitials }_$base"
-							else
-								base
-						}
-						val columnName = columns.headOption match {
-							case Some((_, name)) => name
-							case None => prop.name.column
-						}
-						val constraintNameBase = {
-							val nameWithoutId = columnName.replace("_id", "")
-							val base = {
-								if (prefixProperties)
-									nameWithoutId
-								else
-									s"${ classInitials }_${ refInitials }_$nameWithoutId"
-							}
-							s"${ base }_ref"
-						}
-						Some(s"CONSTRAINT $projectPrefix${ constraintNameBase }_fk FOREIGN KEY $projectPrefix${
-							constraintNameBase }_idx ($columnName) REFERENCES `$refTableName`(`$refColumnName`) ON DELETE ${
-							if (referenceType.sqlConversions.forall { _.target.isNullable }) "SET NULL" else "CASCADE"
-						}")
-					case _ => None
+			else {
+				writer.println(s"$idBase, ")
+				
+				val propertyDeclarations = columns.map { case (prop, name) =>
+					val defaultPart = prop.default.mapIfNotEmpty { " DEFAULT " + _ }
+					s"`$name` ${ prop.sqlType.baseTypeSql }${ prop.sqlType.notNullPart }$defaultPart"
 				}
+				val comboIndexColumnNames = classToWrite.comboIndexColumnNames.map { _.map { prefixColumnName(_) } }
+				val firstComboIndexColumns = comboIndexColumnNames.filter { _.size > 1 }.map { _.head }.toSet
+				val individualIndexDeclarations = columns
+					.filter { case (prop, name) => prop.isIndexed && !firstComboIndexColumns.contains(name) }
+					.map { case (_, name) => s"INDEX $projectPrefix${ classInitials }_${ name }_idx (`$name`)" }
+				val comboIndexDeclarations = comboIndexColumnNames.filter { _.size > 1 }
+					.zipWithIndex.map { case (colNames, index) =>
+						s"INDEX $projectPrefix${ classInitials }_combo_${ index + 1 }_idx (${ colNames.mkString(", ") })"
+					}
+				val foreignKeyDeclarations = namedProps.flatMap { case (prop, columns) =>
+					prop.dataType match {
+						case ClassReference(rawReferencedTableName, rawColumnName, referenceType) =>
+							val refTableName = rawReferencedTableName.table
+							val refInitials = initialsMap(refTableName)
+							val refColumnName = {
+								val base = rawColumnName.column
+								if (prefixProperties)
+									s"${ refInitials }_$base"
+								else
+									base
+							}
+							val columnName = columns.headOption match {
+								case Some((_, name)) => name
+								case None => prop.name.column
+							}
+							val constraintNameBase = {
+								val nameWithoutId = columnName.replace("_id", "")
+								val base = {
+									if (prefixProperties)
+										nameWithoutId
+									else
+										s"${ classInitials }_${ refInitials }_$nameWithoutId"
+								}
+								s"${ base }_ref"
+							}
+							Some(s"CONSTRAINT $projectPrefix${ constraintNameBase }_fk FOREIGN KEY $projectPrefix${
+								constraintNameBase }_idx ($columnName) REFERENCES `$refTableName`(`$refColumnName`) ON DELETE ${
+								if (referenceType.sqlConversions.forall { _.target.isNullable }) "SET NULL" else "CASCADE"
+							}")
+						case _ => None
+					}
+				}
+				
+				// May delay foreign key -writing
+				val (declarationsToWrite, declarationsToDelay) = {
+					val standard = Vector.concat(propertyDeclarations, individualIndexDeclarations,
+						comboIndexDeclarations)
+					foreignKeyDeclarations.notEmpty match {
+						case Some(foreignKeys) =>
+							if (excludeForeignKeys)
+								standard -> Some(tableName -> foreignKeys)
+							else
+								(standard ++ foreignKeys, None)
+						
+						case None => standard -> None
+					}
+				}
+				
+				declarationsToWrite.dropRight(1).foreach { line => writer.println(s"\t$line, ") }
+				writer.println(s"\t${ declarationsToWrite.last }")
+				
+				declarationsToDelay
 			}
-			
-			val allDeclarations = propertyDeclarations ++ individualIndexDeclarations ++ comboIndexDeclarations ++
-				foreignKeyDeclarations
-			allDeclarations.dropRight(1).foreach { line => writer.println(s"\t$line, ") }
-			writer.println(s"\t${ allDeclarations.last }")
 		}
 		
 		writer.println(")Engine=InnoDB DEFAULT CHARACTER SET utf8 DEFAULT COLLATE utf8_general_ci;")
 		writer.println()
+		
+		delayed
 	}
 	
 	def initialsFrom(tableNames: Iterable[String])(implicit naming: NamingRules) = {
