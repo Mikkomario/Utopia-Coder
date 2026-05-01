@@ -29,11 +29,12 @@ object ProjectData
  *                    Default = empty = each module specifies its own full package paths.
  * @param databaseName Name of the database used in this project. Modules may override this.
  *                     Default = empty = no default database specified.
+ * @param indexPrefix Prefix added to generated SQL indices. Used for ensuring uniqueness (optional).
  * @param namingRules Naming rules to use by default. Modules may override this.
  *                    Default = [[NamingRules.default]].
  * @param defaultMutability Mutability to apply by default. May be overridden. Default = immutable.
  * @param customDataTypes Custom data types used throughout this project.
- *                        May be referenced from all sub-modules.
+ *                        May be referenced from all submodules.
  *                        Specified as a map, where keys are type names which may be referenced and values are the
  *                        actual referenced data types.
  *                        Default = empty.
@@ -47,7 +48,7 @@ object ProjectData
  */
 case class ProjectData(name: Name = Name("Project", CamelCase.capitalized), modulePaths: Seq[ProjectPaths] = Empty,
                        version: Option[Version] = None, rootPackage: Package = Package.empty,
-                       databaseName: Option[Name] = None, namingRules: NamingRules = NamingRules.default,
-                       defaultMutability: Mutability = Immutable,
+                       databaseName: Option[Name] = None, indexPrefix: String = "",
+                       namingRules: NamingRules = NamingRules.default, defaultMutability: Mutability = Immutable,
                        customDataTypes: Map[String, PropertyType] = Map(), author: String = "",
                        prefixColumns: Boolean = false)

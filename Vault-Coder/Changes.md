@@ -8,8 +8,11 @@ Compatible with Vault v2.1
   - No generic combined model trait is generated anymore
 ### Bugfixes
 - Fixed some issues with the software not generating Flow v2.7 -compatible code
+- Table initials are now actually unique
 - **UncertainBoolean** value conversions were updated
 - When timestamp-property -based filtering is applied, the **Repr** type is now required to be **FilterableView**
+### New features
+- Added support for project-specific index-prefixes
 ### Other changes
 - Targeting is now the default mode
   - Replaced the `T` flag with `NT` (no-targeting)

@@ -87,8 +87,9 @@ The input .json file should contain a single object with following properties:
   - `false` (i.e. immutable) by default
 - **"models_without_vault": Boolean (optional)** - Whether model classes can't contain database references 
   (Metropolis-style project) (default = `false`)
-- **"prefix_columns": Boolean (optional)** - Whether sql column names should have a table-name -based prefix 
+- **"prefix_columns": Boolean (optional)** - Whether SQL column names should have a table-name -based prefix 
   (default = `false`)
+- **"index_prefix" / "prefix": String** - Prefix added to all generated SQL indices & foreign keys
 - **"naming": Object (optional)** - An object where you can specify custom naming schemes for the generated documents
   - See [Naming Object Structure](#naming-object-structure) for more details
 - **"types" / "data_types": Object (optional)** - Contains a custom data type object for each key. 
@@ -128,8 +129,9 @@ Multimodal project files support the following properties:
 - **"mutable_props" / "mutable": Boolean (optional)** - True if properties should be considered mutable by default
   - May / will be overridden by module- and property-specific declarations
   - `false` (i.e. immutable) by default
-- **"prefix_columns": Boolean (optional)** - Whether sql column names should have a table-name -based prefix
+- **"prefix_columns": Boolean (optional)** - Whether SQL column names should have a table-name -based prefix
   (default = `false`)
+- **"index_prefix" / "prefix": String** - Prefix added to all generated SQL indices & foreign keys
 - **"naming": Object (optional)** - An object where you can specify custom naming schemes for the generated documents
   - See [Naming Object Structure](#naming-object-structure) for more details
 - **"types" / "data_types": Object (optional)** - Contains a custom data type object for each key.

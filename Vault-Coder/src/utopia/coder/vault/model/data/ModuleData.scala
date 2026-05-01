@@ -21,15 +21,16 @@ import utopia.coder.vault.model.enumeration.Mutability
   * @param instances Introduced class instances in this project
   * @param namingRules Naming rules to use in this project
   * @param version Project version
-  * @param defaultMutability Whether defined properties should be mutable or immutable by default
+  * @param indexPrefix Prefix added to generated SQL indices (used for ensuring uniqueness)
+ * @param defaultMutability Whether defined properties should be mutable or immutable by default
  * @param modelCanReferToDB Whether model classes are allowed to refer to database classes
   * @param prefixColumnNames Whether column names should have a prefix
   */
 case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: Package,
                       databaseName: Option[Name], enumerations: Seq[Enum],
                       classes: Seq[Class], combinations: Seq[CombinationData], instances: Seq[Instance],
-                      namingRules: NamingRules, version: Option[Version], defaultMutability: Mutability,
-                      modelCanReferToDB: Boolean, prefixColumnNames: Boolean)
+                      namingRules: NamingRules, version: Option[Version], indexPrefix: String,
+                      defaultMutability: Mutability, modelCanReferToDB: Boolean, prefixColumnNames: Boolean)
 	extends MaybeEmpty[ModuleData]
 {
 	// COMPUTED ------------------------------

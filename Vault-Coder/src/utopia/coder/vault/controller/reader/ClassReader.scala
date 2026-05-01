@@ -103,8 +103,9 @@ object ClassReader
 		val modules = moduleReferencesFrom(root, rootPath)
 		
 		ProjectData(projectName, modules, root("version").string.map { Version(_) }, rootPackage, databaseName,
-			namingRules, Mutability.forIsMutable(root("mutable_props", "mutable").getBoolean), customTypes,
-			author, root("prefix_columns").getBoolean)
+			root("index_prefix", "prefix").getString, namingRules,
+			Mutability.forIsMutable(root("mutable_props", "mutable").getBoolean), customTypes, author,
+			root("prefix_columns").getBoolean)
 	}
 	
 	private def moduleReferencesFrom(root: Model, rootPath: Path)(implicit log: Logger) =
@@ -161,6 +162,10 @@ object ClassReader
 		val defaultMutability = root("mutable_props", "mutable").boolean match {
 			case Some(customMutability) => Mutability.forIsMutable(customMutability)
 			case None => project.defaultMutability
+		}
+		val indexPrefix = root("index_prefix", "prefix").string match {
+			case Some(prefix) => s"${ project.indexPrefix.appendIfNotEmpty("_") }$prefix"
+			case None => project.indexPrefix
 		}
 		val usePrefixes = root("prefix_columns").booleanOr(project.prefixColumns)
 		
@@ -287,7 +292,7 @@ object ClassReader
 		// Returns class instances, also
 		val instances = classData.flatMap { _._3 }
 		ModuleData(moduleName, modelPackage, dbPackage, databaseName,
-			enumerations, classes, combinations, instances, namingRules, version, defaultMutability,
+			enumerations, classes, combinations, instances, namingRules, version, indexPrefix, defaultMutability,
 			!root("models_without_vault").getBoolean, usePrefixes)
 	}
 	

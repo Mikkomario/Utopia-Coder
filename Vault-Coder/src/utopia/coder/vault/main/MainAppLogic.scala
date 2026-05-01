@@ -130,8 +130,8 @@ object MainAppLogic extends CoderAppLogic
 										.map { _ -> modulePaths }
 								}
 							}
-							filterAndWriteModules(project.name, project.version, paths.output, project.namingRules, modules,
-								targetType, filter.value, args, project.prefixColumns)
+							filterAndWriteModules(project.name, project.version, paths.output, project.namingRules,
+								modules, targetType, filter.value, args, project.indexPrefix, project.prefixColumns)
 					}
 					
 				case Success(Right(module)) => filterAndWriteModule(module, paths, targetType, filter.value, args)
@@ -170,12 +170,12 @@ object MainAppLogic extends CoderAppLogic
 	private def filterAndWriteModule(module: ModuleData, paths: ProjectPaths, targetType: => Int,
 	                                 filter: => Option[Filter], arguments: CommandArguments) =
 		filterAndWriteModules(module.moduleName, module.version, paths.output, module.namingRules,
-			Single(module -> paths), targetType, filter, arguments, module.prefixColumnNames)
+			Single(module -> paths), targetType, filter, arguments, module.indexPrefix, module.prefixColumnNames)
 	
 	private def filterAndWriteModules(projectName: Name, commonVersion: Option[Version], commonOutputPath: Path,
 	                                  commonNaming: NamingRules, modules: Iterable[(ModuleData, ProjectPaths)],
 	                                  targetType: => Int, filter: => Option[Filter], arguments: CommandArguments,
-	                                  prefixColumnNames: Boolean): Boolean =
+	                                  projectPrefix: String, prefixColumnNames: Boolean): Boolean =
 	{
 		val startTime = LocalTime.now()
 		
@@ -233,7 +233,7 @@ object MainAppLogic extends CoderAppLogic
 					.map { case (databaseName, modules) =>
 						println(s"Writing common files for ${ modules.size } modules to $commonOutputPath")
 						writeCommonFiles(projectName, commonVersion, modules, databaseName, commonOutputPath,
-							prefixColumnNames)(commonNaming)
+							projectPrefix, prefixColumnNames)(commonNaming)
 					}
 					.findMap { _.failure }
 					.foreach { log(_, "Failed to write some of the commonly shared files") }
@@ -277,7 +277,8 @@ object MainAppLogic extends CoderAppLogic
 	}
 	
 	private def writeCommonFiles(projectName: Name, version: Option[Version], modules: Iterable[ModuleData],
-	                             databaseName: Option[Name], outputDir: Path, prefixColumnNames: Boolean)
+	                             databaseName: Option[Name], outputDir: Path, projectPrefix: String,
+	                             prefixColumnNames: Boolean)
 	                            (implicit naming: NamingRules) =
 	{
 		// WET WET (refactor)
@@ -293,7 +294,7 @@ object MainAppLogic extends CoderAppLogic
 		val classes = modules.flatMap { _.classes }.toSeq.sorted
 		// Writes the table structure
 		SqlWriter(projectName, databaseName, version, classes.filterNot { _.isGeneric }, path("sql", "db", "structure"),
-			prefixColumnNames)
+			projectPrefix, prefixColumnNames)
 			.flatMap { _ =>
 				// Writes the inserts
 				InsertsWriter(projectName, databaseName, version, modules.flatMap { _.instances },

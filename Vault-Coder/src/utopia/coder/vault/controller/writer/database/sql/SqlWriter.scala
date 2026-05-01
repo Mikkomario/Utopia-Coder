@@ -47,7 +47,7 @@ object SqlWriter
 	 * @return Target path. Failure if writing failed.
 	  */
 	def apply(projectName: Name, dbName: Option[Name], version: Option[Version], classes: Seq[Class], targetPath: Path,
-	          prefixColumnNames: Boolean)
+	          projectPrefix: String, prefixColumnNames: Boolean)
 	         (implicit codec: Codec, naming: NamingRules) =
 	{
 		// Doesn't write anything if no classes are included
@@ -96,7 +96,7 @@ object SqlWriter
 				
 				// Groups the classes by package and writes them
 				writeClasses(writer, initials, classesByTableName.groupBy { _._2.packageName }, cleanedReferences,
-					prefixColumnNames)
+					projectPrefix.appendIfNotEmpty("_"), prefixColumnNames)
 			}
 		}
 		else
@@ -108,7 +108,7 @@ object SqlWriter
 	@tailrec
 	private def writeClasses(writer: PrintWriter, initialsMap: Map[String, String],
 	                          classesByPackageAndTableName: Map[String, Map[String, Class]],
-	                          references: Map[String, Set[String]], prefixProperties: Boolean)
+	                          references: Map[String, Set[String]], projectPrefix: String, prefixProperties: Boolean)
 	                        (implicit naming: NamingRules): Unit =
 	{
 		// Finds the classes which don't make any references to other remaining classes
@@ -122,7 +122,7 @@ object SqlWriter
 		if (notReferencingTableNames.isEmpty) {
 			writer.println("\n-- WARNING: Following classes contain a cyclic loop\n")
 			classesByPackageAndTableName.valuesIterator.flatMap { _.valuesIterator }.toVector.sortBy { _.name.singular }
-				.foreach { writeClass(writer, _, initialsMap, prefixProperties) }
+				.foreach { writeClass(writer, _, initialsMap, projectPrefix, prefixProperties) }
 		}
 		// Case: There are some classes which don't reference remaining classes => writes those
 		else {
@@ -147,7 +147,7 @@ object SqlWriter
 			val packageHeader = Name.interpret(packageName, CamelCase.lower).to(Text.allCapitalized).singular
 			writer.println(s"\n--\t$packageHeader\t${"-" * 10}\n")
 			val allRemainingPackageClasses = writePossibleClasses(writer, initialsMap, writeableClasses, references,
-				prefixProperties) ++ remainingPackageClasses
+				projectPrefix, prefixProperties) ++ remainingPackageClasses
 			// Prepares the next recursive iteration
 			val remainingClasses = {
 				if (allRemainingPackageClasses.isEmpty)
@@ -156,40 +156,42 @@ object SqlWriter
 					classesByPackageAndTableName + (packageName -> allRemainingPackageClasses)
 			}
 			if (remainingClasses.nonEmpty)
-				writeClasses(writer, initialsMap, remainingClasses, references, prefixProperties)
+				writeClasses(writer, initialsMap, remainingClasses, references, projectPrefix, prefixProperties)
 		}
 	}
 	
 	@tailrec
 	private def writePossibleClasses(writer: PrintWriter, initialsMap: Map[String, String],
 	                                 classesByTableName: Map[String, Class], references: Map[String, Set[String]],
-	                                 prefixProperties: Boolean)
+	                                 projectPrefix: String, prefixProperties: Boolean)
 	                                (implicit naming: NamingRules): Map[String, Class] =
 	{
 		// Finds the classes which don't make any references to other remaining classes
 		val remainingTableNames = classesByTableName.keySet
-		val notReferencingTableNames = remainingTableNames
-			.filterNot { tableName => references(tableName)
-				.exists { referencedTableName => remainingTableNames.contains(referencedTableName) } }
+		val notReferencingTableNames = remainingTableNames.filterNot { tableName =>
+			references(tableName).exists { referencedTableName => remainingTableNames.contains(referencedTableName) }
+		}
 		// Case: All classes make at least once reference => sends them back to the original method caller
 		if (notReferencingTableNames.isEmpty)
 			classesByTableName
 		// Case: There are some classes which don't reference remaining classes => writes those
 		else {
 			// Writes the classes in alphabetical order
-			notReferencingTableNames.toVector.sorted
-				.foreach { table => writeClass(writer, classesByTableName(table), initialsMap, prefixProperties) }
+			notReferencingTableNames.toVector.sorted.foreach { table =>
+				writeClass(writer, classesByTableName(table), initialsMap, projectPrefix, prefixProperties)
+			}
 			// Continues recursively. Returns the final group of remaining classes.
 			val remainingClassesByTableName = classesByTableName -- notReferencingTableNames
 			if (remainingClassesByTableName.nonEmpty)
-				writePossibleClasses(writer, initialsMap, remainingClassesByTableName, references, prefixProperties)
+				writePossibleClasses(writer, initialsMap, remainingClassesByTableName, references, projectPrefix,
+					prefixProperties)
 			else
 				remainingClassesByTableName
 		}
 	}
 	
 	private def writeClass(writer: PrintWriter, classToWrite: Class, initialsMap: Map[String, String],
-	                       prefixProperties: Boolean)
+	                       projectPrefix: String, prefixProperties: Boolean)
 	                      (implicit naming: NamingRules): Unit =
 	{
 		implicit val wr: PrintWriter = writer
@@ -255,10 +257,10 @@ object SqlWriter
 			val firstComboIndexColumns = comboIndexColumnNames.filter { _.size > 1 }.map { _.head }.toSet
 			val individualIndexDeclarations = columns
 				.filter { case (prop, name) => prop.isIndexed && !firstComboIndexColumns.contains(name) }
-				.map { case (_, name) => s"INDEX ${ classInitials }_${ name }_idx (`$name`)" }
+				.map { case (_, name) => s"INDEX $projectPrefix${ classInitials }_${ name }_idx (`$name`)" }
 			val comboIndexDeclarations = comboIndexColumnNames.filter { _.size > 1 }
 				.zipWithIndex.map { case (colNames, index) =>
-				s"INDEX ${ classInitials }_combo_${ index + 1 }_idx (${ colNames.mkString(", ") })"
+				s"INDEX $projectPrefix${ classInitials }_combo_${ index + 1 }_idx (${ colNames.mkString(", ") })"
 			}
 			val foreignKeyDeclarations = namedProps.flatMap { case (prop, columns) =>
 				prop.dataType match {
@@ -286,7 +288,7 @@ object SqlWriter
 							}
 							s"${ base }_ref"
 						}
-						Some(s"CONSTRAINT ${ constraintNameBase }_fk FOREIGN KEY ${
+						Some(s"CONSTRAINT $projectPrefix${ constraintNameBase }_fk FOREIGN KEY $projectPrefix${
 							constraintNameBase }_idx ($columnName) REFERENCES `$refTableName`(`$refColumnName`) ON DELETE ${
 							if (referenceType.sqlConversions.forall { _.target.isNullable }) "SET NULL" else "CASCADE"
 						}")
