@@ -51,7 +51,7 @@ object StandardPropertyType
 			case "creation" | "created" => Some(CreationTime)
 			case "updated" | "modification" | "update" => Some(UpdateTime)
 			case "deprecation" | "deprecated" => Some(Deprecation)
-			case "expiration" | "expired" => Some(Expiration)
+			case "expiration" | "expires" => Some(Expiration)
 			case "value" | "val" => Some(GenericValue(appliedLength))
 			case "model" | "values" => Some(GenericModel(appliedLength))
 			case "days" => Some(DayCount)
