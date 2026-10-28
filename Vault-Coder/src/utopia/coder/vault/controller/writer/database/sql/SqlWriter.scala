@@ -9,13 +9,13 @@ import utopia.coder.vault.model.datatype.StandardPropertyType.{ClassReference, E
 import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.Empty
 import utopia.flow.collection.mutable.iterator.{LazyInitIterator, PollableOnce}
+import utopia.flow.parse.BufferedPrintWriter
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.parse.string.Regex
 import utopia.flow.time.Today
 import utopia.flow.util.StringExtensions._
 import utopia.flow.util.Version
 
-import java.io.PrintWriter
 import java.nio.file.Path
 import scala.annotation.tailrec
 import scala.io.Codec
@@ -111,7 +111,7 @@ object SqlWriter
 	 * @param prefixProperties Whether to prefix column names
 	 * @param naming Implicit naming rules
 	 */
-	private def writeClasses(writer: PrintWriter, initialsMap: Map[String, String],
+	private def writeClasses(writer: BufferedPrintWriter, initialsMap: Map[String, String],
 	                         classesByPackageAndTableName: Map[String, Map[String, Class]],
 	                         references: Map[String, Set[String]], projectPrefix: String, prefixProperties: Boolean)
 	                        (implicit naming: NamingRules): Unit =
@@ -213,7 +213,7 @@ object SqlWriter
 	}
 	
 	@tailrec
-	private def writePossibleClasses(writer: PrintWriter, initialsMap: Map[String, String],
+	private def writePossibleClasses(writer: BufferedPrintWriter, initialsMap: Map[String, String],
 	                                 classesByTableName: Map[String, Class], references: Map[String, Set[String]],
 	                                 projectPrefix: String, prefixProperties: Boolean)
 	                                (implicit naming: NamingRules): Map[String, Class] =
@@ -245,11 +245,11 @@ object SqlWriter
 	// Returns possible declarations to delay, containing 2 values:
 	//      1. Name of the altered table
 	//      2. declarations to add
-	private def writeClass(writer: PrintWriter, classToWrite: Class, initialsMap: Map[String, String],
+	private def writeClass(writer: BufferedPrintWriter, classToWrite: Class, initialsMap: Map[String, String],
 	                       projectPrefix: String, prefixProperties: Boolean, excludeForeignKeys: Boolean = false)
 	                      (implicit naming: NamingRules) =
 	{
-		implicit val wr: PrintWriter = writer
+		implicit val wr: BufferedPrintWriter = writer
 		
 		val tableName = classToWrite.tableName
 		lazy val classInitials = initialsMap(tableName)
@@ -559,7 +559,7 @@ object SqlWriter
 				.takeWhile { len => sizes.existsCount(count - 1) { _ >= len } }
 	}
 	
-	private def writeDocumentation(doc: String)(implicit writer: PrintWriter) = {
+	private def writeDocumentation(doc: String)(implicit writer: BufferedPrintWriter) = {
 		doc.notEmpty.foreach { doc =>
 			val lines = doc.linesIterator.map(Regex.newLine.filterNot).toVector
 			writer.println(s"-- ${lines.head}")

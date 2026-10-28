@@ -12,6 +12,7 @@ Compatible with Vault v2.1
 - Table initials are now actually unique
 - **UncertainBoolean** value conversions were updated
 - When timestamp-property -based filtering is applied, the **Repr** type is now required to be **FilterableView**
+- Changed `expired` type key to `expires` (typo)
 ### New features
 - Added support for project-specific index-prefixes
 ### Other changes

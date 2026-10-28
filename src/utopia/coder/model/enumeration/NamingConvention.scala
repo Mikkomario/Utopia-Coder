@@ -82,7 +82,7 @@ object NamingConvention
 		lazy val containsHyphen = hyphenRegex.existsIn(string)
 		
 		// Hyphen & underscore are mutually exclusive, resulting in a text type when combined
-		if (Regex.whiteSpace.existsIn(string) || (containsHyphen && containsUnderScore)) {
+		if (Regex.whitespace.existsIn(string) || (containsHyphen && containsUnderScore)) {
 			if (string.view.drop(1).exists { _.isUpper })
 				Text.allCapitalized
 			else if (string.head.isUpper)
@@ -153,7 +153,7 @@ object NamingConvention
 		override def separator = ""
 		
 		override def accepts(name: String) = {
-			if (underscoreRegex.existsIn(name) || Regex.whiteSpace.existsIn(name) || hyphenRegex.existsIn(name))
+			if (underscoreRegex.existsIn(name) || Regex.whitespace.existsIn(name) || hyphenRegex.existsIn(name))
 				false
 			else
 				name.headOption.exists { c => !c.isLetter || c.isUpper == capitalized }
@@ -285,7 +285,7 @@ object NamingConvention
 		
 		// This naming convention doesn't support uppercase characters, nor whitespaces
 		override def accepts(name: String) =
-			!Regex.whiteSpace.existsIn(name) && !hyphenRegex.existsIn(name) &&
+			!Regex.whitespace.existsIn(name) && !hyphenRegex.existsIn(name) &&
 				name.forall { c => !c.isLetter || !c.isUpper }
 		
 		override def convert(string: String, originalStyle: NamingConvention) =
@@ -304,7 +304,7 @@ object NamingConvention
 		override def separator = "-"
 		
 		override def accepts(name: String) =
-			!Regex.whiteSpace.existsIn(name) && !underscoreRegex.existsIn(name) &&
+			!Regex.whitespace.existsIn(name) && !underscoreRegex.existsIn(name) &&
 				name.forall { c => !c.isLetter || !c.isUpper }
 		
 		override def convert(string: String, originalStyle: NamingConvention) = originalStyle match {
@@ -395,7 +395,7 @@ object NamingConvention
 			s"$beginning $casedEnd"
 		}
 		
-		override def split(string: String) = Regex.whiteSpace.split(string)
+		override def split(string: String) = Regex.whitespace.split(string)
 		
 		
 		// OTHER    -----------------------

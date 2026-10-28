@@ -22,7 +22,7 @@ object ReadRegexTest extends App
 		(Regex.word + Regex.letterOrDigit).withinParentheses.noneOrOnce +
 		(Regex.escape('_') + Regex.escape('=')).withinParentheses.noneOrOnce
 	val testRegex = Regex("protected |private ")
-	private lazy val segmentSeparatorRegex = (Regex.escape('/') * 2) + Regex.whiteSpace +
+	private lazy val segmentSeparatorRegex = (Regex.escape('/') * 2) + Regex.whitespace +
 		Regex.upperCaseLetter.oneOrMoreTimes + Regex.escape('\t').oneOrMoreTimes +
 		Regex.escape('-').oneOrMoreTimes
 	

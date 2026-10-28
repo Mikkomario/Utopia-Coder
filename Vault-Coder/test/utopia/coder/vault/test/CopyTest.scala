@@ -41,9 +41,10 @@ object CopyTest extends App
 		val file = ScalaParser(path).get
 		println(s"File read.")
 		println(s"Read ${file.declarations.size} instance declarations")
-		val defaultPath = path.withMappedFileName { _.untilLast(".") + "-copy.scala" }
+		val defaultPath = path.mapFileNameWithoutExtension { n => s"$n-copy" }
 		val outputPath = StdIn
-			.readNonEmptyLine(s"Where do you want to save the file copy? Default = $defaultPath") match {
+			.readNonEmptyLine(s"Where do you want to save the file copy? Default = $defaultPath") match
+		{
 			case Some(input) => input: Path
 			case None => defaultPath
 		}

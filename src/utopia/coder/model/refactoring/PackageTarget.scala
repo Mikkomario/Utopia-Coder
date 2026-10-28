@@ -2,8 +2,8 @@ package utopia.coder.model.refactoring
 
 import utopia.coder.model.scala.Package
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.caching.LazyTree
 import utopia.flow.collection.immutable.caching.iterable.CachingSeq
+import utopia.flow.collection.immutable.tree.ValueTree
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.logging.Logger
 
@@ -40,26 +40,26 @@ case class PackageTarget(knownParents: Package = Package.empty, target: Package 
 	 *         root package
 	 */
 	def locate(root: Path)(implicit log: Logger) = {
-		val tree = root.toTree.filterByNav { _.isDirectory }
+		val tree = root.toTree.filter { _.value.isDirectory }
 		knownParents.notEmpty match {
 			// Case: Some parents are known => Locates those first
 			case Some(knownParents) =>
 				val topKnownParent = knownParents.parts.head
 				val subParents = knownParents.tail
-				tree.pathsToRootsWhereIterator { n => n.hasChildren && n.nav.fileName == topKnownParent }
+				tree.pathsToRootsWhereIterator { n => n.hasChildren && n.value.fileName == topKnownParent }
 					// TODO: use flatMap (targeting all) or find (targeting one)?
 					.flatMap { pathToTopParent =>
-						lazy val topParentPaths = pathToTopParent.map { _.nav }
+						lazy val topParentPaths = pathToTopParent.map { _.value }
 						resolvePackagePaths(pathToTopParent.last, subParents).flatMap { parents =>
 							val bottomParent = parents.last
-							lazy val parentPaths = topParentPaths ++ parents.tail.map { _.nav }
+							lazy val parentPaths = topParentPaths ++ parents.tail.map { _.value }
 							// Continues by identifying the targets under the located parent paths
 							resolvePackagePaths(bottomParent, target, recursive)
 								// The bottom parent is the first element in each path,
 								// therefore removes it from all results
 								.filter { _.hasSize > 1 }
 								.map { targetPath =>
-									LocatedPackage(parentPaths, targetPath.tail.map { _.nav })
+									LocatedPackage(parentPaths, targetPath.tail.map { _.value })
 								}
 						}
 					}
@@ -67,12 +67,12 @@ case class PackageTarget(knownParents: Package = Package.empty, target: Package 
 			// Case: No parents are known => Looks for the first target package instead
 			case None =>
 				val firstTargetDirName = target.parts.head
-				tree.pathsToRootsWhereIterator { n => n.hasChildren && n.nav.fileName == firstTargetDirName }
+				tree.pathsToRootsWhereIterator { n => n.hasChildren && n.value.fileName == firstTargetDirName }
 					.flatMap { pathToFirstTarget =>
 						val firstTarget = pathToFirstTarget.last
-						lazy val parentPaths = pathToFirstTarget.map { _.nav }
+						lazy val parentPaths = pathToFirstTarget.map { _.value }
 						resolvePackagePaths(firstTarget, target.tail, recursive).map { targetPaths =>
-							LocatedPackage(parentPaths, targetPaths.map { _.nav })
+							LocatedPackage(parentPaths, targetPaths.map { _.value })
 						}
 					}
 		}
@@ -80,7 +80,7 @@ case class PackageTarget(knownParents: Package = Package.empty, target: Package 
 	
 	// Returns whole package paths (i.e. lists all directories on each path)
 	// Branches if * is listed as a package
-	private def resolvePackagePaths(parent: LazyTree[Path], childPackages: Package, includeChildren: Boolean = false) = {
+	private def resolvePackagePaths(parent: ValueTree[Path], childPackages: Package, includeChildren: Boolean = false) = {
 		// Iterates down one layer at a time
 		val primaryResults = childPackages.parts.foldLeft(CachingSeq(Vector(parent))) { (parents, next) =>
 			// Case: Invalid path
@@ -92,7 +92,7 @@ case class PackageTarget(knownParents: Package = Package.empty, target: Package 
 					parents.flatMap { p => p.last.children.map { p :+ _ } }
 				// Case: Next part targets a specific package / directory
 				else
-					parents.flatMap { p => p.last.children.find { _.nav.fileName == next }.map { p :+ _ } }
+					parents.flatMap { p => p.last.children.find { _.value.fileName == next }.map { p :+ _ } }
 			}
 		}
 		// Case: using recursive mode => Adds sub-packages, also

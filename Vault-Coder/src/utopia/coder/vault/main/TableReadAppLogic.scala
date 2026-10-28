@@ -58,7 +58,7 @@ object TableReadAppLogic extends AppLogic
 							.getOrElse {
 								StdIn.printAndReadLine(
 									"Please list the tables you want to read\nSeparate table names with space\nLeave empty to read all tables")
-									.split(Regex.whiteSpace).toVector
+									.split(Regex.whitespace).toVector
 									.map { _.stripControlCharacters.trim }.filter { _.nonEmpty }
 							}
 				}

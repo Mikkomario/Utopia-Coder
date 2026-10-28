@@ -71,10 +71,10 @@ object ScalaParser
 	private lazy val scalaDocStartRegex = Regex("\\/\\*\\*")
 	private lazy val commentStartRegex = Regex("\\/\\*")
 	private lazy val commentEndRegex = Regex("\\*\\/")
-	private lazy val emptyScalaDocLineRegex = (Regex.newLine || Regex.whiteSpace || Regex.escape('\t') ||
+	private lazy val emptyScalaDocLineRegex = (Regex.newLine || Regex.whitespace || Regex.escape('\t') ||
 		Regex.escape('*')).withinParentheses.anyTimes
 	private lazy val segmentSeparatorRegex = Regex.upperCaseLetter.oneOrMoreTimes +
-		(Regex.escape('\t') || Regex.whiteSpace).withinParentheses.oneOrMoreTimes +
+		(Regex.escape('\t') || Regex.whitespace).withinParentheses.oneOrMoreTimes +
 		Regex.escape('-').oneOrMoreTimes
 	
 	

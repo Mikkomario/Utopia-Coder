@@ -1,11 +1,11 @@
 package utopia.coder.model.scala.code
 
+import utopia.coder.model.scala.code.CodeLine.{maxLineLength, oneTimeRegexes, repeatableRegexes, tabWidth}
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Pair, Single}
 import utopia.flow.operator.MaybeEmpty
-import utopia.flow.parse.string.Regex
-import utopia.flow.collection.CollectionExtensions._
-import utopia.coder.model.scala.code.CodeLine.{maxLineLength, oneTimeRegexes, repeatableRegexes, tabWidth}
 import utopia.flow.operator.combine.Combinable
+import utopia.flow.parse.string.Regex
 
 object CodeLine
 {
@@ -24,15 +24,15 @@ object CodeLine
 	// that the splitting part should be preserved on the original line
 	private lazy val repeatableRegexes = Vector(
 		Regex("with ") -> false,
-		(Regex.escape(',') + Regex.whiteSpace.noneOrOnce).withinParentheses.ignoringQuotations -> true,
+		(Regex.escape(',') + Regex.whitespace.noneOrOnce).withinParentheses.ignoringQuotations -> true,
 		(Regex("s").noneOrOnce + Regex.escape('\"') + (!Regex.escape('\"')).anyTimes + Regex.escape('\"')) -> false,
-		(Regex.whiteSpace + Regex.escape('=') + Regex.whiteSpace) -> true,
-		((Regex.whiteSpace + Regex.word + Regex.whiteSpace) +
+		(Regex.whitespace + Regex.escape('=') + Regex.whitespace) -> true,
+		((Regex.whitespace + Regex.word + Regex.whitespace) +
 			!(Regex.escape('=') + Regex.escape('>')).withinParentheses) -> false,
-		(Regex.anyOf("+-*/").oneOrMoreTimes + Regex.whiteSpace) -> true
+		(Regex.anyOf("+-*/").oneOrMoreTimes + Regex.whitespace) -> true
 	)
 	private lazy val oneTimeRegexes = Vector(
-		Regex.escape('.') + Regex.letter.oneOrMoreTimes + Regex.whiteSpace.noneOrOnce + Regex.escape('{'),
+		Regex.escape('.') + Regex.letter.oneOrMoreTimes + Regex.whitespace.noneOrOnce + Regex.escape('{'),
 		Regex.escape('.') + Regex.letter.oneOrMoreTimes
 	)
 	

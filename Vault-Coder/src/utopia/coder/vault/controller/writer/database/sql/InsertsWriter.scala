@@ -8,11 +8,11 @@ import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.generic.model.immutable.Value
 import utopia.flow.generic.model.mutable.DataType._
 import utopia.flow.operator.ordering.CombinedOrdering
+import utopia.flow.parse.BufferedPrintWriter
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.time.Today
 import utopia.flow.util.Version
 
-import java.io.PrintWriter
 import java.nio.file.Path
 import scala.io.Codec
 import scala.util.Success
@@ -79,7 +79,7 @@ object InsertsWriter
 			Success(targetPath)
 	}
 	
-	private def writeClassInstances(writer: PrintWriter, parentClass: Class, instances: Iterable[Instance])
+	private def writeClassInstances(writer: BufferedPrintWriter, parentClass: Class, instances: Iterable[Instance])
 	                               (implicit naming: NamingRules) =
 	{
 		val classDocName = if (instances.size > 1) parentClass.name.pluralDoc else parentClass.name.doc
@@ -94,7 +94,7 @@ object InsertsWriter
 		writer.println()
 	}
 	
-	private def writeInstanceInserts(writer: PrintWriter, tableName: String, instances: Iterable[Instance],
+	private def writeInstanceInserts(writer: BufferedPrintWriter, tableName: String, instances: Iterable[Instance],
 	                                 idColumnName: Option[String] = None)
 	                                (implicit naming: NamingRules) =
 	{

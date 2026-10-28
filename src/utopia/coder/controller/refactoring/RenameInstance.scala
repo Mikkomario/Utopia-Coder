@@ -29,7 +29,7 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 	
 	implicit val codec: Codec = Codec.UTF8
 	
-	private lazy val targetTypeRegex = Regex(targetType.keyword) + Regex.whiteSpace
+	private lazy val targetTypeRegex = Regex(targetType.keyword) + Regex.whitespace
 	
 	
 	// OTHER    ---------------------
@@ -96,8 +96,8 @@ case class RenameInstance(targetPackage: PackageTarget, targetType: InstanceDecl
 					.withDefaultValue(Map.empty)
 				val completedEditPerFile = flatEdits.map { case (_, file, from, _) => file -> from }.toMap
 				
-				sourceRoot.toTree.nodesBelowIterator.filter { _.nav.fileType ~== "scala" }.tryUntilFails { fileNode =>
-					val file = fileNode.nav
+				sourceRoot.toTree.nodesBelowIterator.filter { _.value.fileType ~== "scala" }.tryUntilFails { fileNode =>
+					val file = fileNode.value
 					// Reads the package and the imports section of the file in order to see whether
 					// that file is affected by these changes
 					Lines.iterate

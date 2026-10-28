@@ -12,7 +12,7 @@ import java.nio.file.Path
  * @author Mikko Hilpinen
  * @since 23.04.2024, v1.1
  */
-case class LocatedPackage(parents: Vector[Path], targets: Vector[Path])
+case class LocatedPackage(parents: Seq[Path], targets: Seq[Path])
 {
 	// ATTRIBUTES   -------------------------
 	
