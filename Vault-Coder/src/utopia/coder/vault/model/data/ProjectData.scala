@@ -20,7 +20,7 @@ object ProjectData
 }
 
 /**
- * Contains information which affects multiple modules / sub-projects
+ * Contains information that affects multiple modules / sub-projects
  * @param name Name of this project
  * @param modulePaths For each module in this project, the paths to module-specific input, output & source directories
  * @param version Current project version - Used as the minimum version in each module.
@@ -35,7 +35,7 @@ object ProjectData
  * @param defaultMutability Mutability to apply by default. May be overridden. Default = immutable.
  * @param customDataTypes Custom data types used throughout this project.
  *                        May be referenced from all submodules.
- *                        Specified as a map, where keys are type names which may be referenced and values are the
+ *                        Specified as a map, where keys are type names that may be referenced and values are the
  *                        actual referenced data types.
  *                        Default = empty.
  * @param author Author to assign to each generated class by default (may be overridden).

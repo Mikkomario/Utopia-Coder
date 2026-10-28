@@ -116,7 +116,7 @@ object SqlWriter
 	                         references: Map[String, Set[String]], projectPrefix: String, prefixProperties: Boolean)
 	                        (implicit naming: NamingRules): Unit =
 	{
-		// Finds the classes which don't make any references to other remaining classes
+		// Finds the classes that don't make any references to other remaining classes
 		val remainingTableNames = classesByPackageAndTableName.valuesIterator.flatMap { _.keysIterator }.toSet
 		val notReferencingTableNames = remainingTableNames.filterNot { tableName =>
 			references(tableName).exists(remainingTableNames.contains)
@@ -165,11 +165,11 @@ object SqlWriter
 						.foreach { writeClass(writer, _, initialsMap, projectPrefix, prefixProperties) }
 			}
 		}
-		// Case: There are some classes which don't reference remaining classes => writes those
+		// Case: There are some classes that don't reference remaining classes => writes those
 		else {
 			// Writes a single package, including as many classes as possible
-			// Prefers packages which can be finished off, also preferring larger class sets
-			// Package name -> (currently writeable classes, classes which are dependent from other remaining packages)
+			// Prefers packages that can be finished off, also preferring larger class sets
+			// Package name -> (currently writeable classes, classes that are dependent from other remaining packages)
 			val packagesWithInfo: Map[String, (Map[String, Class], Map[String, Class])] =
 				classesByPackageAndTableName.map { case (packageName, classesByTableName) =>
 					val packageClassTables = classesByTableName.keySet
@@ -218,7 +218,7 @@ object SqlWriter
 	                                 projectPrefix: String, prefixProperties: Boolean)
 	                                (implicit naming: NamingRules): Map[String, Class] =
 	{
-		// Finds the classes which don't make any references to other remaining classes
+		// Finds the classes that don't make any references to other remaining classes
 		val remainingTableNames = classesByTableName.keySet
 		val notReferencingTableNames = remainingTableNames.filterNot { tableName =>
 			references(tableName).exists { referencedTableName => remainingTableNames.contains(referencedTableName) }
@@ -226,7 +226,7 @@ object SqlWriter
 		// Case: All classes make at least once reference => sends them back to the original method caller
 		if (notReferencingTableNames.isEmpty)
 			classesByTableName
-		// Case: There are some classes which don't reference remaining classes => writes those
+		// Case: There are some classes that don't reference remaining classes => writes those
 		else {
 			// Writes the classes in alphabetical order
 			notReferencingTableNames.toVector.sorted.foreach { table =>

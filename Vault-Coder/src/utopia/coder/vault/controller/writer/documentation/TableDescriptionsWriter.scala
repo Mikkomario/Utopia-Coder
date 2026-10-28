@@ -12,7 +12,7 @@ import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
 
 /**
- * Used for writing json documents which contain detailed descriptive information of the project's database structure.
+ * Used for writing JSON documents that contain detailed descriptive information of the project's database structure.
  * May be used for providing instructions for a software user, LLM, etc.
  *
  * @author Mikko Hilpinen
@@ -21,7 +21,7 @@ import scala.io.Codec
 object TableDescriptionsWriter
 {
 	/**
-	 * Writes a newline-delimited json document containing descriptions of all classes and all properties
+	 * Writes a newline-delimited JSON document containing descriptions of all classes and all properties
 	 * @param classes Classes to describe
 	 * @param targetPath Path to the document to write
 	 * @param codec Implicit encoding to apply

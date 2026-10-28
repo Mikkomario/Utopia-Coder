@@ -56,7 +56,6 @@ case class PropertyDeclaration(declarationType: PropertyDeclarationType, name: S
 	  * @return Whether this is a computed property
 	  */
 	def isComputed = declarationType == ComputedProperty
-	
 	/**
 	  * @return Whether the value of this property is stored (not computed)
 	  */
@@ -84,4 +83,9 @@ case class PropertyDeclaration(declarationType: PropertyDeclarationType, name: S
 			parameters.map { _.implicits }.getOrElse(implicitParams), annotations,
 			description.nonEmptyOrElse(returnDescription), headerComments, isOverridden, isImplicit,
 			isLowMergePriority)
+			
+	
+	// OTHER    ---------------------------------------
+	
+	def withType(propType: PropertyDeclarationType) = copy(declarationType = propType)
 }

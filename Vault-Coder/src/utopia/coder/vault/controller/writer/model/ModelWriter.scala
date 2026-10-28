@@ -6,6 +6,7 @@ import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
 import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference.Flow._
+import utopia.coder.model.scala.datatype.TypeVariance.Covariance
 import utopia.coder.model.scala.datatype._
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
@@ -83,7 +84,7 @@ object ModelWriter
 										factoryRef)
 										.flatMap { case (dataLikeRef, buildCopyName) =>
 											writeStoredLike(classToWrite, storePackage, parentClassReferences,
-												dataLikeRef, factoryWrapperRef, buildCopyName)
+												dataLikeRef, factoryRef, buildCopyName)
 												.map { storedLikeRef =>
 													Some(GenericClassModelReferences(
 														hasPropsRef, dataLikeRef, storedLikeRef) -> buildCopyName)
@@ -186,7 +187,7 @@ object ModelWriter
 							description = s"New ${prop.name} to assign"))
 				} ++ withXImplementations).toSet,
 				description = s"Common trait for ${
-					classToWrite.name }-related factories which allow construction with individual properties",
+					classToWrite.name }-related factories that allow construction with individual properties",
 				author = classToWrite.author,
 				since = DeclarationDate.versionedToday
 			)
@@ -288,7 +289,7 @@ object ModelWriter
 			name = traitName.className,
 			extensions = extensions,
 			properties = propertyDeclarations ++ toModel ++ renamedImplementations,
-			description = s"Common trait for classes which provide access to ${ classToWrite.name } properties",
+			description = s"Common trait for classes that provide access to ${ classToWrite.name } properties",
 			author = classToWrite.author,
 			since = DeclarationDate.versionedToday
 		)).write()
@@ -347,7 +348,7 @@ object ModelWriter
 				parentClassReferences.flatMap[Extension] { _.generic.map { _.dataLike(reprType) } } ++
 				parentDataTraitReferences.map(Extension.fromReference),
 			methods = withMethods + buildCopy ++ parentBuildCopies,
-			description = s"Common trait for classes which provide read and copy access to ${
+			description = s"Common trait for classes that provide read and copy access to ${
 				classToWrite.name } properties",
 			author = classToWrite.author,
 			since = DeclarationDate.versionedToday
@@ -410,7 +411,7 @@ object ModelWriter
 					ComputedProperty("toModel", code.references, isOverridden = true)(code.text)
 				}
 				
-				// Only implements the withX methods which have not yet been implemented in a generic parent
+				// Only implements the withX methods that have not yet been implemented in a generic parent
 				// (via buildCopy)
 				val withMethods = concreteWithMethodsFor(
 					classToWrite.properties.filterNot { _.isDirectExtension }, "copy")
@@ -474,10 +475,12 @@ object ModelWriter
 		}
 		
 		val schemaCode = modelDeclaration.targetCode +
-			CodePiece.collection(classToWrite.properties.size)(
-				classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
-					.getOrElse(CodePiece.empty)
-			).withinParenthesis
+			CodePiece
+				.collection(classToWrite.properties.size)(
+					classToWrite.properties.map(propertyDeclarationFrom).reduceLeftOption { _.append(_, ", ") }
+						.getOrElse(CodePiece.empty)
+				)
+				.withinParenthesis
 		val schema = LazyValue("schema", schemaCode.references, isOverridden = !fromModelMayFail,
 			isLowMergePriority = classToWrite.isExtension || classToWrite.properties.exists { _.isMultiColumn })(
 			schemaCode.text)
@@ -529,14 +532,15 @@ object ModelWriter
 	// Writes XLike trait for generic implementations
 	// FIXME: Looks like property  & copy functions are not getting written correctly
 	private def writeStoredLike(classToWrite: Class, storedPackage: Package, parentClassReferences: Seq[ClassReferences],
-	                            dataLikeRef: Reference, factoryWrapperRef: Reference, buildCopyName: String)
+	                            dataLikeRef: Reference, factoryRef: Reference, buildCopyName: String)
 	                           (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// When extending YStoredLike[Data, Repr], the Repr type must conform to YStoredData
 		val parentDataRefs = parentClassReferences.map { _.data }
 		
 		val dataType = ScalaType.basic("Data")
-		val data = GenericType.childOf("Data", dataLikeRef(dataType), description = "Type of the wrapped data")
+		val data = GenericType.childOf("Data", dataLikeRef(dataType), Covariance,
+			description = "Type of the wrapped data")
 		val repr = GenericType.covariant("Repr",
 			requirement = parentDataRefs.headOption.map { TypeRequirement.childOf(_) },
 			description = "Implementing type")
@@ -557,7 +561,6 @@ object ModelWriter
 			}
 		}
 		
-		val wrappedFactory = ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)("data")
 		// Implements access properties based on the wrapped data, but not for parent class properties
 		val propertyAccessors = classToWrite.properties.filterNot { _.isDirectExtension }.map { prop =>
 			val propName = prop.name.prop
@@ -574,10 +577,10 @@ object ModelWriter
 			name = ((storedPrefix +: classToWrite.name) + likeSuffix).className,
 			genericTypes = Pair(data, repr),
 			extensions = customExtensions ++
-				Pair[Extension](factoryWrapperRef(dataType, reprType), dataLikeRef(reprType)) ++ inheritedExtensions,
-			properties = propertyAccessors :+ wrappedFactory,
+				Pair[Extension](factoryRef(reprType), dataLikeRef(reprType)) ++ inheritedExtensions,
+			properties = propertyAccessors,
 			methods = Set(buildCopy),
-			description = s"Common trait for ${ classToWrite.name.pluralDoc } which have been stored in the database",
+			description = s"Common trait for ${ classToWrite.name.pluralDoc } that have been stored in the database",
 			author = classToWrite.author,
 			since = DeclarationDate.versionedToday
 		)).write()
@@ -600,6 +603,7 @@ object ModelWriter
 			Parameter("id", idType, description = s"ID of this ${ classToWrite.name.doc } in the database"),
 			Parameter("data", dataClassRef, description = s"Wrapped ${ classToWrite.name.doc } data")
 		)
+		val wrappedFactory = ComputedProperty("wrappedFactory", visibility = Protected, isOverridden = true)("data")
 		val wrap = MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
 			Parameter("data", dataClassRef))("copy(data = data)")
 		
@@ -632,9 +636,6 @@ object ModelWriter
 						if (classToWrite.isExtension)
 							(Empty, if (setup.modelCanReferToDB) Single(accessorFor(classToWrite, targeted)) else Empty)
 						else {
-							val wrappedFactory = ComputedProperty("wrappedFactory", visibility = Protected,
-								isOverridden = true)("data")
-							
 							// Extends StoredModelConvertible & FromIdFactory
 							val fromIdFactory = vault.fromIdFactory(ScalaType.int, classType)
 							val (stored, toModel) = {
@@ -654,8 +655,7 @@ object ModelWriter
 							val accessor =
 								if (setup.modelCanReferToDB) Some(accessorFor(classToWrite, targeted)) else None
 							
-							(stored :+[Extension] fromIdFactory,
-								OptimizedIndexedSeq.concat(accessor, toModel, Single(wrappedFactory)))
+							(stored :+[Extension] fromIdFactory, OptimizedIndexedSeq.concat(accessor, toModel))
 						}
 					}
 					
@@ -670,7 +670,7 @@ object ModelWriter
 				TraitDeclaration(
 					name = className,
 					extensions = customExtensions ++ inheritedExtensions,
-					properties = properties,
+					properties = properties :+ wrappedFactory,
 					methods = methods,
 					description = description,
 					author = classToWrite.author,
@@ -717,6 +717,7 @@ object ModelWriter
 						name = concreteClassName,
 						constructionParams = constructionParams,
 						extensions = Single(classType),
+						properties = Single(wrappedFactory),
 						methods = Set(wrap, withIdFor(classToWrite)),
 						visibility = Private,
 						description = s"Concrete implementation of the ${ classToWrite.name } trait",
@@ -890,7 +891,8 @@ object ModelWriter
 			!dt.supportsDefaultJsonValues)
 			paramsCode = paramsCode.append("isOptional = true", ", ")
 		
-		propertyDeclaration.targetCode + paramsCode.withinParenthesis
+		// All property declarations start on a new line
+		"\n" +: (propertyDeclaration.targetCode + paramsCode.withinParenthesis)
 	}
 	
 	private def withMethodNameFor(prop: Property)(implicit naming: NamingRules): String = withMethodNameFor(prop.name)

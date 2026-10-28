@@ -17,7 +17,7 @@ import utopia.flow.util.StringExtensions._
 import scala.io.Codec
 
 /**
- * Used for writing database configuration classes, which are used with generic traits
+ * Used for writing database configuration classes that are used with generic traits
  *
  * @author Mikko Hilpinen
  * @since 14.06.2024, v1.11
@@ -37,8 +37,8 @@ object DbPropsWriter
 	// OTHER    ---------------------------
 	
 	/**
-	 * Writes a XDbProps and XDbPropsWrapper traits,
-	 * which are used when defining/customizing database interactions with generic traits
+	 * Writes a XDbProps and XDbPropsWrapper traits
+	 * that are used when defining/customizing database interactions with generic traits
 	 * @param classToWrite Written class / trait this configuration is used with
 	 * @param codec Implicit codec used to determine file formatting
 	 * @param setup Implicit project setup
@@ -86,7 +86,7 @@ object DbPropsWriter
 			.flatMap { prop =>
 				prop.dbProperties.map { prop =>
 					ComputedProperty.newAbstract(prop.name.prop, vault.dbProp,
-						description = s"Declaration which defines how ${
+						description = s"Declaration that defines how ${
 							prop.name } shall be interacted with in the database")
 				}
 			}
@@ -104,7 +104,7 @@ object DbPropsWriter
 			extensions = parentClassReferences.flatMap { _.generic.map[Extension] { _.dbProps } } :+ vault.hasIdProperty,
 			properties = abstractProps ++ renameImplementations,
 			author = classToWrite.author,
-			description = s"Common trait for classes which provide access to ${ classToWrite.name } database properties",
+			description = s"Common trait for classes that provide access to ${ classToWrite.name } database properties",
 			since = DeclarationDate.versionedToday
 		)
 		
@@ -125,7 +125,7 @@ object DbPropsWriter
 		// val defaultIdPropName = classToWrite.idDatabasePropName.quoted
 		/*
 		Parameter("idPropName", ScalaType.string, classToWrite.idDatabasePropName.quoted,
-				description = s"Name of the database property which represents this class' primary row id (default = \"$defaultIdPropName\")")
+				description = s"Name of the database property that represents this class' primary row id (default = \"$defaultIdPropName\")")
 		 */
 		val constructionParams = Parameter("table", vault.table,
 			description = "Table operated using this configuration") +: propNames.map { _._2 }
@@ -143,7 +143,7 @@ object DbPropsWriter
 		val companionObject = ObjectDeclaration(
 			name = traitName,
 			methods = Set(MethodDeclaration("apply", explicitOutputType = Some(traitType),
-				returnDescription = s"A model which defines all ${ classToWrite.name } database properties")(
+				returnDescription = s"A model that defines all ${ classToWrite.name } database properties")(
 				constructionParams)(s"$concreteClassName(${ constructionParams.map { _.name }.mkString(", ") })")),
 			nested = Set(concreteImplementation)
 		)

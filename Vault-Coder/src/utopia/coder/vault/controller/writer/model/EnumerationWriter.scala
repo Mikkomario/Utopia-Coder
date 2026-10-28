@@ -115,17 +115,17 @@ object EnumerationWriter
 			s"findForValue(value)${ end.replace("$" + idPropName, "$value") }"
 		}
 		val valueParam = Parameter("value", value,
-			description = s"A value representing an ${ e.name.doc } ${ e.idPropName.doc }")
+			description = s"A value representing a ${ e.name.doc } ${ e.idPropName.doc }")
 		val enumValueToValueCode = e.idType.toValueCode(idPropName)
 		
 		File(e.packagePath,
 			// Writes the enumeration trait first
 			TraitDeclaration(enumName,
 				extensions = Single(valueConvertible),
-				// Each value contains an id so that it can be referred from the database
+				// Each value contains an ID so that it can be referred from the database
 				properties = Vector(
 					PropertyDeclaration.newAbstract(idPropName, e.idType.toScala,
-						description = s"${e.idPropName} used to represent this ${e.name} in database and json"),
+						description = s"${e.idPropName} used to represent this ${e.name} in database and JSON"),
 					ComputedProperty("toValue", enumValueToValueCode.references, isOverridden = true)(
 						enumValueToValueCode.text)
 				),
@@ -136,7 +136,7 @@ object EnumerationWriter
 			ObjectDeclaration(enumName,
 				// Contains the .values -property
 				properties = Single(values) ++ defaultProp,
-				// Contains an id to enum value -function (one with Try, another with Option)
+				// Contains an ID to enum value -function (one with Try, another with Option)
 				methods = Set(
 					MethodDeclaration(_findForIdName,
 						returnDescription = s"${ e.name.doc } matching the specified ${ e.idPropName.doc }. None if the ${

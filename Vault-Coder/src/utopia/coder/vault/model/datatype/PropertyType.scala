@@ -8,7 +8,7 @@ import utopia.coder.vault.model.enumeration.Mutability
 import utopia.flow.collection.immutable.{Empty, Single}
 
 /**
-  * A common trait for property types which support both nullable (optional) and non-nullable (concrete) variants
+  * A common trait for property types that support both nullable (optional) and non-nullable (concrete) variants
   * @author Mikko Hilpinen
   * @since 29.8.2021, v0.1
   */
@@ -94,7 +94,7 @@ trait PropertyType extends ScalaTypeConvertible with ValueConvertibleType
 	
 	/**
 	  * Writes a code that reads an instance of this type from a value or a sequence of values
-	  * (which still represent a single instance).
+	  * (that still represent a single instance).
 	  *
 	  * If 'yieldsTryFromValue' is true, the resulting code will yield a Try.
 	  * Otherwise the resulting code will yield a direct instance of this type.
@@ -250,7 +250,7 @@ trait ConcreteSingleColumnPropertyType extends SingleColumnPropertyType
 	  */
 	def optionFromValueCode(valueCode: String, isFromJson: Boolean = false): CodePiece
 	/**
-	  * Writes code that takes an Option (which may contain an instance of this type) and yields a Value
+	  * Writes code that takes an Option (that may contain an instance of this type) and yields a Value
 	  * @param optionCode Reference to the option to convert
 	  * @param isToJson Whether the generated code is used in a setting where the value is then written to json
 	  *                 (default = false)
@@ -330,7 +330,7 @@ trait ConcreteSingleColumnPropertyType extends SingleColumnPropertyType
 }
 
 /**
-  * A common type for property types which are based on another type
+  * A common type for property types that are based on another type
   */
 trait PropertyTypeWrapper extends PropertyType
 {
@@ -366,7 +366,7 @@ trait PropertyTypeWrapper extends PropertyType
 }
 
 /**
-  * Common trait for properties which are based on another, single column property type
+  * Common trait for properties that are based on another, single column property type
   */
 trait SingleColumnPropertyTypeWrapper extends PropertyTypeWrapper with SingleColumnPropertyType
 {

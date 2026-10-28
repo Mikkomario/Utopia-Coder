@@ -181,7 +181,7 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 	}
 	
 	/**
-	 * @return A property which inherits this one
+	 * @return A property that inherits this one
 	 */
 	def newChild = copy(parents = Single(this))
 	

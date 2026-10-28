@@ -12,6 +12,7 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences, GenericDbModelRefs}
 import utopia.coder.vault.model.data.{Class, DbProperty, Property, VaultProjectSetup}
+import utopia.coder.vault.model.datatype.StandardPropertyType.{Deprecation, Expiration}
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.CollectionExtensions._
@@ -46,7 +47,7 @@ object DbModelWriter
 	/**
 	  * Generates the DB model class and the associated companion object
 	  * @param classToWrite The base class
-	  * @param parentClassReferences References generated for classes which this class inherits
+	  * @param parentClassReferences References generated for classes that this class inherits
 	 * @param modelRefs    References to various model-related classes and traits
 	  * @param tablesRef Reference to the Tables object utilized in this project
 	 * @param dbPropsData References to 1) XDbProps trait and 2) XDbPropsWrapper trait,
@@ -159,7 +160,7 @@ object DbModelWriter
 		
 		// Contains a dbProps -property for accessing property names
 		val dbPropsProp = ComputedProperty.newAbstract("dbProps", dbPropsRef,
-			description = "Access to the database properties which are utilized in this model",
+			description = "Access to the database properties that are utilized in this model",
 			isOverridden = classToWrite.isExtension)
 		// Defines the properties passed to the constructor
 		// When extending a parent YModelLike[Repr],
@@ -222,7 +223,7 @@ object DbModelWriter
 		File(storablePackage, modelLike).write().map { _ -> buildCopy }
 	}
 	
-	// XModel trait, which extends XModelLike
+	// XModel trait that extends XModelLike
 	// Does not declare new features, simply acts as an alternative to XModelLike without the generic Repr type
 	private def writeModelTrait(classToWrite: Class, storablePackage: Package,
 	                            parentClassReferences: Seq[ClassReferences],
@@ -296,7 +297,7 @@ object DbModelWriter
 	                             (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Contains multiple elements:
-		//      1) The XModelFactory trait which extends XModelFactoryLike, removing generic parameters
+		//      1) The XModelFactory trait that extends XModelFactoryLike, removing generic parameters
 		//      2) The XModelFactory companion object
 		//          2.1) Concrete XModel implementation
 		//          2.2) Concrete XModelFactory implementation
@@ -386,7 +387,7 @@ object DbModelWriter
 				val params = Pair(
 					Parameter("table", table, description = "Table targeted by these models"),
 					Parameter(dbPropsName, dbPropsRef,
-						description = "Properties which specify how the database interactions are performed")
+						description = "Properties that specify how the database interactions are performed")
 				)
 				
 				// Implements a custom apply function since case class shortcut is not available
@@ -414,10 +415,16 @@ object DbModelWriter
 				// When inheriting, also defines renamed implementations
 				val dbPropImplementations = classToWrite.properties.flatMap { prop =>
 					val dbPropImplementations = prop.dbProperties.map { dbProp =>
-						LazyValue(dbProp.name.prop,
+						val declaration = LazyValue(dbProp.name.prop,
 							description = s"Database property used for interacting with ${ dbProp.name.pluralDoc }",
 							isOverridden = prop.isDirectExtension)(
 							s"property(${ dbProp.modelName.quoted })")
+						
+						// Properties used for determining deprecation are not lazy
+						if (prop.dataType == Deprecation || prop.dataType == Expiration)
+							declaration.withType(ImmutableValue)
+						else
+							declaration
 					}
 					val renameImplementation = prop.rename.map { case (nameInParent, localName) =>
 						ComputedProperty(nameInParent.prop, isOverridden = true)(localName.prop)
@@ -714,7 +721,7 @@ object DbModelWriter
 	private def buildCopyParamsFor(classToWrite: Class)(implicit naming: NamingRules) = {
 		val idPropType = classToWrite.idType.sqlConversion.intermediate
 		val idParam = Parameter("id", idPropType.toScala, "id",
-			description = "Id to assign to the new model (default = currently assigned id)")
+			description = "ID to assign to the new model (default = currently assigned id)")
 		
 		idParam +: classToWrite.dbProperties
 			.map { prop =>

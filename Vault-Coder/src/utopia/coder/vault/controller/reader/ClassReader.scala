@@ -197,7 +197,7 @@ object ClassReader
 										.map { classFrom(_, packageAtt.name, allEnumerations, customTypes, author) }
 								// Case: Parsing failed => Logs a warning
 								case Failure(error) =>
-									log(error, s"Failed to parse the json file referred as package ${
+									log(error, s"Failed to parse the JSON file referred as package ${
 										packageAtt.name}, pointing to file ${referencedPath.absolute}")
 									Empty
 							}
@@ -301,7 +301,7 @@ object ClassReader
 			.flatMap { typeProperty =>
 				typeProperty.value.model
 					.toTry { new DataTypeException(
-						s"Custom data types must be presented as json objects. ${ typeProperty.name }/'${
+						s"Custom data types must be presented as JSON objects. ${ typeProperty.name }/'${
 							typeProperty.value }' is not a model.") }
 					.flatMap(CustomPropertyType.apply)
 					.log
@@ -368,12 +368,14 @@ object ClassReader
 					val idName = Name.interpret(model("index_name", "index_property", "index_prop", "id_name", "id_property",
 						"id_prop", "index", "id").stringOr("id"), ClassPropName.style)
 					val underScoreIdName = idName.singularIn(UnderScore)
-					val values = model("values", "vals").getVector.zipWithIndex.map { case(v, index) =>
+					val valuesWithDefaults = model("values", "vals").getVector.zipWithIndex.map { case(v, index) =>
 						v.model match {
-							case Some(model) => enumValueFrom(model, index, underScoreIdName)
-							case None => EnumerationValue(v.getString, (index + 1).toString)
+							case Some(model) =>
+								enumValueFrom(model, index, underScoreIdName) -> model("default").getBoolean
+							case None => EnumerationValue(v.getString, (index + 1).toString) -> false
 						}
 					}
+					val values = valuesWithDefaults.map { _._1 }
 					val idType = model("index_type", "id_type", "type").string
 						.flatMap { custom =>
 							StandardPropertyType.interpret(custom, model("id_length", "id_max", "length").int,
@@ -383,6 +385,7 @@ object ClassReader
 						.getOrElse { IntNumber(IntSize.fitting(values.size).getOrElse(Default)) }
 					val default = model("default").string
 						.flatMap { defaultName => values.find { _.name ~== defaultName } }
+						.orElse { valuesWithDefaults.find { _._2 }.map { _._1 } }
 					val actualPackage = model("package").string match {
 						case Some(pck) => Package(pck)
 						case None => enumPackage

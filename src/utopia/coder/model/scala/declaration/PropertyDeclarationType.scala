@@ -76,12 +76,12 @@ object PropertyDeclarationType
 	  */
 	case object ImmutableValue extends PropertyDeclarationType
 	{
-		override def toScala = "val"
+		override val toScala = "val"
 	}
 	
 	case object LazyValue extends PropertyDeclarationType
 	{
-		override def toScala = "lazy val"
+		override val toScala = "lazy val"
 	}
 	
 	/**
@@ -89,7 +89,7 @@ object PropertyDeclarationType
 	  */
 	case object Variable extends PropertyDeclarationType
 	{
-		override def toScala = "var"
+		override val toScala = "var"
 	}
 	
 	/**
@@ -97,6 +97,6 @@ object PropertyDeclarationType
 	  */
 	case object ComputedProperty extends PropertyDeclarationType
 	{
-		override def toScala = "def"
+		override val toScala = "def"
 	}
 }

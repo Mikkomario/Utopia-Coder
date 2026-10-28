@@ -79,7 +79,7 @@ case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: 
 	/**
 	  * @param filter A filter to apply
 	  * @param includeCombos Whether combo objects and combining classes should be included as well (default = false)
-	  * @return A copy of this data with only classes remaining which match the filter by their name
+	  * @return A copy of this data with only classes remaining that match the filter by their name
 	  */
 	def filterByClassName(filter: Filter, includeCombos: Boolean = false) = {
 		val f = { c: Class => filter(c.name) }
@@ -88,7 +88,7 @@ case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: 
 	/**
 	  * @param filter A filter to apply
 	  * @param includeCombos Whether combo objects and combining classes should be included as well (default = false)
-	  * @return A copy of this data with only classes remaining which match the filter by their package name
+	  * @return A copy of this data with only classes remaining that match the filter by their package name
 	  */
 	def filterByPackage(filter: Filter, includeCombos: Boolean = false) = {
 		val f = { c: Class => filter(c.packageName) }
@@ -97,7 +97,7 @@ case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: 
 	
 	/**
 	  * @param f A filter to apply
-	  * @return A copy of this data with only classes remaining which match the filter
+	  * @return A copy of this data with only classes remaining that match the filter
 	  */
 	def filterByClass(f: Class => Boolean) = filterByClassOrCombo(f) { _ => false }
 	/**
@@ -111,7 +111,7 @@ case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: 
 	  *                     (also includes their related combinations)
 	  * @param includeCombo A function that returns true for combinations that should be included in the results
 	  *                     (also includes their classes)
-	  * @return A copy of this data with only classes remaining which match the filter
+	  * @return A copy of this data with only classes remaining that match the filter
 	  */
 	def filterByClassOrCombo(includeClass: Class => Boolean)(includeCombo: CombinationData => Boolean) = {
 		val remainingClasses = classes.filter(includeClass)
@@ -121,7 +121,7 @@ case class ModuleData(moduleName: Name, modelPackage: Package, databasePackage: 
 	
 	/**
 	  * @param filter A filter to apply
-	  * @return A copy of this data with only enumerations remaining which match the filter by their name
+	  * @return A copy of this data with only enumerations remaining that match the filter by their name
 	  */
 	def filterByEnumName(filter: Filter) =
 		copy(enumerations = enumerations.filter { e => filter(e.name) }, classes = Empty, combinations = Empty)

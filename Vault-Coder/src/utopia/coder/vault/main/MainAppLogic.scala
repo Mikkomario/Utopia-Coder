@@ -34,7 +34,7 @@ import scala.io.Codec
 import scala.util.{Failure, Success, Try}
 
 /**
-  * The main Vault-Coder application logic which reads one or more input files and generates class files,
+  * The main Vault-Coder application logic that reads one or more input files and generates class files,
   * tables, documentation, etc.
   * @author Mikko Hilpinen
   * @since 4.9.2021, v0.1
@@ -151,7 +151,7 @@ object MainAppLogic extends CoderAppLogic
 	 * @param subDirectoryName Name of the directory in which the old files from this directory are placed
 	 */
 	def backup(directory: Path, subDirectoryName: String = "last-build") = {
-		// Moves the previously written files to a backup directory (which is cleared first)
+		// Moves the previously written files to a backup directory (that is cleared first)
 		val backupDirectory = directory/subDirectoryName
 		if (backupDirectory.exists)
 			backupDirectory.deleteContents().failure.foreach { e =>
@@ -245,7 +245,7 @@ object MainAppLogic extends CoderAppLogic
 		val writeResults = filteredData.filter { _._1.nonEmpty }.map { case (module, paths) =>
 			println(s"Writing class and enumeration data to ${paths.output.toAbsolutePath}...")
 			paths.output.asExistingDirectory.flatMap { directory =>
-				// Moves the previously written files to a backup directory (which is cleared first)
+				// Moves the previously written files to a backup directory (that is cleared first)
 				if (directory != commonOutputPath)
 					backup(directory)
 				
@@ -325,7 +325,7 @@ object MainAppLogic extends CoderAppLogic
 		data.enumerations.tryMapAll { EnumerationWriter(_) }
 			// Writes project documentation
 			.flatMap { _ => DocumentationWriter(data, path("md")) }
-			// Writes the tables document, which is referred to later, also
+			// Writes the tables document that is referred to later, also
 			.flatMap { _ => TablesWriter(data.classes.filterNot { _.isGeneric }) }
 			.flatMap { tablesRef =>
 				DescriptionLinkInterfaceWriter(data.classes, tablesRef, targetingByDefault).flatMap { descriptionLinkObjects =>

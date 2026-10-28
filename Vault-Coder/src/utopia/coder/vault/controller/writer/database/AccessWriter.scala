@@ -151,7 +151,7 @@ object AccessWriter
 			}
 			ComputedProperty("model", Set(dbPropsOrDbModelRef),
 				explicitOutputType = explicitType, visibility = Protected,
-				description = "Model which contains the primary database properties interacted with in this access point",
+				description = "Model that contains the primary database properties interacted with in this access point",
 				isOverridden = classToWrite.isExtension)(
 				if (classToWrite.isGeneric) "" else dbPropsOrDbModelRef.target)
 		}
@@ -524,7 +524,7 @@ object AccessWriter
 						extensions = extensions,
 						properties = highestTraitProperties,
 						methods = highestTraitMethods,
-						description = s"A common trait for access points which target individual ${
+						description = s"A common trait for access points that target individual ${
 							classToWrite.name.pluralDoc } or similar items at a time",
 						author = classToWrite.author, since = DeclarationDate.versionedToday
 					)
@@ -820,7 +820,7 @@ object AccessWriter
 						extensions = extensions,
 						properties = highestTraitProperties,
 						methods = highestTraitMethods,
-						description = s"A common trait for access points which target multiple ${
+						description = s"A common trait for access points that target multiple ${
 							classToWrite.name.pluralDoc} or similar instances at a time",
 						author = classToWrite.author, since = DeclarationDate.versionedToday))
 					.write().map { Some(_) }
@@ -911,7 +911,7 @@ object AccessWriter
 						// Contains setters for property values (plural)
 						methods = (if (parentRef.isDefined) Set[MethodDeclaration]() else highestTraitMethods) ++
 							inheritanceMethods + filteringApply(traitType),
-						description = s"A common trait for access points which target multiple ${
+						description = s"A common trait for access points that target multiple ${
 							classToWrite.name.pluralDoc } at a time",
 						author = classToWrite.author, since = DeclarationDate.versionedToday
 					)

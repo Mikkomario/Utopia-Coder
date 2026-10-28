@@ -35,7 +35,7 @@ object CombinedModelWriter
 	          (implicit setup: VaultProjectSetup, codec: Codec, naming: NamingRules) =
 	{
 		// The combinations are written in two parts:
-		//      1) Trait format, which may be extended
+		//      1) Trait format that may be extended
 		//      2) Concrete implementation within the companion object
 		
 		val traitName = data.name.className

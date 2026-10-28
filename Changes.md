@@ -3,6 +3,8 @@
 ## v1.1.4 (in development)
 ### Other changes
 - Removed model classes that are no longer present in Flow; Added HasProperties reference.
+- When writing merge conflicts, only conflicts that are visibly distinct (ignoring whitespace differences) 
+  are documented
 
 ## v1.1.3 - 1.11.2025
 ### Bugfixes

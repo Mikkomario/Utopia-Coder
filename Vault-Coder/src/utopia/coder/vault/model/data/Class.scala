@@ -48,7 +48,7 @@ object Class
 	 * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
 	 *                              Generating such a trait is recommended when intending to generate or build multiple
 	 *                              combinations around this class.
-	 * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
+	 * @param isGeneric Whether this is a generic class / trait that may be extended by other classes
 	 *                  (default = false)
 	 * @return A new class
 	  */
@@ -66,7 +66,7 @@ object Class
 	 * @param localName Name used for this class in a local / closed setting, such as in a combo trait
 	 *                  (default = None = use full name)
 	 * @param properties Properties in this class
-	  * @param packageName Name of the package in which to wrap this class (default = empty)
+	  * @param packageName Name of the package in that to wrap this class (default = empty)
 	  * @param customSubPackageName Name to apply for this class's package when writing access points.
 	  *                             Empty if to be auto-generated (default).
 	  * @param idName Name of this class' id property (default = id)
@@ -80,7 +80,7 @@ object Class
 	 * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
 	 *                              Generating such a trait is recommended when intending to generate or build multiple
 	 *                              combinations around this class.
-	 * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
+	 * @param isGeneric Whether this is a generic class / trait that may be extended by other classes
 	 *                  (default = false)
 	 * @return A new class
 	  */
@@ -117,14 +117,14 @@ object Class
   * @param description A description of this class
   * @param author Author of this class
  * @param referenceFrom Package from which this class should be referenced from.
- *                      Specify this value only for classes which
+ *                      Specify this value only for classes that
  *                      exist in another project and should not generate any files.
  * @param useLongId Whether to use long instead of int in the id property
   * @param hasCombos Whether this class forms combo-classes
  * @param writeCommonComboTrait Whether a common combination trait should be generated for this class.
  *                              Generating such a trait is recommended when intending to generate or build multiple
  *                              combinations around this class.
- * @param isGeneric Whether this is a generic class / trait which may be extended by other classes
+ * @param isGeneric Whether this is a generic class / trait that may be extended by other classes
   */
 // TODO: customTableName should be Option[Name]
 case class Class(name: Name, localName: Name, customTableName: Option[String], storedPrefix: String,
@@ -159,21 +159,21 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 		case _ => false
 	} }
 	/**
-	 * @return Property in this class which contains instance deprecation time. None if no such property is present.
+	 * @return Property in this class that contains instance deprecation time. None if no such property is present.
 	 */
 	lazy val nullDeprecationProperty = properties.find { _.dataType match {
 		case Deprecation => true
 		case _ => false
 	} }
 	/**
-	 * @return Property in this class which contains instance expiration time. None if no such property is present.
+	 * @return Property in this class that contains instance expiration time. None if no such property is present.
 	 */
 	lazy val expirationProperty = properties.find { _.dataType match {
 		case Expiration => true
 		case _ => false
 	} }
 	/**
-	 * The property in this class which relates to instance deprecation
+	 * The property in this class that relates to instance deprecation
 	 */
 	lazy val deprecationProperty = nullDeprecationProperty.orElse(expirationProperty)
 	

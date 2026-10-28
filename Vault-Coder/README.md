@@ -174,6 +174,7 @@ When specifying enumeration values, please specify the following properties:
   - Please note that in order to pass a String id, you need to wrap it in double quotes, 
     for example `"\"TestId\""`, which would show as `"TestId"` in the code.
 - **"doc": String (optional)** - Documentation for this enumeration value
+- **default: Boolean** - Whether this value is this enumeration's default value
 
 ### Class Object Structure
 Class objects should contain following properties:

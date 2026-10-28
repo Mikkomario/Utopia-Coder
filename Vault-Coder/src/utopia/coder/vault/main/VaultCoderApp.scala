@@ -4,7 +4,7 @@ import utopia.coder.controller.app.{AppLogic, CoderApp, ListProjectsAppLogic, Sh
 import utopia.coder.vault.util.Common._
 
 /**
-  * The command line application for this project, which simply reads data from a json file and outputs it to a certain
+  * The command line application for this project that simply reads data from a json file and outputs it to a certain
   * location
   * @author Mikko Hilpinen
   * @since 4.9.2021, v0.1

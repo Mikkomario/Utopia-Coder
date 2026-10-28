@@ -3,7 +3,7 @@ package utopia.coder.model.data
 import utopia.coder.controller.refactoring.Backup
 import utopia.coder.model.merging.MergeConflict
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.{Empty, Single}
+import utopia.flow.collection.immutable.{Empty, Pair, Single}
 import utopia.flow.parse.file.FileExtensions._
 import utopia.flow.util.result.TryExtensions._
 import utopia.flow.util.Version
@@ -83,14 +83,22 @@ trait ProjectSetup
 	def recordConflicts(conflicts: Seq[MergeConflict], header: => String) = {
 		if (conflicts.nonEmpty) {
 			mergeConflictsFilePath.createParentDirectories().flatMap { path =>
-				path.appendLines(Vector("", "", s"// $header ${"-" * 10}") ++ conflicts.flatMap { conflict =>
-					if (conflict.readVersion.nonEmpty || conflict.generatedVersion.nonEmpty)
-						("" +: conflict.description.notEmpty.map { "// " + _ }.toVector) ++
-							("// Old Version" +: conflict.readVersion.map { _.toString }) ++
-							("// New Version" +: conflict.generatedVersion.map { _.toString })
-					else
-						Single(s"// ${conflict.description}")
-				})
+				path.appendLines(Vector("", "", s"// $header ${"-" * 10}").iterator ++
+					conflicts.iterator
+						// Only documents conflicts that are visibly distinct (ignoring whitespace differences)
+						.filter { conflict =>
+							Pair(conflict.readVersion, conflict.generatedVersion).isAsymmetricBy {
+								_.iterator.map { _.code.filterNot { c => c == ' ' || c == '\n' } }.mkString
+							}
+						}
+						.flatMap { conflict =>
+							if (conflict.readVersion.nonEmpty || conflict.generatedVersion.nonEmpty)
+								("" +: conflict.description.notEmpty.map { "// " + _ }.toVector) ++
+									("// Old Version" +: conflict.readVersion.map { _.toString }) ++
+									("// New Version" +: conflict.generatedVersion.map { _.toString })
+							else
+								Single(s"// ${conflict.description}")
+						})
 			}.failure.foreach { error =>
 				println(s"Failed to write conflicts document due to an error: ${error.getMessage}")
 			}

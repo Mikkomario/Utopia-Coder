@@ -237,7 +237,7 @@ object TargetingWriter
 	                       (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
 		// Won't generate a file if there are no "with" or "in" -methods
-		// (except for classes that extend more than 1 other class, and those which support deprecation)
+		// (except for classes that extend more than 1 other class, and those that support deprecation)
 		val filterMethods = AccessWriter.filterMethodsFor(classToWrite, "model")
 		val filterProps = timestampFilterPropsFor(classToWrite)
 		val parents = parentClassRefs.flatMap { _.targeting.flatMap { _.filtering } }
@@ -292,7 +292,7 @@ object TargetingWriter
 							ComputedProperty("timestampColumn", isOverridden = true)(s"model.${ p.name.prop }")
 						},
 					methods = filterMethods,
-					description = s"Common trait for access points which may be filtered based on ${
+					description = s"Common trait for access points that may be filtered based on ${
 						classToWrite.name } properties",
 					author = classToWrite.author,
 					since = DeclarationDate.versionedToday
@@ -331,7 +331,7 @@ object TargetingWriter
 							description = s"Wrapped access point. Expected to include ${ classToWrite.tableName }.")
 					) ++ modelParam,
 				extensions = Pair(filterRef(accessType), filterableViewWrapper(accessType)),
-				description = s"An interface which provides ${
+				description = s"An interface that provides ${
 					classToWrite.name } -based filtering for other types of access points.",
 				properties = Single(ComputedProperty("table", isOverridden = true)("model.table")),
 				author = classToWrite.author,
@@ -403,10 +403,10 @@ object TargetingWriter
 		val comboProps = combos.flatMap { combo =>
 			val childAccessPackage = packageFor(combo.childClass)
 			
-			// 1. Caches the joined access version, which is used in these properties
+			// 1. Caches the joined access version that is used in these properties
 			val joinedPropName = (joinedToPrefix +: combo.childName).apply(ClassPropName, plural = accessMany)
 			val joinedProp = LazyValue(joinedPropName, Set(tablesRef),
-				description = s"A copy of this access which also targets ${ combo.childClass.tableName }",
+				description = s"A copy of this access that also targets ${ combo.childClass.tableName }",
 				isLowMergePriority = true)(
 				s"join(${ tablesRef.target }.${ combo.childClass.name.prop })")
 			

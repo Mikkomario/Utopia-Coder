@@ -5,14 +5,14 @@ import utopia.coder.model.enumeration.NamingConvention.CamelCase
 import utopia.coder.model.scala.Visibility.{Private, Protected}
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
-import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
+import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter}
 import utopia.coder.vault.controller.writer.model.ParseModelCode
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences}
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
-import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq, Pair, Single}
+import utopia.flow.collection.immutable.{OptimizedIndexedSeq, Pair, Single}
 
 import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
@@ -145,7 +145,7 @@ object DbFactoryWriter
 				Set(applyMethod, fromModelImplementation)
 		}
 		
-		val factoryDescription = s"Common trait for factories which parse ${
+		val factoryDescription = s"Common trait for factories that parse ${
 			classToWrite.name } data from database-originated models"
 		
 		val classNameSuffix = if (targeting) readerSuffix else factorySuffix
@@ -171,19 +171,18 @@ object DbFactoryWriter
 				since = DeclarationDate.versionedToday
 			)
 			
-			// The concrete implementation accepts 2 parameters: 1) table and 2) dbProps
+			// The concrete implementation accepts a dbProps instance
 			// The linked apply(...) method uses these same parameters
 			val concreteImplementationName = s"_$factoryName"
-			val constructorParams = Pair(
-				Parameter("table", table, description = "Table from which data is read"),
-				Parameter("dbProps", dbPropsOrDbModelRef,
-					description = "Database properties used when reading column data"))
+			val constructorParams = Single(Parameter("dbProps", dbPropsOrDbModelRef,
+				description = "Database properties used when reading column data"))
+			val tableProp = ComputedProperty("table", isOverridden = true)("dbProps.table")
 			val concreteFactoryImplementation = ClassDeclaration(
 				visibility = Private,
 				name = concreteImplementationName,
 				extensions = Single(factoryType),
 				constructionParams = constructorParams,
-				properties = if (targeting) Empty else Single(defaultOrderingProp),
+				properties = if (targeting) Single(tableProp) else Pair(tableProp, defaultOrderingProp),
 				// NB: The drop(2) here is not very elegant. May require refactoring later.
 				methods = Set(MethodDeclaration("apply", Set(modelRefs.stored, modelRefs.data),
 					visibility = Protected, isOverridden = true)(
@@ -226,7 +225,7 @@ object DbFactoryWriter
 		else
 			builder += fromValidatedRowModelFactory(modelType)
 		
-		// For tables which contain a creation time index, additional inheritance is added
+		// For tables that contain a creation time index, additional inheritance is added
 		// However, this feature is disabled in targeting mode
 		if (!targeting && classToWrite.recordsIndexedCreationTime)
 			builder += fromTimelineRowFactory(modelType)
@@ -244,7 +243,7 @@ object DbFactoryWriter
 	{
 		val builder = new VectorBuilder[PropertyDeclaration]()
 		
-		// All objects define a model property, which is used in other functions
+		// All objects define a model property that is used in other functions
 		// (when inheriting, this is called dbProps instead)
 		val modelName = if (classToWrite.isExtension) "dbProps" else "model"
 		builder += ImmutableValue(modelName, Set(dbModelRef),
@@ -316,7 +315,7 @@ object DbFactoryWriter
 	
 	private def genericTraitApplyParamsFor(classToWrite: Class)(implicit naming: NamingRules) = {
 		// The apply parameters consist of 2 static parameters: model + id,
-		// as well as n custom parameters which are defined by trait properties
+		// as well as n custom parameters that are defined by trait properties
 		val customApplyParams = classToWrite.properties.map { prop =>
 			Parameter(prop.name.prop, prop.dataType.toScala,
 				description = s"${ prop.name } to assign to the new ${ classToWrite.name }")
@@ -324,7 +323,7 @@ object DbFactoryWriter
 		Pair(
 			Parameter("model", flow.hasProperties, description = "Model from which additional data may be read"),
 			Parameter("id", classToWrite.idType.toScala,
-				description = s"Id to assign to the read/parsed ${ classToWrite.name }")
+				description = s"ID to assign to the read/parsed ${ classToWrite.name }")
 		) ++ customApplyParams
 	}
 }
