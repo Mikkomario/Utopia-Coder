@@ -417,7 +417,7 @@ object MainAppLogic extends CoderAppLogic
 							case None => dbModelRefs.rightOrMap { _.model }
 							case Some((refs, _)) => refs.first
 						}
-						DbFactoryWriter(classToWrite, parentClassReferences, modelRefs, dbPropsOrModelRef,
+						DbReaderWriter(classToWrite, parentClassReferences, modelRefs, dbPropsOrModelRef,
 							targetingByDefault)
 							.flatMap { case (dbFactoryRef, dbFactoryLikeRef) =>
 								// Adds description-specific references if applicable
@@ -521,7 +521,7 @@ object MainAppLogic extends CoderAppLogic
 		
 		val modelRefs = ModelWriter.generateReferences(rootPackage/"model", classToWrite)
 		val dbModelRefs = DbModelWriter.generateReferences(dbPackage/"storable", classToWrite)
-		val (dbFactory, dbFactoryLike) = DbFactoryWriter
+		val (dbFactory, dbFactoryLike) = DbReaderWriter
 			.generateReferences(dbPackage/(if (targeting) "reader" else "factory"), classToWrite, targeting)
 		val accessRefs = AccessWriter.generateReferences(accessPackage, classToWrite)
 		

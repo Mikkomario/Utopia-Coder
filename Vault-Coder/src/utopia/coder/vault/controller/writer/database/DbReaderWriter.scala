@@ -2,7 +2,7 @@ package utopia.coder.vault.controller.writer.database
 
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.CamelCase
-import utopia.coder.model.scala.Visibility.{Private, Protected}
+import utopia.coder.model.scala.Visibility.Protected
 import utopia.coder.model.scala.datatype.Reference._
 import utopia.coder.model.scala.datatype.{Extension, GenericType, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue}
@@ -12,26 +12,27 @@ import utopia.coder.vault.controller.writer.model.ParseModelCode
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences}
 import utopia.coder.vault.model.data.{Class, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences.Vault._
-import utopia.flow.collection.immutable.{OptimizedIndexedSeq, Pair, Single}
+import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq, Pair, Single}
 
-import scala.collection.immutable.VectorBuilder
 import scala.io.Codec
 
 /**
-  * Used for writing standard model (from DB) factory objects
+  * Used for writing standard model (from DB) reader objects
   * @author Mikko Hilpinen
   * @since 1.9.2021, v0.1
   */
-object DbFactoryWriter
+object DbReaderWriter
 {
 	// ATTRIBUTES   --------------------
 	
 	/**
-	  * A suffix added to class names in order to make them factory class names
+	  * A suffix added to class names in order to make them factory class names.
+	 * Used in the legacy mode.
 	  */
 	val factorySuffix = Name("DbFactory", "DbFactories", CamelCase.capitalized)
 	/**
-	 * A suffix added to class names when writing database readers
+	 * A suffix added to class names when writing database readers.
+	 * Used in the current targeting mode.
 	 */
 	val readerSuffix = Name("DbReader", "DbReaders", CamelCase.capitalized)
 	
@@ -68,12 +69,11 @@ object DbFactoryWriter
 		val classNameSuffix = if (targeting) readerSuffix else factorySuffix
 		val factoryName = (classToWrite.name + classNameSuffix).className
 		
-		// Case: Abstract trait => Implements XDbFactoryLike, XDbFactory trait
-		//                         and XDbFactory companion object containing a concrete implementation
+		// Case: Abstract trait => Implements XDbFactoryLike trait and XDbReader class
 		if (classToWrite.isGeneric)
-			writeGenericFactory(classToWrite, factoryPackage, factoryName, parentClassReferences, modelRefs,
+			writeGenericTraits(classToWrite, factoryPackage, factoryName, parentClassReferences, modelRefs,
 				dbPropsOrDbModelRef, targeting)
-		// Case: Concrete factory => Just implements the XDbFactory object
+		// Case: Concrete factory => Just implements the XDbReader object
 		else {
 			// Implements the primary from-model method
 			val fromModel = fromModelMethodFor(classToWrite, modelRefs.stored, modelRefs.data, targeting)
@@ -114,12 +114,12 @@ object DbFactoryWriter
 		factory -> factoryLike
 	}
 	
-	private def writeGenericFactory(classToWrite: Class, factoryPackage: Package, factoryName: String,
-	                                parentClassReferences: Seq[ClassReferences],
-	                                modelRefs: ClassModelReferences, dbPropsOrDbModelRef: Reference, targeting: Boolean)
+	private def writeGenericTraits(classToWrite: Class, readerPackage: Package, readerName: String,
+	                               parentClassReferences: Seq[ClassReferences], modelRefs: ClassModelReferences,
+	                               dbPropsOrDbModelRef: Reference, targeting: Boolean)
 	                               (implicit codec: Codec, setup: VaultProjectSetup, naming: NamingRules) =
 	{
-		// Starts with the XDbFactoryLike[+A] trait
+		// Starts with the XDbReaderLike[+A] trait
 		val aGenericType = GenericType.covariant("A", description = "Type of read instances")
 		val aType = aGenericType.toScalaType
 		
@@ -127,6 +127,8 @@ object DbFactoryWriter
 		val dbProps = ComputedProperty.newAbstract("dbProps", dbPropsOrDbModelRef,
 			description = "Database properties used when parsing column data",
 			isOverridden = classToWrite.isExtension)
+		// Implements the table property
+		val tableProp = ComputedProperty("table", isOverridden = true)("dbProps.table")
 		
 		// Defines an abstract apply(AnyModel, id, ...) for constructing new instances
 		val applyParams = genericTraitApplyParamsFor(classToWrite)
@@ -134,7 +136,7 @@ object DbFactoryWriter
 			returnDescription = s"A ${ classToWrite.name } with the specified data", isProtected = true)(
 			applyParams)
 		
-		// Implements the from model parsing functionality using this apply function
+		// Implements the from-model parsing functionality using this apply function
 		val fromModelImplementation = fromModelMethodFor(classToWrite, modelRefs.stored, modelRefs.data, targeting)
 		// When inheriting another trait, makes sure the new apply is not identical to the old
 		val methods = {
@@ -145,66 +147,36 @@ object DbFactoryWriter
 				Set(applyMethod, fromModelImplementation)
 		}
 		
-		val factoryDescription = s"Common trait for factories that parse ${
-			classToWrite.name } data from database-originated models"
-		
 		val classNameSuffix = if (targeting) readerSuffix else factorySuffix
-		File(factoryPackage, TraitDeclaration(
+		File(readerPackage, TraitDeclaration(
 			name = (classToWrite.name + classNameSuffix + likeSuffix).className,
 			genericTypes = Single(aGenericType),
 			extensions = extensionsFor(classToWrite, parentClassReferences, aType, targeting),
-			properties = Single(dbProps),
+			properties = Pair(dbProps, tableProp),
 			methods = methods,
-			description = factoryDescription,
+			description = s"Common trait for factories that parse ${
+				classToWrite.name } data from database-originated models",
 			author = classToWrite.author,
 			since = DeclarationDate.versionedToday
-		)).write().flatMap { factoryLikeRef =>
-			// Next writes the XDbFactory trait + companion object
-			val factoryType = ScalaType.basic(factoryName)
-			
-			// The trait doesn't add additional functionality, it simply removes the generic A type
-			val traitDeclaration = TraitDeclaration(
-				name = factoryName,
-				extensions = Single(factoryLikeRef(modelRefs.stored)),
-				description = factoryDescription,
-				author = classToWrite.author,
-				since = DeclarationDate.versionedToday
-			)
-			
-			// The concrete implementation accepts a dbProps instance
-			// The linked apply(...) method uses these same parameters
-			val concreteImplementationName = s"_$factoryName"
-			val constructorParams = Single(Parameter("dbProps", dbPropsOrDbModelRef,
-				description = "Database properties used when reading column data"))
-			val tableProp = ComputedProperty("table", isOverridden = true)("dbProps.table")
-			val concreteFactoryImplementation = ClassDeclaration(
-				visibility = Private,
-				name = concreteImplementationName,
-				extensions = Single(factoryType),
-				constructionParams = constructorParams,
-				properties = if (targeting) Single(tableProp) else Pair(tableProp, defaultOrderingProp),
+		)).write().flatMap { readerLikeRef =>
+			// Next writes the XDbReader class
+			val readerClass = ClassDeclaration(
+				name = readerName,
+				extensions = Single(readerLikeRef(modelRefs.stored)),
+				// The concrete class accepts a dbProps instance
+				constructionParams = Single(Parameter("dbProps", dbPropsOrDbModelRef,
+					description = "Database properties used when reading column data")),
+				properties = if (targeting) Empty else Single(defaultOrderingProp),
 				// NB: The drop(2) here is not very elegant. May require refactoring later.
 				methods = Set(MethodDeclaration("apply", Set(modelRefs.stored, modelRefs.data),
 					visibility = Protected, isOverridden = true)(
 					applyParams)(
 					s"${ modelRefs.stored.target }(id, ${ modelRefs.data.target }(${
 						applyParams.drop(2).map { _.name }.mkString(", ") }))")),
+				description = s"Used for pulling ${ classToWrite.name.pluralDoc } from the database",
 				isCaseClass = true
 			)
-			
-			val constructConcrete = MethodDeclaration("apply", explicitOutputType = Some(factoryType),
-				returnDescription = s"A factory used for parsing ${
-					classToWrite.name.pluralDoc } from database model data")(constructorParams)(
-				s"$concreteImplementationName(${ constructorParams.map { _.name }.mkString(", ") })")
-			
-			// The companion object provides access to this concrete implementation via apply
-			val companionObject = ObjectDeclaration(
-				name = factoryName,
-				methods = Set(constructConcrete),
-				nested = Set(concreteFactoryImplementation)
-			)
-			
-			File(factoryPackage, companionObject, traitDeclaration).write().map { _ -> Some(factoryLikeRef) }
+			File(readerPackage, readerClass).write().map { _ -> Some(readerLikeRef) }
 		}
 	}
 	
@@ -241,7 +213,7 @@ object DbFactoryWriter
 	private def concretePropertiesFor(classToWrite: Class, dbModelRef: Reference, targeting: Boolean)
 	                                 (implicit naming: NamingRules) =
 	{
-		val builder = new VectorBuilder[PropertyDeclaration]()
+		val builder = OptimizedIndexedSeq.newBuilder[PropertyDeclaration]
 		
 		// All objects define a model property that is used in other functions
 		// (when inheriting, this is called dbProps instead)
@@ -250,8 +222,9 @@ object DbFactoryWriter
 			description = "Model that specifies how the data is read", isOverridden = classToWrite.isExtension)(
 			dbModelRef.target)
 		
-		// All objects define the table property (implemented)
-		builder += ComputedProperty("table", isOverridden = true)(s"$modelName.table")
+		// All objects define the table property (implemented), except when already defined in the abstract parent
+		if (!classToWrite.isExtension)
+			builder += ComputedProperty("table", isOverridden = true)(s"$modelName.table")
 		// Timestamp-based factories also specify a creation time property name
 		// This feature is disabled in targeting mode
 		if (!targeting) {

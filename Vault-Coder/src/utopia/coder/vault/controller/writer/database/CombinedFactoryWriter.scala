@@ -131,5 +131,5 @@ object CombinedFactoryWriter
 		setup.factoryPackageFor(targeting)/data.packageName
 	
 	private def factoryNameFor(data: CombinationData, targeting: Boolean)(implicit naming: NamingRules) =
-		(data.name + (if (targeting) DbFactoryWriter.readerSuffix else DbFactoryWriter.factorySuffix)).className
+		(data.name + (if (targeting) DbReaderWriter.readerSuffix else DbReaderWriter.factorySuffix)).className
 }

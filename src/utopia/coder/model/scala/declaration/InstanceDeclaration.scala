@@ -2,10 +2,11 @@ package utopia.coder.model.scala.declaration
 
 import utopia.coder.model.scala.doc.ScalaDocKeyword.{Author, Since}
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.Pair
+import utopia.flow.collection.immutable.{Empty, Pair}
 import utopia.flow.util.StringExtensions._
 import utopia.coder.model.scala.code.CodeBuilder
 import utopia.coder.model.merging.{MergeConflict, Mergeable}
+import utopia.coder.model.scala.Visibility.Public
 import utopia.coder.model.scala.code.Code
 import utopia.coder.model.scala.datatype.{Extension, GenericType, ScalaType}
 import utopia.coder.model.scala.declaration.InstanceDeclarationType.{ClassD, ObjectD, TraitD}
@@ -15,6 +16,63 @@ import utopia.coder.model.scala.template.CodeConvertible
 import utopia.flow.operator.ordering.CombinedOrdering
 
 import scala.collection.immutable.VectorBuilder
+
+object InstanceDeclaration
+{
+	/**
+	 * Creates either a class or a trait
+	 * @param name Name of this class/trait
+	 * @param genericTypes Accepted generic type parameters. Default = empty.
+	 * @param constructionParams Accepted construction parameters. Note: Only supported by classes. Default = empty.
+	 * @param extensions Inherited extensions. Default = empty.
+	 * @param types Declared types. Default = empty.
+	 * @param creationCode Code ran at instance creation. Only supported by classes at this time. Default = empty.
+	 * @param properties Declared properties. Default = empty.
+	 * @param methods Declared methods / functions. Default = empty.
+	 * @param nested Nested instances. Default = empty.
+	 * @param visibility Visibility of this class/trait. Default = public.
+	 * @param annotations Annotations to add. Default = empty.
+	 * @param description A description of this class/trait. Default = empty.
+	 * @param author Author of this class/trait. Default = empty.
+	 * @param headerComments Comments to add above class/trait declaration. Default = empty.
+	 * @param since Date when this class/trait was written. Default = today.
+	 * @param isTrait Whether this is a trait. False if this is a class.
+	 * @param isCase Whether this is a case class. Only applied for classes. Default = false.
+	 * @param isAbstract Whether this is an abstract class. Only considered for classes. Default = false.
+	 * @param isSealed Whether this is a sealed trait. Only supported for traits at this time. Default = false.
+	 * @return A new class or trait declaration
+	 */
+	@throws[IllegalArgumentException]("If attempting to specify constructor parameters for a trait")
+	@throws[UnsupportedOperationException]("If attempting to specify creation code for a trait or to create a sealed class")
+	def classOrTrait(name: String, genericTypes: Seq[GenericType] = Empty,
+	                 constructionParams: Parameters = Parameters.empty, extensions: Seq[Extension] = Empty,
+	                 types: Seq[TypeDeclaration] = Empty, creationCode: Code = Code.empty,
+	                 properties: Seq[PropertyDeclaration] = Empty, methods: Set[MethodDeclaration] = Set(),
+	                 nested: Set[InstanceDeclaration] = Set(), visibility: Visibility = Public,
+	                 annotations: Seq[Annotation] = Empty, description: String = "", author: String = "",
+	                 headerComments: Seq[String] = Empty, since: DeclarationDate = DeclarationDate.today,
+	                 isTrait: Boolean, isCase: Boolean = false, isAbstract: Boolean = false, isSealed: Boolean = false): InstanceDeclaration =
+	{
+		if (isTrait) {
+			if (constructionParams.nonEmpty)
+				throw new IllegalArgumentException("Traits cannot have construction parameters")
+			else if (creationCode.nonEmpty)
+				throw new UnsupportedOperationException("Traits don't support creation code at this time")
+			
+			TraitDeclaration(name, genericTypes, extensions, types, properties,
+				methods, nested, visibility, annotations, description, author, headerComments, since,
+				isSealed = isSealed)
+		}
+		else {
+			if (isSealed)
+				throw new UnsupportedOperationException("Sealed classes are not supported at this time")
+			
+			ClassDeclaration(name, genericTypes, constructionParams, extensions, types, creationCode, properties,
+				methods, nested, visibility, annotations, description, author, headerComments, since,
+				isCaseClass = isCase, isAbstract = isAbstract)
+		}
+	}
+}
 
 /**
   * Declares an object or a class

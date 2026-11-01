@@ -599,6 +599,8 @@ This application will produce the following documents
       - stored
         - **P**
           - **X.scala** - A stored variant of the class model
+          - **StoredXLike.scala** - A version of X that accepts a custom **Repr** type. 
+            Only generated if combo classes will be present.
       - combined
         - **P**
           - **CombinedX.scala** - If there were multiple combinations or if `has_many_combos` was set to true

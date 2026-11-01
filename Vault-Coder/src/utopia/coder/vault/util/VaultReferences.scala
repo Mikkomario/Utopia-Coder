@@ -33,6 +33,7 @@ object VaultReferences
 		lazy val storedModelConvertible = Reference(store, "StoredModelConvertible")
 		lazy val storedFromModelFactory = Reference(store, "StoredFromModelFactory")
 		lazy val standardStoredFactory = Reference(store, "StandardStoredFactory")
+		lazy val canCopyData = Reference(store, "CanCopyData")
 		
 		lazy val connection = Reference(database, "Connection")
 		lazy val table = Reference(models / "immutable", "Table")

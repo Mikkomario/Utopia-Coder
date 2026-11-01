@@ -8,6 +8,7 @@ import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Parameter, Parameters}
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, CombinationReferences}
 import utopia.coder.vault.model.data.{CombinationData, VaultProjectSetup}
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Pair, Single}
 import utopia.flow.util.StringExtensions._
 
@@ -37,7 +38,6 @@ object CombinedModelWriter
 		// The combinations are written in two parts:
 		//      1) Trait format that may be extended
 		//      2) Concrete implementation within the companion object
-		
 		val traitName = data.name.className
 		val traitType = ScalaType.basic(traitName)
 		
@@ -58,10 +58,10 @@ object CombinedModelWriter
 		
 		val comboTrait = TraitDeclaration(
 			name = traitName,
-			extensions = standardExtensions(parentRefs, traitType),
+			// Extends both X and StoredXLike, specifying a new Repr type
+			extensions = parentRefs.stored +: parentRefs.storedLike.map[Extension] { _(traitType) }.emptyOrSingle,
 			properties = Single(childProp),
-			description = data.description
-				.nonEmptyOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
+			description = data.description.nonEmptyOrElse(s"Combines ${data.parentName} with ${data.childName} data"),
 			author = data.author,
 			since = DeclarationDate.versionedToday
 		)
@@ -81,14 +81,15 @@ object CombinedModelWriter
 			extensions = Single(traitType),
 			methods = Set(
 				MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
-					Parameter("factory", parentRefs.data))("copy(data = factory)"),
+					Parameter("data", parentRefs.data))("copy(data = data)"),
 				MethodDeclaration("withId", isOverridden = true)(Parameter("id", data.parentClass.idType.toScala))(
 					"copy(id = id)")
 			),
 			isCaseClass = true
 		)
 		
-		val parentParam = Parameter(parentName.prop, parentRefs.stored, description = s"The ${ parentName.doc } to wrap")
+		val parentParam = Parameter(parentName.prop, parentRefs.stored,
+			description = s"The ${ parentName.doc } to wrap")
 		
 		val companionObject = ObjectDeclaration(
 			name = traitName,
@@ -108,13 +109,4 @@ object CombinedModelWriter
 		File(setup.combinedModelPackage/data.packageName, companionObject, comboTrait)
 			.write().map { comboRef => CombinationReferences(parentRefs.stored, childRef, comboRef) }
 	}
-	
-	// Generates the extensions applied to the highest level combined model -trait
-	private def standardExtensions(parentRefs: ClassModelReferences, reprType: ScalaType) = {
-		// Extends the stored version, and the factory trait with a custom Repr type
-		Pair[Extension](parentRefs.stored, parentRefs.factoryWrapper(parentRefs.data, reprType))
-	}
-	
-	private def parentProp(name: String, dataType: ScalaType, docName: String) =
-		ComputedProperty.newAbstract(name, dataType, description = s"Wrapped $docName")
 }

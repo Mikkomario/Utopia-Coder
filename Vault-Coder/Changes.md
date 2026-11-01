@@ -20,6 +20,7 @@ Compatible with Vault v2.1
 - Targeting is now the default mode
   - Replaced the `T` flag with `NT` (no-targeting)
 - When combo classes are present, the stored class version is now a trait, extended by said combined models
+  - Also, an additional StoredXLike trait gets generated
 - Generic type parameter Data in Generated StoredLike -traits is now covariant 
 - Generated Filter-traits now extend **Filterable** instead of **FilterableView**
 - Value-to-enumeration conversion is now more reliable for Int-based enumerations
