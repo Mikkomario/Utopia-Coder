@@ -216,12 +216,17 @@ object ModelWriter
 		//      3) Overrides renamed withX functions,
 		//         since both parent traits (XFactory and YFactoryWrapper) define those
 		//      5) Will not redefine withX properties from directly extended properties
-		val baseExtension = if (classToWrite.isExtension) None else Some(vault.canCopyData(wrappedType, reprType))
+		val baseExtension = {
+			if (classToWrite.isExtension)
+				Empty
+			else
+				Single[Extension](vault.canCopyData(wrappedType, reprType))
+		}
 		File(factoryPackage,
 			TraitDeclaration(
 				name = (classToWrite.name + factoryTraitSuffix + wrapperSuffix).className,
 				genericTypes = Pair(wrapped, repr),
-				extensions = OptimizedIndexedSeq.concat(
+				extensions = OptimizedIndexedSeq.concat[Extension](
 					Single[Extension](factoryRef(reprType)),
 					baseExtension,
 					parentClassReferences.map[Extension] { _.factoryWrapper(wrappedType, reprType) }
