@@ -3,19 +3,18 @@ package utopia.coder.vault.controller.writer.model
 import utopia.coder.model.data
 import utopia.coder.model.data.{Name, NamingRules}
 import utopia.coder.model.enumeration.NamingConvention.{CamelCase, UnderScore}
-import utopia.coder.model.scala.Visibility.{Private, Protected}
+import utopia.coder.model.scala.Visibility.{Private, Protected, Public}
 import utopia.coder.model.scala.code.CodePiece
 import utopia.coder.model.scala.datatype.Reference.Flow._
-import utopia.coder.model.scala.datatype.TypeVariance.Covariance
 import utopia.coder.model.scala.datatype._
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.{ComputedProperty, ImmutableValue, LazyValue}
 import utopia.coder.model.scala.declaration._
 import utopia.coder.model.scala.{DeclarationDate, Package, Parameter, Parameters}
-import utopia.flow.collection.CollectionExtensions._
 import utopia.coder.vault.controller.writer.database.{AccessWriter, TargetingWriter}
 import utopia.coder.vault.model.data.reference.{ClassModelReferences, ClassReferences, GenericClassModelReferences}
 import utopia.coder.vault.model.data.{Class, Property, VaultProjectSetup}
 import utopia.coder.vault.util.VaultReferences._
+import utopia.flow.collection.CollectionExtensions._
 import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq, Pair, Single}
 import utopia.flow.util.StringExtensions._
 
@@ -468,7 +467,9 @@ object ModelWriter
 				openParentBlock = if (mayFail) "validate(model).flatMap { model => " else CodePiece.empty,
 				yieldTry = mayFail, json = true)
 			
-			MethodDeclaration.usingCode("apply", code, isOverridden = true)(Parameter("model", hasProperties))
+			MethodDeclaration.usingCode(if (mayFail) "apply" else "fromValidatedModel", code,
+				visibility = if (mayFail) Public else Protected, isOverridden = true)(
+				Parameter("model", hasProperties))
 		}
 		
 		// Some of the implementation differs between abstract and concrete classes
