@@ -469,7 +469,7 @@ object ModelWriter
 			
 			MethodDeclaration.usingCode(if (mayFail) "apply" else "fromValidatedModel", code,
 				visibility = if (mayFail) Public else Protected, isOverridden = true)(
-				Parameter("model", hasProperties))
+				Parameter("model", if (mayFail) hasProperties else model))
 		}
 		
 		// Some of the implementation differs between abstract and concrete classes
