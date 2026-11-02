@@ -425,7 +425,7 @@ object ModelWriter
 		// Defines either a trait or a class
 		val dataClass = InstanceDeclaration.classOrTrait(
 			name = dataClassName,
-			constructionParams = constructionParams,
+			constructionParams = if (classToWrite.isGeneric) Parameters.empty else constructionParams,
 			extensions = customExtensions ++ inheritedExtensions,
 			properties = renameImplementations ++ deprecationProps ++ customProps,
 			methods = customMethods,
