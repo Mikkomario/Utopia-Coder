@@ -606,11 +606,6 @@ object ModelWriter
 			Parameter("data", dataClassRef, description = s"Wrapped ${ classToWrite.name.doc } data")
 		)
 		
-		// When inheriting other classes, extends their YData with StoredYLike[Data, Repr]
-		val inheritedExtensions = parentClassReferences.flatMap[Extension] { refs =>
-			refs.data +: refs.generic.map[Extension] { _.storedLike(dataClassRef, classType) }.emptyOrSingle
-		}
-		
 		// The withId(...) and wrap(data) functions are only implemented at the lowest level
 		val concreteMethodImplementations = {
 			val withId = withIdFor(classToWrite)
@@ -630,6 +625,10 @@ object ModelWriter
 				}
 				else
 					None -> classType
+			}
+			// When inheriting other classes, extends their YData with StoredYLike[Data, Repr]
+			val inheritedExtensions = parentClassReferences.flatMap[Extension] { refs =>
+				refs.data +: refs.generic.map[Extension] { _.storedLike(dataClassRef, reprType) }.emptyOrSingle
 			}
 			// Some of the implementation differs greatly between abstract and concrete implementations
 			// Abstract implementations are the StoredX traits that don't match any concrete table
