@@ -16,7 +16,7 @@ import utopia.coder.vault.model.datatype.StandardPropertyType.{Deprecation, Expi
 import utopia.coder.vault.util.VaultReferences.Vault._
 import utopia.coder.vault.util.VaultReferences._
 import utopia.flow.collection.CollectionExtensions._
-import utopia.flow.collection.immutable.{Empty, Pair, Single}
+import utopia.flow.collection.immutable.{Empty, OptimizedIndexedSeq, Pair, Single}
 import utopia.flow.util.StringExtensions._
 
 import scala.io.Codec
@@ -162,6 +162,8 @@ object DbModelWriter
 		val dbPropsProp = ComputedProperty.newAbstract("dbProps", dbPropsRef,
 			description = "Access to the database properties that are utilized in this model",
 			isOverridden = classToWrite.isExtension)
+		// Derives table from the dbProps
+		val tableProp = ComputedProperty("table", isOverridden = true)("dbProps.table")
 		// Defines the properties passed to the constructor
 		// When extending a parent YModelLike[Repr],
 		// skips redefining the same properties and adds rename implementations, where applicable
@@ -210,7 +212,8 @@ object DbModelWriter
 			name = (classToWrite.name + modelSuffix + likeSuffix).className,
 			genericTypes = Single(repr),
 			extensions = customExtensions :+ factory,
-			properties = (optionalProps :+ dbPropsProp) ++ valueProps ++ propRenameImplementations,
+			properties = Vector.concat(optionalProps, Pair(dbPropsProp, tableProp), valueProps,
+				propRenameImplementations),
 			methods = (withMethods + buildCopy) ++ parentBuildCopyImplementations ++
 				withRenameImplementations ++ withId,
 			description = s"Common trait for database models used for interacting with ${
@@ -244,16 +247,15 @@ object DbModelWriter
 			since = DeclarationDate.versionedToday
 		)
 		// The companion object contains a factory function
-		// for creating concrete DB model factories based on table & property configurations
+		// for creating concrete DB model factories based on property configurations
 		val companion = ObjectDeclaration(
 			name = className,
-			methods = Set(MethodDeclaration("factory",
-				returnDescription = s"A factory used for constructing ${
-					classToWrite.name } models using the specified configuration")(
-				Pair(
-					Parameter("table", table, description = "The primarily targeted table"),
-					Parameter("props", dbPropsRef, description = "Targeted database properties")))(
-				s"${ (classToWrite.name + modelSuffix + factorySuffix).className }(table, props)"))
+			methods = Set(
+				MethodDeclaration("factory",
+					returnDescription = s"A factory used for constructing ${
+						classToWrite.name } models using the specified configuration")(
+					Single(Parameter("props", dbPropsRef, description = "Targeted database properties")))(
+					s"${ (classToWrite.name + modelSuffix + factorySuffix).className }(props)"))
 		)
 		
 		File(storablePackage, companion, modelTrait).write()
@@ -330,11 +332,12 @@ object DbModelWriter
 		
 		val companionObject = ObjectDeclaration(
 			name = traitName,
+			// Defines the table by reading it from the database properties
+			properties = Single(ComputedProperty("table", isOverridden = true)("dbProps.table")),
 			methods = Set(
 				MethodDeclaration("apply",
 					returnDescription = s"A factory for constructing ${ classToWrite.name } database models")(
-					Pair(Parameter("table", table), Parameter("dbProps", dbPropsRef)))(
-					s"$concreteFactoryName(table, dbProps)")),
+					Single(Parameter("dbProps", dbPropsRef)))(s"$concreteFactoryName(dbProps)")),
 			nested = Set(concreteFactory, concreteClass)
 		)
 		
@@ -381,11 +384,10 @@ object DbModelWriter
 		
 		// Certain properties differ between concrete classes and abstract traits
 		val (constructionParams, customExtensions, customProps, customMethods) = dbPropsData match {
-			// Case: Extension if a generic trait => Needs to accept the missing properties as parameters
+			// Case: Extension of a generic trait => Needs to accept the missing properties as parameters
 			//                                       and to implement a custom apply function
 			case Some((Pair(dbPropsRef, dbPropsWrapperRef), dbPropsName, parentTrait)) =>
-				val params = Pair(
-					Parameter("table", table, description = "Table targeted by these models"),
+				val params = Single(
 					Parameter(dbPropsName, dbPropsRef,
 						description = "Properties that specify how the database interactions are performed")
 				)
@@ -395,7 +397,7 @@ object DbModelWriter
 				val applyMethod = MethodDeclaration("apply", explicitOutputType = Some(modelClassType),
 					returnDescription = s"Constructs a new ${
 						classToWrite.name } database model with the specified properties")(applyParams)(
-					s"_$modelClassType(table, $dbPropsName, ${ applyParams.map { _.name }.mkString(", ") })")
+					s"_$modelClassType($dbPropsName, ${ applyParams.map { _.name }.mkString(", ") })")
 				
 				// Extends the XModelFactory trait (from the same file)
 				(params, Pair[Extension](parentTrait, dbPropsWrapperRef), Empty, Single(applyMethod))
@@ -503,9 +505,7 @@ object DbModelWriter
 			dbPropsAndModelTypesAndBuildCopy match {
 				// Case: Abstract trait
 				case Some((Pair(dbPropsRef, modelRef), buildCopy)) =>
-					// The concrete implementation requires 2 additional construction parameters
-					val table = Parameter("table", vault.table,
-						description = "Table interacted with when using this model")
+					// The concrete implementation requires an additional construction parameter
 					val dbPropsParam = Parameter("dbProps", dbPropsRef,
 						description = "Configurations of the interacted database properties")
 					
@@ -516,8 +516,8 @@ object DbModelWriter
 								.mkString(", ") })")
 					
 					// Only needs to extend the predefined XModel trait
-					(reprType.toString, Private, Pair(table, dbPropsParam), Single[Extension](modelRef),
-						Empty, Single(buildCopyImplementation))
+					(reprType.toString, Private, Single(dbPropsParam), Single[Extension](modelRef), Empty,
+						Single(buildCopyImplementation))
 					
 				// Case: Concrete / simple class
 				case None =>
@@ -551,7 +551,13 @@ object DbModelWriter
 					}
 					
 					// Defines table by referring to the companion object
-					val table = ComputedProperty("table", isOverridden = true)(s"$reprType.table")
+					// Doesn't need this if already inheriting this property
+					val tableProp = {
+						if (classToWrite.isExtension)
+							None
+						else
+							Some(ComputedProperty("table", isOverridden = true)(s"$reprType.table"))
+					}
 					// Same thing with the value properties
 					// => The property names are acquired using the companion object
 					val valueProps = valuePropertiesPropertyFor(classToWrite,
@@ -566,7 +572,8 @@ object DbModelWriter
 					val withId = if (classToWrite.isExtension) None else Some(withIdMethod(classToWrite, "copy"))
 					
 					(className, Public, Empty, customExtensions :+[Extension] factory,
-						(dbProps.emptyOrSingle :+ table) ++ valueProps, withMethods ++ withId)
+						OptimizedIndexedSeq.concat(dbProps.emptyOrSingle, tableProp.emptyOrSingle, valueProps),
+						withMethods ++ withId)
 			}
 			
 		val constructionParams = customConstructionParams ++ (idParam +: classApplyParams)

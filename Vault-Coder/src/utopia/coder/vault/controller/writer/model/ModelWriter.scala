@@ -620,7 +620,12 @@ object ModelWriter
 			// Only XLike versions define a generic +Repr type
 			val (repr, reprType) = {
 				if (classToWrite.hasCombos) {
-					val repr = GenericType.covariant("Repr", description = "The implementing type")
+					val repr = GenericType.covariant("Repr",
+						// The Repr type may be restricted by the inherited YData trait
+						requirement = parentClassReferences.headOption.map { parent =>
+							TypeRequirement.childOf(parent.data)
+						},
+						description = "The implementing type")
 					Some(repr) -> repr.toScalaType
 				}
 				else

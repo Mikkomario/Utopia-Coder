@@ -1,7 +1,7 @@
 package utopia.coder.vault.controller.writer.model
 
 import utopia.coder.model.data.NamingRules
-import utopia.coder.model.scala.Visibility.{Private, Protected}
+import utopia.coder.model.scala.Visibility.Private
 import utopia.coder.model.scala.datatype.{Extension, Reference, ScalaType}
 import utopia.coder.model.scala.declaration.PropertyDeclarationType.ComputedProperty
 import utopia.coder.model.scala.declaration._
@@ -80,8 +80,7 @@ object CombinedModelWriter
 			constructionParams = constructorParams,
 			extensions = Single(traitType),
 			methods = Set(
-				MethodDeclaration("wrap", visibility = Protected, isOverridden = true)(
-					Parameter("data", parentRefs.data))("copy(data = data)"),
+				MethodDeclaration("wrap", isOverridden = true)(Parameter("data", parentRefs.data))("copy(data = data)"),
 				MethodDeclaration("withId", isOverridden = true)(Parameter("id", data.parentClass.idType.toScala))(
 					"copy(id = id)")
 			),
