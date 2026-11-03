@@ -186,12 +186,12 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 	def dbProperties = properties.view.flatMap { _.dbProperties }
 	
 	/**
-	  * @return Whether this class uses integer type ids
+	  * @return Whether this class uses integer type IDs
 	  */
 	def useIntId = !useLongId
 	
 	/**
-	  * @return Type of the ids used in this class
+	  * @return Type of the IDs used in this class
 	  */
 	def idType =  if (useLongId) LongNumber else IntNumber(Default)
 	

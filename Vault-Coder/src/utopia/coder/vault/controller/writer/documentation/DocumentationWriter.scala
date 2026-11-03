@@ -126,7 +126,7 @@ object DocumentationWriter
 					if (c.idName !~== Class.defaultIdName)
 						writer.println(s"- Uses a **custom id**: `${ c.idName.prop }`")
 					if (c.useLongId)
-						writer.println(s"- Uses very **large ids**")
+						writer.println(s"- Uses very **large IDs**")
 					if (c.isDescribed)
 						writer.println(s"- Utilizes **localized descriptions**")
 					combinationsByParent.get(c).foreach { combos =>

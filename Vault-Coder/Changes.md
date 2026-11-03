@@ -76,14 +76,14 @@ Also, **IntSets** are now automatically supported in the generated with function
 - Database model classes are now named "XDbModel" instead of "XModel"
 - In "many" root access objects, an id-targeting subclass is no longer generated, 
   except for classes that have descriptions. Instead, the access point either extends **ViewManyByIntIds**, 
-  if it uses **Int** ids, or defines a simple `.apply(Iterable[Long])` implementation (in case it uses **Long** ids)
+  if it uses **Int** IDs, or defines a simple `.apply(Iterable[Long])` implementation (in case it uses **Long** IDs)
   - Please note, however, that the nested instances and the apply implementations from previous versions 
     are not removed automatically
 - Combined models are now written as traits with concrete implementations included as nested objects
 ### Bugfixes
 - When specifying multiple directories, the separator is now `:` instead of `&`, since `&` had issues on Linux
-- Fixed an issue where classes with **Long** ids 
-  would be targeted with **Int** ids in their "many" root access -variants
+- Fixed an issue where classes with **Long** IDs 
+  would be targeted with **Int** IDs in their "many" root access -variants
 - When using filtering, parent classes are now included also
 ### New features
 - Added support for inheritance
@@ -141,7 +141,7 @@ Other important new features include:
 - The `.values` property in enumerations with exactly two values is now of type **Pair** instead of **Vector**
 - Setters are no longer always generated in access points (see new feature of mutability)
 ### Bugfixes
-- Enumerations are no longer wrapped as ids in the DB models, but as enum values directly
+- Enumerations are no longer wrapped as IDs in the DB models, but as enum values directly
 - Fixed wrong scaladocs in database model withX method generations
 ### New features
 - Added support for referencing other files as package content
@@ -201,7 +201,7 @@ This update introduces a lot of bugfixes, as well as more extensive code-generat
 This update is intended to be used with **Vault v1.16** (or later).
 ### Bugfixes
 - `.apply(...)` implementation in factory objects that use potentially failing value conversions is now fixed
-- Fixed a bug where certain enumeration ids would be 0-based instead of 1-based
+- Fixed a bug where certain enumeration IDs would be 0-based instead of 1-based
 - Merging now preserves function overrides. I.e. methods with same name but different types of parameters are 
   considered different methods and not merged.
 - Scala parser now properly handles functional types

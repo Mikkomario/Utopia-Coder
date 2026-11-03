@@ -778,7 +778,7 @@ object AccessWriter
 			else {
 				val idsPullCode = classToWrite.idType.fromValuesCode("pullColumn(index)")
 				Some(ComputedProperty("ids", idsPullCode.references, implicitParams = Vector(connectionParam),
-					description = s"Unique ids of the accessible ${ classToWrite.name.pluralDoc }")(
+					description = s"Unique IDs of the accessible ${ classToWrite.name.pluralDoc }")(
 					idsPullCode.text))
 			}
 		}
@@ -950,7 +950,7 @@ object AccessWriter
 						citadel.manyDescribedAccessByIds(modelRef, describedRef))
 				)
 				val subSetClassAccessMethod = MethodDeclaration("apply",
-					returnDescription = s"Access to ${ className.pluralDoc } with the specified ids")(
+					returnDescription = s"Access to ${ className.pluralDoc } with the specified IDs")(
 					Parameter("ids", ScalaType.set(ScalaType.int),
 						description = s"Ids of the targeted ${ className.pluralDoc }"))(
 					s"new $subSetClassName(ids)")
@@ -962,7 +962,7 @@ object AccessWriter
 				if (useLongIds) {
 					val subSetAccessMethod = MethodDeclaration("apply",
 						explicitOutputType = Some(manyAccessTraitRef),
-						returnDescription = s"Access to ${ className.pluralDoc } with the specified ids",
+						returnDescription = s"Access to ${ className.pluralDoc } with the specified IDs",
 						isLowMergePriority = true)(
 						Parameter("ids", ScalaType.iterable(ScalaType.long),
 							description = s"Ids of the targeted ${ className.pluralDoc }"))(
