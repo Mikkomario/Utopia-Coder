@@ -1,8 +1,11 @@
 # Utopia Vault Coder
 
-## v1.13.1 (in development)
+## v1.14 (in development)
 Compatible with Vault v2.1
 ### Breaking changes
+- Duration types now support infinite values by default
+  - For previous functionality, you must use the `"Duration.finite"` / `"FiniteDuration"` type.
+- JSON value conversions involving **Duration** now yield a JSON object that includes the applicable unit
 - Stored class versions are now traits instead of case classes
 - Combined models now extend the stored trait
   - No generic combined model trait is generated anymore
@@ -15,13 +18,13 @@ Compatible with Vault v2.1
 - Changed `expired` type key to `expires` (typo)
 ### New features
 - Added support for project-specific index-prefixes
+- Added support for infinite duration values
 - Enum default values can now be specified by adding `"default": true` to an enum value
 ### Other changes
 - Targeting is now the default mode
   - Replaced the `T` flag with `NT` (no-targeting)
 - When combo classes are present, the stored class version is now a trait, extended by said combined models
   - Also, an additional StoredXLike trait gets generated
-- Generic type parameter Data in Generated StoredLike -traits is now covariant 
 - Generated Filter-traits now extend **Filterable** instead of **FilterableView**
 - Value-to-enumeration conversion is now more reliable for Int-based enumerations
 - Generated Int-based in-conditions now use `Condition.indexIn(...)`

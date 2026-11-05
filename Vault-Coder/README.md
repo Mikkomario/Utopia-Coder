@@ -282,12 +282,13 @@ Each property object should contain following properties:
   - `"Year"` - Results in utopia.flow.time.**Year** type (default name: `"year"`)
   - `"Month"` - Results in utopia.flow.time.**Month** type (default name: `"month"`)
   - `"DateRange" / "dates"` - Results in **DateRange** data type
-  - `"Duration[X]"` - Results in a `FiniteDuration` type (default name: `"duration"`)
+  - `"Duration[X]"` - Results in a `Duration` type (default name: `"duration"`)
     - `X` determines the unit used when storing the duration to the database. Available options are:
       - `h / hour / hours` - Stores as hours (int)
       - `m / min / minute / minutes` - Stores as minutes (int)
       - `s / second / seconds` - Stores as seconds (int)
       - `ms` - Stores as milliseconds (bigint, default)
+    - If you want to limit the available values to finite values, use `"FiniteDuration[X]"` or `"Duration.finite[X]"`
   - `"Velocity[X]"` - Results in LinearVelocity type (default name: `"velocity"`)
     - `X` works similarly as with Duration above, determining how the velocity is stored in the database. 
       - E.g. Specifying seconds (which is the default) causes the velocity to be stored in distance per second.

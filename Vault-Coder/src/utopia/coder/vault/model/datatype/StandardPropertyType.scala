@@ -41,6 +41,7 @@ object StandardPropertyType
 		// Text length may be specified within parentheses after the type (E.g. "String(3)")
 		def appliedLength = typeName.afterFirst("(").untilFirst(")").untilFirst("-")
 			.int.orElse(length).getOrElse(255)
+		def param = typeName.afterFirst("[").untilLast("]")
 		
 		val lowerTypeName = typeName.toLowerCase
 		lowerTypeName.untilFirst("(") match {
@@ -80,11 +81,14 @@ object StandardPropertyType
 					}
 				}
 				else if (lowerTypeName.startsWith("duration"))
-					Some(TimeDuration(timeUnitFromString(typeName.afterFirst("[").untilLast("]"), MilliSecond)))
+					Some(TimeDuration(unit = timeUnitFromString(param, MilliSecond),
+						allowsInfinite = !lowerTypeName.startsWith("duration.finite")))
+				else if (lowerTypeName.startsWith("finiteduration"))
+					Some(TimeDuration(unit = timeUnitFromString(param, MilliSecond)))
 				else if (lowerTypeName.startsWith("velocity"))
-					Some(LinearVelocity(timeUnitFromString(typeName.afterFirst("[").untilLast("]"), Second)))
+					Some(LinearVelocity(timeUnitFromString(param, Second)))
 				else if (lowerTypeName.startsWith("distance"))
-					Some(LengthDistance(typeName.afterFirst("[").untilLast("]")))
+					Some(LengthDistance(param))
 				else
 					BasicPropertyType.interpret(lowerTypeName, length, propertyName)
 						.orElse {
@@ -355,7 +359,7 @@ object StandardPropertyType
 		/**
 		  * Time / LocalTime type
 		  */
-		case object Time extends BasicPropertyType
+		private case object Time extends BasicPropertyType
 		{
 			override val sqlType = SqlPropertyType("TIME")
 			override lazy val valueDataTypeName = "LocalTimeType"
@@ -569,7 +573,7 @@ object StandardPropertyType
 	/**
 	  * Represents a number of days
 	  */
-	case object DayCount extends ConcreteSingleColumnPropertyType
+	private case object DayCount extends ConcreteSingleColumnPropertyType
 	{
 		// ATTRIBUTES   -----------------------
 		
@@ -770,7 +774,7 @@ object StandardPropertyType
 	 * @param length Maximum number of characters allocated for this path
 	 */
 	// TODO: This type requires a custom Option to String conversion
-	case class FilePath(length: Int = 255) extends FacadePropertyType
+	private case class FilePath(length: Int = 255) extends FacadePropertyType
 	{
 		// ATTRIBUTES   ------------------------
 		
@@ -799,7 +803,7 @@ object StandardPropertyType
 	}
 	
 	// TODO: This type requires a custom Option to String conversion
-	case class VersionType(length: Int = 128) extends FacadePropertyType
+	private case class VersionType(length: Int = 128) extends FacadePropertyType
 	{
 		// ATTRIBUTES   ----------------------
 		
@@ -930,34 +934,33 @@ object StandardPropertyType
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) = ""
 	}
 	
-	case object TimeDuration
+	private case object TimeDuration
 	{
 		val millis = apply(MilliSecond)
-		val seconds = apply(Second)
-		val minutes = apply(Minute)
-		val hours = apply(Hour)
-		
-		def values = Vector(millis, seconds, minutes, hours)
 	}
-	
 	/**
 	  * Represents a duration of time
 	  * @param unit Unit used when storing this duration to the database
+	 * @param allowsInfinite Whether infinite duration is a valid value in this context
 	  */
-	case class TimeDuration(unit: TimeUnit) extends ConcreteSingleColumnPropertyType
+	case class TimeDuration(unit: TimeUnit, allowsInfinite: Boolean = false) extends ConcreteSingleColumnPropertyType
 	{
 		// ATTRIBUTES   ------------------------
 		
 		override val scalaType = flow.duration
 		
-		override lazy val sqlType = SqlPropertyType(unit match {
-			case NanoSecond | MicroSecond | MilliSecond => "BIGINT"
-			case _ => "INT"
-		}, "0", s"${ timeUnitToString(unit) }s")
+		override val sqlType = SqlPropertyType(
+			unit match {
+				case NanoSecond | MicroSecond | MilliSecond => "BIGINT"
+				case _ => "INT"
+			},
+			defaultValue = if (allowsInfinite) "" else "0", columnNameSuffix = s"${ timeUnitToString(unit) }s",
+			isNullable = allowsInfinite)
 		override lazy val valueDataType = dataType / "DurationType"
 		
 		override val emptyValue = CodePiece.empty
-		override lazy val nonEmptyDefaultValue = CodePiece("Duration.zero", Set(flow.duration))
+		override val nonEmptyDefaultValue =
+			CodePiece(if (allowsInfinite) "Duration.infinite" else "Duration.zero", Set(flow.duration))
 		
 		override val defaultPropertyName = "duration"
 		override val defaultMutability: Option[Mutability] = None
@@ -968,8 +971,8 @@ object StandardPropertyType
 		override val yieldsTryFromValue = false
 		override val yieldsTryFromJsonValue: Boolean = false
 		
-		private lazy val unitName = unit.getClass.getSimpleName
-		private lazy val toDuration = {
+		private val unitName = unit.getClass.getSimpleName
+		private val numberToDuration = {
 			val convert = unit match {
 				case NanoSecond => ".nanos"
 				case MicroSecond => ".microSeconds"
@@ -981,7 +984,7 @@ object StandardPropertyType
 			}
 			convert.ifNotEmpty
 		}
-		private lazy val toNumber = unit match {
+		private val toNumber = unit match {
 			case NanoSecond => ".toNanos"
 			case MicroSecond => ".toMicros"
 			case MilliSecond => ".toMillis"
@@ -993,39 +996,82 @@ object StandardPropertyType
 		
 		// IMPLEMENTED  ------------------------
 		
-		override def toValueCode(instanceCode: String) = CodePiece(s"$instanceCode$toNumber", Set(valueConversions))
-		override def toJsonValueCode(instanceCode: String): CodePiece = CodePiece(instanceCode, Set(valueConversions))
+		override def toValueCode(instanceCode: String) = {
+			val code = if (allowsInfinite) s"$instanceCode.finite.map { _$toNumber }" else s"$instanceCode$toNumber"
+			CodePiece(code, Set(valueConversions))
+		}
+		override def toJsonValueCode(instanceCode: String): CodePiece = {
+			val code = {
+				if (allowsInfinite)
+					s"$instanceCode.finite.map { d => ${ finiteToValueCode("d") } }"
+				else
+					finiteToValueCode(instanceCode)
+			}
+			CodePiece(code, Set(valueConversions, model))
+		}
 		override def optionToValueCode(optionCode: String, isToJson: Boolean) = {
-			if (isToJson)
-				CodePiece(optionCode, Set(valueConversions))
-			else
-				CodePiece(s"$optionCode.map { _$toNumber }", Set(valueConversions))
+			if (isToJson) {
+				val code = {
+					if (allowsInfinite)
+						s"$optionCode.flatMap { _.finite }.map { d => ${ finiteToValueCode("d") } }"
+					else
+						s"$optionCode.map { d => ${ finiteToValueCode("d") } }"
+				}
+				CodePiece(code, Set(valueConversions, model))
+			}
+			else {
+				val finiteCode = {
+					if (allowsInfinite)
+						s"$optionCode.flatMap { _.finite }"
+					else
+						optionCode
+				}
+				CodePiece(s"$finiteCode.map { _$toNumber }", Set(valueConversions))
+			}
 		}
 		
-		override def fromValueCode(valueCode: String, isFromJson: Boolean) = {
-			if (isFromJson)
-				s"$valueCode.getDuration"
+		override def fromValueCode(valueCode: String, isFromJson: Boolean): CodePiece = {
+			if (isFromJson) {
+				if (allowsInfinite)
+					CodePiece(s"$valueCode.durationOr(Duration.infinite)", Set(duration))
+				else
+					s"$valueCode.getDuration"
+			}
 			else
-				toDuration match {
-					case Some(toDuration) => CodePiece(s"$valueCode.getLong$toDuration", Set(timeExtensions))
+				numberToDuration match {
+					case Some(toDuration) =>
+						if (allowsInfinite)
+							CodePiece(s"$valueCode.long.map { _$toDuration }.getOrElse(Duration.infinite)",
+								Set(timeExtensions, duration))
+						else
+							CodePiece(s"$valueCode.getLong$toDuration", Set(timeExtensions))
 					case None =>
-						CodePiece(s"Duration($valueCode.getLong, $unitName)", Set(duration, timeUnit/unitName))
+						if (allowsInfinite)
+							CodePiece(s"$valueCode.long.map { Duration(_, $unitName) }.getOrElse(Duration.infinite)",
+								Set(duration, timeUnit/unitName))
+						else
+							CodePiece(s"Duration($valueCode.getLong, $unitName)", Set(duration, timeUnit/unitName))
 				}
 		}
 		override def optionFromValueCode(valueCode: String, isFromJson: Boolean) = {
 			if (isFromJson)
 				s"$valueCode.duration"
-			else {
-				toDuration match {
+			else
+				numberToDuration match {
 					case Some(toDuration) => CodePiece(s"$valueCode.long.map { _$toDuration }", Set(timeExtensions))
 					case None =>
 						CodePiece(s"$valueCode.long.map { Duration(_, $unitName) }", Set(duration, timeUnit/unitName))
 				}
-			}
 		}
 		
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) =
 			s"Duration of this ${ className.doc }"
+			
+		
+		// OTHER    --------------------------
+		
+		private def finiteToValueCode(durationCode: String) =
+			s"Model.from(\"value\" -> $durationCode$toNumber, \"unit\" -> ${ unitName.toLowerCase })"
 	}
 	
 	/**
@@ -1281,8 +1327,8 @@ object StandardPropertyType
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules) = ""
 	}
 	
-	abstract class PairLikeType(innerType: PropertyType, pairType: Reference, propertyNames: Pair[String],
-	                            singleValueConstructorName: String)
+	private abstract class PairLikeType(innerType: PropertyType, pairType: Reference, propertyNames: Pair[String],
+	                                    singleValueConstructorName: String)
 		extends PropertyType
 	{
 		// ATTRIBUTES   ----------------------
@@ -1402,7 +1448,7 @@ object StandardPropertyType
 				innerConversion.midConversion(s"$originCode.$propertyName").referringTo(pairType)
 		}
 	}
-	case class Paired(innerType: PropertyType)
+	private case class Paired(innerType: PropertyType)
 		extends PairLikeType(innerType, pair, Pair("first", "second"), "twice")
 	{
 		override lazy val scalaType: ScalaType = pair(innerType.scalaType)
@@ -1410,7 +1456,7 @@ object StandardPropertyType
 		override protected def toPairCode(instanceCode: String): CodePiece = instanceCode
 		override protected def fromPairCode(pairCode: String): CodePiece = pairCode
 	}
-	case class Spanning(innerType: PropertyType, isNumeric: Boolean = false)
+	private case class Spanning(innerType: PropertyType, isNumeric: Boolean = false)
 		extends PairLikeType(innerType, if (isNumeric) numericSpan else span,
 			Pair("start", "end"), "singleValue")
 	{
@@ -1422,7 +1468,7 @@ object StandardPropertyType
 			CodePiece(s"${reference.target}($pairCode)", Set(reference))
 		}
 	}
-	case object DateRange extends PairLikeType(Date, dateRange, Pair("start", "end"), "single")
+	private case object DateRange extends PairLikeType(Date, dateRange, Pair("start", "end"), "single")
 	{
 		override def scalaType: ScalaType = dateRange
 		
@@ -1431,7 +1477,7 @@ object StandardPropertyType
 			CodePiece(s"${dateRange.target}.exclusive($pairCode)", Set(dateRange))
 	}
 	
-	case object AngleType extends FacadePropertyType
+	private case object AngleType extends FacadePropertyType
 	{
 		// ATTRIBUTES   ------------------------
 		
@@ -1462,7 +1508,7 @@ object StandardPropertyType
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
 	
-	case object DoubleVector2D extends PairLikeType(DoubleNumber, paradigm.vector2D, Pair("x", "y"), "twice")
+	private case object DoubleVector2D extends PairLikeType(DoubleNumber, paradigm.vector2D, Pair("x", "y"), "twice")
 	{
 		override def scalaType: ScalaType = paradigm.vector2D
 		
@@ -1477,7 +1523,7 @@ object StandardPropertyType
 			CodePiece(s"$valueCode.getVector2D", Set(paradigm.paradigmValue))
 	}
 	
-	object LinearVelocity
+	private object LinearVelocity
 	{
 		lazy val perSecond = LinearVelocity(Second)
 	}
@@ -1514,10 +1560,9 @@ object StandardPropertyType
 		override def writeDefaultDescription(className: Name, propName: Name)(implicit naming: NamingRules): String = ""
 	}
 	
-	object LengthDistance
+	private object LengthDistance
 	{
-		def meters: LengthDistance = apply("Meter", "m")
-		def kilometers = apply("KiloMeter", "km")
+		private def meters: LengthDistance = apply("Meter", "m")
 		
 		def apply(rawUnit: String): LengthDistance = rawUnit.toLowerCase match {
 			case "m" | "meter" => apply("Meter", "m")
@@ -1564,7 +1609,7 @@ object StandardPropertyType
 	}
 	
 	// FIXME: Wrong option to value conversion: "Some(data.location.map { v => v.latLongDegrees }.first)" should be "data.location.map { v => v.latitudeDegrees }"
-	case object LatitudeLongitudePair extends FacadePropertyType
+	private case object LatitudeLongitudePair extends FacadePropertyType
 	{
 		override protected val delegate: PropertyType = Paired(DoubleNumber)
 		
