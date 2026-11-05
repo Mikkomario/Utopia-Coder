@@ -1071,7 +1071,7 @@ object StandardPropertyType
 		// OTHER    --------------------------
 		
 		private def finiteToValueCode(durationCode: String) =
-			s"Model.from(\"value\" -> $durationCode$toNumber, \"unit\" -> ${ unitName.toLowerCase })"
+			s"Model.from(\"value\" -> $durationCode$toNumber, \"unit\" -> \"${ unitName.toLowerCase }\")"
 	}
 	
 	/**
