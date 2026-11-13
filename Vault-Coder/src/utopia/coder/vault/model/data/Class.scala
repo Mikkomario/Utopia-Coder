@@ -299,8 +299,9 @@ case class Class(name: Name, localName: Name, customTableName: Option[String], s
 			}
 			// Prepares an ordered sequence of properties listed in the parents (whether overridden or not)
 			// and properties only present in the child
-			val inheritedProps = newExtensions
+			val inheritedProps = newExtensions.iterator
 				.flatMap { parent => parent.properties.map { p => parentToChildMap.getOrElse(p, p.newChild) } }
+				.distinctBy { _.name }.toOptimizedSeq
 			val uninheritedProps = properties.filterNot(resolvedPropertyReferences.contains)
 			
 			// Orders the properties in the following order,

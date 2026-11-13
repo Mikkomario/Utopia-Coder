@@ -13,6 +13,7 @@ Compatible with Vault v2.1
 - Fixed some issues with the software not generating Flow v2.7 -compatible code
 - Tables are now (always) created in the correct order
 - Table initials are now actually unique
+- Fixed an issue where inheriting multiple parent properties caused duplicate properties
 - **UncertainBoolean** value conversions were updated
 - When timestamp-property -based filtering is applied, the **Repr** type is now required to be **FilterableView**
 - Changed `expired` type key to `expires` (typo)

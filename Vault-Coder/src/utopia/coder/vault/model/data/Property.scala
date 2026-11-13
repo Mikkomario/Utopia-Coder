@@ -240,7 +240,7 @@ case class Property(name: Name, dataType: PropertyType, customDefaultValue: Code
 						}
 						.getOrElse(Empty),
 					customMutability = orderedImplementations.view.flatMap { _.customMutability }.headOption,
-					parents = parents ++ parents,
+					parents = this.parents ++ parents,
 					withAccessName = orderedImplementations.view.map { _.withAccessName }
 						.find { _.nonEmpty }.getOrElse(withAccessName),
 					inAccessName = orderedImplementations.view.map { _.inAccessName }
