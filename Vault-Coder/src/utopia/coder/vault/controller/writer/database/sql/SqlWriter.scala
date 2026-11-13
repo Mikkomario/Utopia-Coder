@@ -175,18 +175,16 @@ object SqlWriter
 					val packageClassTables = classesByTableName.keySet
 					// Writeable = Class only makes references inside this package
 					// Dependent = Class makes references to other remaining packages
-					val (writeableClasses, dependentClasses) = {
+					val (dependentClasses, writeableClasses) = {
 						if (classesByTableName.keysIterator.exists(notReferencingTableNames.contains))
 							classesByTableName
 								.divideBy { case (tableName, _) =>
-									references.get(tableName).exists { refs =>
-										((refs & remainingTableNames) -- packageClassTables).nonEmpty
-									}
+									checkReferences(tableName, packageClassTables, remainingTableNames, references)
 								}
 								.toTuple
 						// Case: None of these classes may be written at this time => Can't initiate this package
 						else
-							(Map[String, Class](), classesByTableName)
+							(classesByTableName, Map[String, Class]())
 					}
 					packageName -> (writeableClasses, dependentClasses)
 				}
@@ -211,6 +209,48 @@ object SqlWriter
 				writeClasses(writer, initialsMap, remainingClasses, references, projectPrefix, prefixProperties)
 		}
 	}
+	
+	/**
+	 * Checks whether all table references may be fully resolved within a single package
+	 * @param table Tested table
+	 * @param packageTables Names of the tables that belong to the same package as 'table'
+	 * @param remainingTableNames Names of all tables that haven't been written yet
+	 * @param referencesByTable A map where keys are table names and values are references made from those tables
+	 * @param testedTables A set that contains tables for which 'checkReferences' has already been called.
+	 *                     Used to avoid cyclic reference loops.
+	 * @return Whether 'table' only makes "safe" references: I.e. unresolved references only to other tables
+	 *         within the same package, none of which make unsafe references.
+	 */
+	private def checkReferences(table: String, packageTables: Set[String], remainingTableNames: Set[String],
+	                            referencesByTable: Map[String, Set[String]], testedTables: Set[String] = Set()): Boolean =
+		referencesByTable.get(table) match {
+			case Some(references) =>
+				// Checks each reference
+				references.forall { ref =>
+					// Case: Self-reference => Safe
+					if (ref == table)
+						true
+					// Case: Cyclic reference => Unsafe
+					else if (testedTables.contains(ref))
+						false
+					// Case: Unresolved reference => Checks whether it's to the same package
+					else if (remainingTableNames.contains(ref)) {
+						// Case: Reference to another table in the same package
+						//       => Verifies whether all references from that table are safe, also
+						if (packageTables.contains(ref))
+							checkReferences(ref, packageTables, remainingTableNames, referencesByTable,
+								testedTables + table)
+						// Case: Reference to a different package => Unsafe
+						else
+							false
+					}
+					// Case: Resolved reference => Safe
+					else
+						true
+				}
+			// Case: No references made => Safe
+			case None => true
+		}
 	
 	@tailrec
 	private def writePossibleClasses(writer: BufferedPrintWriter, initialsMap: Map[String, String],
